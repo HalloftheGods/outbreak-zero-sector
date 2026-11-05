@@ -1,0 +1,308 @@
+// Single source of truth for everything that crosses the sim/client boundary.
+// Pure data and types only, so it loads in the browser, Node and vitest alike.
+
+export type EntityId = string;
+
+export type WeaponId = 'pistol' | 'carbine' | 'shotgun';
+export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute';
+export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun';
+export type PlayerStatus = 'alive' | 'downed' | 'dead';
+export type GamePhase = 'intermission' | 'wave' | 'gameover';
+
+export const WEAPON_ORDER: readonly WeaponId[] = ['pistol', 'carbine', 'shotgun'];
+export const SURVIVOR_SKIN_COUNT = 4;
+
+export interface PlayerEntity {
+  readonly id: EntityId;
+  name: string;
+  /** Index into the survivor art, 0..SURVIVOR_SKIN_COUNT-1, unique per room while skins last. */
+  skin: number;
+  x: number;
+  y: number;
+  angle: number;
+  moving: boolean;
+  status: PlayerStatus;
+  health: number;
+  maxHealth: number;
+  weapon: WeaponId;
+  /** Rounds in the current magazine. */
+  ammo: number;
+  magSize: number;
+  /** Spare rounds for the current weapon. Every gun is finite, and reloading only moves rounds out of this. */
+  reserve: number;
+  /** Weapons this player owns, in WEAPON_ORDER. */
+  owned: WeaponId[];
+  /** Spare rounds per weapon, for the HUD slots. */
+  ammoBag: Record<WeaponId, number>;
+  /** Rounds loaded in each gun, so the HUD can show a loaded gun that is not in hand. 0 for guns not owned. */
+  mags: Record<WeaponId, number>;
+  /** Medkits carried, used with the heal input. */
+  medkits: number;
+  /** Id of the building this player stands in, or null outdoors. */
+  indoors: string | null;
+  /** 0 when not reloading, otherwise 0..1 through the reload. */
+  reload: number;
+  /** Seconds until a downed player dies. 0 unless downed. */
+  bleedout: number;
+  /** 0..1 progress of a teammate reviving this downed player. */
+  revive: number;
+  score: number;
+  kills: number;
+  /** Highest input seq applied; the client reconciles prediction against it. */
+  lastInputSeq: number;
+}
+
+export interface ZombieEntity {
+  readonly id: EntityId;
+  readonly type: ZombieType;
+  x: number;
+  y: number;
+  angle: number;
+  health: number;
+  maxHealth: number;
+  /** True during the attack wind-up and swing, drives the attack clip. */
+  attacking: boolean;
+}
+
+export interface BulletEntity {
+  readonly id: EntityId;
+  readonly shooterId: EntityId;
+  x: number;
+  y: number;
+  /** World pixels per second. */
+  vx: number;
+  vy: number;
+}
+
+export interface PickupEntity {
+  readonly id: EntityId;
+  readonly type: PickupType;
+  x: number;
+  y: number;
+}
+
+export interface PlayerRunStats {
+  readonly id: EntityId;
+  readonly name: string;
+  readonly skin: number;
+  readonly kills: number;
+  readonly score: number;
+}
+
+export interface GameOverStats {
+  readonly wave: number;
+  readonly durationSec: number;
+  readonly players: readonly PlayerRunStats[];
+}
+
+/** One-shot facts for audio, particles and banners. Every field is in world space. */
+export type GameEvent =
+  | { readonly type: 'shot'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number; readonly angle: number }
+  | { readonly type: 'dry_fire'; readonly playerId: EntityId; readonly x: number; readonly y: number }
+  | { readonly type: 'melee'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly angle: number; readonly hit: boolean }
+  | { readonly type: 'heal'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly amount: number }
+  | { readonly type: 'zombie_alert'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
+  | { readonly type: 'reload_start'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
+  | { readonly type: 'reload_end'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
+  | { readonly type: 'weapon_switch'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
+  | { readonly type: 'bullet_impact'; readonly x: number; readonly y: number; readonly angle: number }
+  | { readonly type: 'zombie_hit'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number }
+  | { readonly type: 'zombie_die'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly killerId: EntityId | null; readonly points: number }
+  | { readonly type: 'zombie_attack'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
+  | { readonly type: 'bloater_burst'; readonly x: number; readonly y: number; readonly radius: number }
+  | { readonly type: 'player_hurt'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly damage: number }
+  | { readonly type: 'player_downed'; readonly playerId: EntityId; readonly x: number; readonly y: number }
+  | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
+  | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
+  | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
+  | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
+  | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
+  | { readonly type: 'wave_clear'; readonly wave: number }
+  | { readonly type: 'game_over'; readonly stats: GameOverStats };
+
+export interface ClientInputPacket {
+  readonly seq: number;
+  readonly up: boolean;
+  readonly down: boolean;
+  readonly left: boolean;
+  readonly right: boolean;
+  /** Radians, world space, y down: 0 = east, PI/2 = south. */
+  readonly angle: number;
+  readonly shoot: boolean;
+  readonly reload: boolean;
+  /** Requested weapon, or null. The sim ignores weapons the player does not own. */
+  readonly weapon: WeaponId | null;
+  /** Shove with the gun: weak, noiseless, always available. */
+  readonly melee: boolean;
+  /** Use a carried medkit. */
+  readonly heal: boolean;
+}
+
+export interface SnapshotPacket {
+  readonly type: 'snapshot';
+  readonly tick: number;
+  readonly phase: GamePhase;
+  /** Horde number. Phase 'intermission' is the scavenging lull, phase 'wave' is a horde hunting the players. */
+  readonly wave: number;
+  /** Seconds to the next horde during intermission, otherwise 0. */
+  readonly intermission: number;
+  /** Zombies of the current horde alive or still to spawn; 0 during the lull. Roaming town zombies don't count. */
+  readonly hostiles: number;
+  readonly players: readonly PlayerEntity[];
+  readonly zombies: readonly ZombieEntity[];
+  readonly bullets: readonly BulletEntity[];
+  readonly pickups: readonly PickupEntity[];
+  /** Events since the previous snapshot, in order. */
+  readonly events: readonly GameEvent[];
+  readonly gameOver: GameOverStats | null;
+}
+
+export interface WelcomePacket {
+  readonly type: 'welcome';
+  readonly yourId: EntityId;
+  readonly tickRate: number;
+  /** generateWorldMap(mapSeed) rebuilds the same map on the client. */
+  readonly mapSeed: number;
+}
+
+export type ServerPacket =
+  | WelcomePacket
+  | SnapshotPacket
+  | { readonly type: 'player_disconnected'; readonly playerId: EntityId };
+
+export type ClientPacket =
+  | { readonly type: 'join'; readonly name: string; readonly token: string }
+  | { readonly type: 'input'; readonly input: ClientInputPacket }
+  | { readonly type: 'restart' };
+
+// --- World map -------------------------------------------------------------
+
+export const TILE_SIZE = 16;
+
+export const TILE_KINDS = [
+  'asphalt',
+  'asphalt_cracked',
+  'lane_h',
+  'lane_v',
+  'crosswalk_h',
+  'crosswalk_v',
+  'parking_line',
+  'sidewalk',
+  'curb_n',
+  'curb_s',
+  'curb_e',
+  'curb_w',
+  'grass',
+  'dirt',
+  'floor_wood',
+  'floor_tile',
+  'floor_concrete',
+  'floor_carpet',
+] as const;
+export type TileKind = (typeof TILE_KINDS)[number];
+
+/**
+ * Footprints in world pixels. A prop instance's x,y is the centre of the bottom
+ * edge of its footprint, so the solid box is [x-w/2, y-h, x+w/2, y]. Art may rise
+ * above the footprint (building fronts, tree crowns) and is y-sorted on prop.y.
+ * Footprint h of 0 means walk-through scenery.
+ */
+export const PROP_DEFS = {
+  car_sedan_h: { w: 44, h: 18 },
+  car_sedan_v: { w: 20, h: 40 },
+  car_wreck_h: { w: 44, h: 18 },
+  van_h: { w: 52, h: 22 },
+  dumpster: { w: 30, h: 14 },
+  crate_stack: { w: 20, h: 14 },
+  barrier: { w: 32, h: 8 },
+  sandbags: { w: 36, h: 10 },
+  tree: { w: 12, h: 8 },
+  fire_barrel: { w: 12, h: 8 },
+  street_lamp: { w: 6, h: 4 },
+  hydrant: { w: 6, h: 4 },
+  bush: { w: 0, h: 0 },
+  rubble: { w: 0, h: 0 },
+  fence_h: { w: 32, h: 6 },
+  fence_v: { w: 6, h: 32 },
+  gas_pump: { w: 12, h: 8 },
+  shelf: { w: 32, h: 10 },
+  counter: { w: 48, h: 12 },
+  table: { w: 24, h: 14 },
+  sofa: { w: 36, h: 14 },
+  bed: { w: 24, h: 32 },
+  locker: { w: 16, h: 8 },
+  workbench: { w: 40, h: 12 },
+} as const;
+export type PropKind = keyof typeof PROP_DEFS;
+export const PROP_KINDS = Object.keys(PROP_DEFS) as PropKind[];
+
+/**
+ * Enterable buildings. w,h is the footprint in world pixels (multiples of TILE_SIZE),
+ * walls included. doorX is the door's centre measured from the footprint's left edge,
+ * always on the south wall, and DOOR_WIDTH wide so it lines up with whole tiles.
+ */
+export const DOOR_WIDTH = 32;
+export const WALL_THICKNESS = 6;
+export const BUILDING_DEFS = {
+  pharmacy: { label: 'Pharmacy', w: 160, h: 112, doorX: 80, floor: 'floor_tile' },
+  clinic: { label: 'Clinic', w: 192, h: 128, doorX: 96, floor: 'floor_tile' },
+  police: { label: 'Police Station', w: 224, h: 144, doorX: 112, floor: 'floor_concrete' },
+  gun_shop: { label: 'Gun Shop', w: 144, h: 112, doorX: 48, floor: 'floor_wood' },
+  grocery: { label: 'Grocery', w: 208, h: 128, doorX: 64, floor: 'floor_tile' },
+  diner: { label: 'Diner', w: 160, h: 96, doorX: 112, floor: 'floor_tile' },
+  garage: { label: 'Auto Garage', w: 176, h: 112, doorX: 48, floor: 'floor_concrete' },
+  warehouse: { label: 'Warehouse', w: 240, h: 144, doorX: 192, floor: 'floor_concrete' },
+  house: { label: 'House', w: 112, h: 96, doorX: 48, floor: 'floor_wood' },
+  apartment: { label: 'Apartments', w: 160, h: 128, doorX: 80, floor: 'floor_carpet' },
+} as const;
+export type BuildingKind = keyof typeof BUILDING_DEFS;
+export const BUILDING_KINDS = Object.keys(BUILDING_DEFS) as BuildingKind[];
+
+export interface BuildingInstance {
+  readonly id: string;
+  readonly kind: BuildingKind;
+  /** Top-left corner of the footprint, on the tile grid. */
+  readonly x: number;
+  readonly y: number;
+  /** Picks a facade from the art's variants. */
+  readonly variant: number;
+}
+
+/** A named part of town, for the map screen. */
+export interface District {
+  readonly name: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface PropInstance {
+  readonly kind: PropKind;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface MapLight {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  /** CSS colour. */
+  readonly color: string;
+  readonly flicker: boolean;
+}
+
+export interface WorldMap {
+  readonly seed: number;
+  /** World size in pixels, a multiple of TILE_SIZE. */
+  readonly width: number;
+  readonly height: number;
+  readonly cols: number;
+  readonly rows: number;
+  /** cols*rows indices into TILE_KINDS, row-major. */
+  readonly tiles: Uint8Array;
+  readonly props: readonly PropInstance[];
+  readonly buildings: readonly BuildingInstance[];
+  readonly districts: readonly District[];
+  readonly lights: readonly MapLight[];
+  /** Open ground for players to start on. */
+  readonly spawn: { readonly x: number; readonly y: number };
+}

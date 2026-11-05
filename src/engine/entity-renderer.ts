@@ -1,0 +1,371 @@
+import { PLAYER_RADIUS, PLAYER_SPEED, ZOMBIES } from '../../shared/constants.ts';
+import { PROP_DEFS } from '../../shared/protocol.ts';
+import type {
+  EntityId,
+  PickupEntity,
+  PlayerEntity,
+  PropInstance,
+  WorldMap,
+  ZombieEntity,
+  ZombieType,
+} from '../../shared/protocol.ts';
+import { dirFromAngle } from '../art/types.ts';
+import type { ArtBook, PixelSprite } from '../art/types.ts';
+import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
+import { CHEST_HEIGHT } from './scene.ts';
+import type { SceneView } from './scene.ts';
+import { clipDuration, clipFrame, clipFrameAt, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
+import { trackWalking } from './visuals.ts';
+import type { VisualStore } from './visuals.ts';
+
+const CULL_MARGIN = 40;
+const CORPSE_BAKE_SEC = 24;
+const MAX_CORPSES = 28;
+const KILLED_MEMORY_SEC = 2;
+const FADED_ALPHA = 0.42;
+const FADE_RATE = 7;
+const SILHOUETTE_ALPHA = 0.34;
+const SHADOW_ALPHA = 0.42;
+/** A shove lurches the body this far along its aim and straight back. */
+const LUNGE_PX = 4;
+const LUNGE_SEC = 0.2;
+/** Below this the beam has not reached a pickup, so it stays dark. */
+const GLINT_LIGHT = 70;
+const GLINT_CYCLE_SEC = 1.3;
+const GLINT_SHARE = 0.22;
+const GLINT_HEIGHT = 5;
+const GLINT_CORE = '#fff6d8';
+const GLINT_RAY = '#e8c878';
+
+interface PlacedProp {
+  readonly prop: PropInstance;
+  readonly sprite: PixelSprite;
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+  /** Art rises over the ground behind the footprint, so it can hide someone. */
+  readonly tall: boolean;
+  /** The room this prop furnishes, drawn only while that room is open. */
+  readonly room: PlacedBuilding | null;
+  alpha: number;
+}
+
+interface Corpse {
+  readonly type: ZombieType;
+  readonly x: number;
+  readonly y: number;
+  readonly bornAt: number;
+}
+
+type DrawItem =
+  | { readonly y: number; readonly kind: 'prop'; readonly prop: PlacedProp }
+  | { readonly y: number; readonly kind: 'building'; readonly building: PlacedBuilding }
+  | { readonly y: number; readonly kind: 'player'; readonly player: PlayerEntity }
+  | { readonly y: number; readonly kind: 'zombie'; readonly zombie: ZombieEntity }
+  | { readonly y: number; readonly kind: 'pickup'; readonly pickup: PickupEntity };
+
+const shadows = new Map<number, HTMLCanvasElement>();
+
+/** A flat pixel ellipse. Rows are stepped by hand so the edge stays hard. */
+function shadowSprite(width: number): HTMLCanvasElement {
+  let canvas = shadows.get(width);
+  if (!canvas) {
+    const height = Math.max(3, Math.round(width * 0.42));
+    canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = `rgba(4, 5, 10, ${SHADOW_ALPHA})`;
+    for (let y = 0; y < height; y += 1) {
+      const ny = ((y + 0.5) / height) * 2 - 1;
+      const half = Math.round((width / 2) * Math.sqrt(1 - ny * ny));
+      ctx.fillRect(Math.round(width / 2) - half, y, half * 2, 1);
+    }
+    shadows.set(width, canvas);
+  }
+  return canvas;
+}
+
+function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: number): void {
+  const sprite = shadowSprite(width);
+  ctx.drawImage(sprite, x - Math.round(width / 2), y - Math.round(sprite.height / 2));
+}
+
+/** A stable offset per item, so the glints around a room do not blink in time. */
+function glintPhase(id: EntityId): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) % 997;
+  return hash / 997;
+}
+
+/** Everything standing on the ground: y-sorted props, people, zombies, pickups and building shells. */
+export class EntityRenderer {
+  private readonly art: ArtBook;
+  private readonly visuals: VisualStore;
+  private readonly buildings: BuildingLayer;
+  private props: PlacedProp[] = [];
+  private fires: PlacedProp[] = [];
+  private corpses: Corpse[] = [];
+  /** Zombies whose death has been shown, though the delayed view has not caught up. */
+  private readonly killed = new Map<EntityId, number>();
+  private stamp: (sprite: PixelSprite, x: number, y: number, alpha?: number) => void = () => {};
+
+  constructor(art: ArtBook, visuals: VisualStore, buildings: BuildingLayer) {
+    this.art = art;
+    this.visuals = visuals;
+    this.buildings = buildings;
+  }
+
+  setMap(map: WorldMap, stamp: (sprite: PixelSprite, x: number, y: number, alpha?: number) => void): void {
+    this.stamp = stamp;
+    this.props = map.props.map((prop) => {
+      const sprite = this.art.environment.props[prop.kind];
+      const x0 = Math.round(prop.x) - sprite.ax;
+      const y0 = Math.round(prop.y) - sprite.ay;
+      return {
+        prop,
+        sprite,
+        x0,
+        y0,
+        x1: x0 + sprite.w,
+        y1: y0 + sprite.h,
+        tall: sprite.ay > PROP_DEFS[prop.kind].h + 8,
+        room: this.buildings.placedAt(prop.x, prop.y - PROP_DEFS[prop.kind].h / 2),
+        alpha: 1,
+      };
+    });
+    this.fires = this.props.filter((placed) => placed.prop.kind === 'fire_barrel');
+    this.reset();
+  }
+
+  reset(): void {
+    this.corpses = [];
+    this.killed.clear();
+  }
+
+  addCorpse(id: EntityId, type: ZombieType, x: number, y: number, time: number): void {
+    this.killed.set(id, time + KILLED_MEMORY_SEC);
+    this.corpses.push({ type, x, y, bornAt: time });
+    if (this.corpses.length > MAX_CORPSES) this.bake(this.corpses.shift()!);
+  }
+
+  private bake(corpse: Corpse): void {
+    const frames = this.art.zombies[corpse.type].death.frames;
+    this.stamp(frames[frames.length - 1], corpse.x, corpse.y, 0.85);
+  }
+
+  private settleCorpses(time: number): void {
+    while (this.corpses.length > 0 && time - this.corpses[0].bornAt > CORPSE_BAKE_SEC) {
+      this.bake(this.corpses.shift()!);
+    }
+    for (const [id, expires] of this.killed) {
+      if (time > expires) this.killed.delete(id);
+    }
+  }
+
+  private drawCorpses(ctx: CanvasRenderingContext2D, left: number, top: number, time: number): void {
+    for (const corpse of this.corpses) {
+      const clip = this.art.zombies[corpse.type].death;
+      drawSprite(ctx, clipFrame(clip, time - corpse.bornAt), Math.round(corpse.x) - left, Math.round(corpse.y) - top);
+    }
+  }
+
+  /** Its corpse is already down, even while the delayed scene still lists the zombie. */
+  isKilled(id: EntityId): boolean {
+    return this.killed.has(id);
+  }
+
+  private collect(scene: SceneView, left: number, top: number, viewW: number, viewH: number): DrawItem[] {
+    const items: DrawItem[] = [];
+    const right = left + viewW;
+    const bottom = top + viewH;
+    const visible = (x: number, y: number) =>
+      x > left - CULL_MARGIN && x < right + CULL_MARGIN && y > top - CULL_MARGIN && y < bottom + CULL_MARGIN;
+
+    for (const placed of this.props) {
+      const onScreen = placed.x1 > left && placed.x0 < right && placed.y1 > top && placed.y0 < bottom;
+      const roomClosed = placed.room !== null && placed.room.reveal === 0;
+      if (onScreen && !roomClosed) items.push({ y: placed.prop.y, kind: 'prop', prop: placed });
+    }
+    for (const placed of this.buildings.placed) {
+      const onScreen = placed.x1 > left && placed.x0 < right && placed.y1 > top && placed.y0 < bottom;
+      if (onScreen) items.push({ y: placed.depthY, kind: 'building', building: placed });
+    }
+    for (const player of scene.players) {
+      if (visible(player.x, player.y)) items.push({ y: player.y, kind: 'player', player });
+    }
+    for (const zombie of scene.zombies) {
+      if (!this.killed.has(zombie.id) && visible(zombie.x, zombie.y)) items.push({ y: zombie.y, kind: 'zombie', zombie });
+    }
+    for (const pickup of scene.pickups) {
+      if (visible(pickup.x, pickup.y)) items.push({ y: pickup.y, kind: 'pickup', pickup });
+    }
+    return items.sort((a, b) => a.y - b.y);
+  }
+
+  /** The part of the scene that the lightmap darkens. */
+  drawWorld(
+    ctx: CanvasRenderingContext2D,
+    scene: SceneView,
+    left: number,
+    top: number,
+    viewW: number,
+    viewH: number,
+    time: number,
+    dt: number,
+  ): void {
+    this.settleCorpses(time);
+    this.buildings.drawInteriors(ctx, left, top);
+    this.drawCorpses(ctx, left, top, time);
+    const viewer = scene.players.find((player) => player.id === scene.viewerId) ?? null;
+    const blend = 1 - Math.exp(-FADE_RATE * dt);
+    for (const item of this.collect(scene, left, top, viewW, viewH)) {
+      if (item.kind === 'prop') this.drawProp(ctx, item.prop, viewer, left, top, blend);
+      else if (item.kind === 'building') this.buildings.drawShell(ctx, item.building, left, top);
+      else if (item.kind === 'player') this.drawPlayer(ctx, item.player, left, top, time);
+      else if (item.kind === 'zombie') this.drawZombie(ctx, item.zombie, left, top, time);
+      else this.drawPickup(ctx, item.pickup, left, top, time);
+    }
+  }
+
+  private drawProp(
+    ctx: CanvasRenderingContext2D,
+    placed: PlacedProp,
+    viewer: PlayerEntity | null,
+    left: number,
+    top: number,
+    blend: number,
+  ): void {
+    const hidesViewer = viewer !== null && placed.tall && this.covers(placed, placed.prop.y, viewer);
+    placed.alpha += ((hidesViewer ? FADED_ALPHA : 1) - placed.alpha) * blend;
+    ctx.globalAlpha = placed.alpha;
+    ctx.drawImage(spriteCanvas(placed.sprite), placed.x0 - left, placed.y0 - top);
+    ctx.globalAlpha = 1;
+  }
+
+  private covers(art: Pick<PlacedProp, 'x0' | 'y0' | 'x1' | 'y1'>, depthY: number, player: PlayerEntity): boolean {
+    const chestY = player.y - CHEST_HEIGHT;
+    return player.y < depthY
+      && player.x > art.x0 && player.x < art.x1
+      && chestY > art.y0 && chestY < art.y1;
+  }
+
+  private survivorFrame(player: PlayerEntity, time: number): PixelSprite {
+    const art = this.art.survivors[player.skin % this.art.survivors.length];
+    const visual = this.visuals.get(player.id);
+    if (player.status !== 'alive') {
+      const clip = player.status === 'dead' ? art.dead : art.downed;
+      return clipFrame(clip, time - visual.statusAt);
+    }
+    const set = art.weapons[player.weapon];
+    const dir = dirFromAngle(player.angle);
+    const fire = set.fire[dir];
+    const sinceShove = time - visual.meleeAt;
+    const shoving = sinceShove < clipDuration(fire);
+    if (shoving) return clipFrame(fire, sinceShove);
+    if (player.reload > 0) return clipFrameAt(set.reload[dir], player.reload);
+    const sinceShot = time - visual.fireAt;
+    if (sinceShot < clipDuration(fire)) return clipFrame(fire, sinceShot);
+    const walk = set.walk[dir];
+    if (player.moving) return strideFrame(walk, visual.walked, PLAYER_SPEED / walk.fps);
+    return clipFrame(set.idle[dir], time);
+  }
+
+  private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerEntity, left: number, top: number, time: number): void {
+    const visual = this.visuals.touch(player.id);
+    trackWalking(visual, player.x, player.y);
+    if (visual.status !== player.status) {
+      visual.status = player.status;
+      visual.statusAt = time;
+    }
+    const sprite = this.survivorFrame(player, time);
+    visual.sprite = sprite;
+    const lunge = this.lunge(time - visual.meleeAt);
+    const x = Math.round(player.x + Math.cos(player.angle) * lunge) - left;
+    const y = Math.round(player.y + Math.sin(player.angle) * lunge) - top;
+    if (player.status === 'alive') drawShadow(ctx, x, y, PLAYER_RADIUS * 2 + 2);
+    if (time < visual.flashUntil) drawSilhouette(ctx, sprite, x, y);
+    else drawSprite(ctx, sprite, x, y);
+  }
+
+  private lunge(sinceShove: number): number {
+    return sinceShove < LUNGE_SEC ? Math.sin((sinceShove / LUNGE_SEC) * Math.PI) * LUNGE_PX : 0;
+  }
+
+  private drawZombie(ctx: CanvasRenderingContext2D, zombie: ZombieEntity, left: number, top: number, time: number): void {
+    const visual = this.visuals.touch(zombie.id);
+    trackWalking(visual, zombie.x, zombie.y);
+    if (zombie.attacking && !visual.attacking) visual.attackAt = time;
+    visual.attacking = zombie.attacking;
+
+    const art = this.art.zombies[zombie.type];
+    const dir = dirFromAngle(zombie.angle);
+    const walk = art.walk[dir];
+    const sprite = zombie.attacking
+      ? clipFrame(art.attack[dir], time - visual.attackAt)
+      : strideFrame(walk, visual.walked, ZOMBIES[zombie.type].speed / walk.fps);
+    visual.sprite = sprite;
+    const x = Math.round(zombie.x) - left;
+    const y = Math.round(zombie.y) - top;
+    drawShadow(ctx, x, y, ZOMBIES[zombie.type].radius * 2 + 2);
+    if (time < visual.flashUntil) drawSilhouette(ctx, sprite, x, y);
+    else drawSprite(ctx, sprite, x, y);
+  }
+
+  private drawPickup(ctx: CanvasRenderingContext2D, pickup: PickupEntity, left: number, top: number, time: number): void {
+    const x = Math.round(pickup.x) - left;
+    const y = Math.round(pickup.y) - top;
+    drawShadow(ctx, x, y, 10);
+    drawSprite(ctx, clipFrame(this.art.pickups[pickup.type], time), x, y);
+  }
+
+  /** Flames and tracers light themselves, so they go on after the lightmap. */
+  drawEmissive(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number, time: number): void {
+    const flames = this.art.environment.barrelFire;
+    for (const fire of this.fires) {
+      const onScreen = fire.x1 > left && fire.x0 < left + viewW && fire.y1 > top - 24 && fire.y0 < top + viewH;
+      if (onScreen) drawSprite(ctx, clipFrame(flames, time + fire.prop.x), fire.x0 + fire.sprite.ax - left, fire.y0 + fire.sprite.ay - top);
+    }
+    for (const bullet of scene.bullets) {
+      const clip = this.art.fx.tracer[dirFromAngle(Math.atan2(bullet.vy, bullet.vx))];
+      drawSprite(ctx, clipFrame(clip, time), Math.round(bullet.x) - left, Math.round(bullet.y) - CHEST_HEIGHT - top);
+    }
+  }
+
+  /** A small star where the light lands on loot: enough to catch the eye, no pool to give the room away. */
+  drawGlints(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number, time: number, lightAt: (x: number, y: number) => number): void {
+    for (const pickup of scene.pickups) {
+      const x = Math.round(pickup.x) - left;
+      const y = Math.round(pickup.y) - top - GLINT_HEIGHT;
+      const onScreen = x >= 0 && y >= 0 && x < viewW && y < viewH;
+      const cycle = (time / GLINT_CYCLE_SEC + glintPhase(pickup.id)) % 1;
+      const showing = onScreen && cycle < GLINT_SHARE && lightAt(x, y + GLINT_HEIGHT) >= GLINT_LIGHT;
+      if (!showing) continue;
+      const reach = cycle < GLINT_SHARE / 2 ? 1 : 2;
+      ctx.fillStyle = GLINT_RAY;
+      ctx.fillRect(x - reach, y, reach * 2 + 1, 1);
+      ctx.fillRect(x, y - reach, 1, reach * 2 + 1);
+      ctx.fillStyle = GLINT_CORE;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  private hiddenByShell(player: PlayerEntity, left: number, top: number, viewW: number, viewH: number): boolean {
+    return this.buildings.placed.some((placed) => {
+      const onScreen = placed.x1 > left && placed.x0 < left + viewW && placed.y1 > top && placed.y0 < top + viewH;
+      return onScreen && placed.reveal < 0.5 && this.covers(placed, placed.depthY, player);
+    });
+  }
+
+  /** Teammates stay findable behind and inside buildings as a pale outline. */
+  drawOccluded(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number): void {
+    ctx.globalAlpha = SILHOUETTE_ALPHA;
+    for (const player of scene.players) {
+      const sprite = this.visuals.get(player.id).sprite;
+      const showsOutline = sprite !== null && player.status !== 'dead' && this.hiddenByShell(player, left, top, viewW, viewH);
+      if (showsOutline) drawSilhouette(ctx, sprite, Math.round(player.x) - left, Math.round(player.y) - top);
+    }
+    ctx.globalAlpha = 1;
+  }
+}

@@ -1,0 +1,104 @@
+<template>
+  <section class="px-screen town" aria-label="Town map">
+    <canvas ref="canvasRef" class="town-canvas px-frame" :style="{ '--side': canvasSide }" />
+    <aside class="town-key">
+      <h2 class="town-title">Town map</h2>
+      <ul class="town-legend">
+        <li v-for="[color, label] in TOWN_LEGEND" :key="label">
+          <span class="town-swatch" :style="{ '--swatch': color }" />{{ label }}
+        </li>
+        <li class="town-tick">Tick: been inside</li>
+      </ul>
+      <p class="px-note">{{ mode === 'solo' ? 'Paused.' : 'The town does not wait.' }} Tab to close</p>
+    </aside>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
+import { TOWN_LEGEND } from '../game/town-map.ts';
+import type { TransportKind } from '../network/transport.ts';
+import { useGame } from './use-game.ts';
+
+const SCREEN_MARGIN = 24;
+const KEY_WIDTH = 260;
+
+defineProps<{ mode: TransportKind }>();
+
+const game = useGame();
+const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
+const mapPixels = ref(1);
+const fit = ref(Math.min(window.innerWidth - KEY_WIDTH, window.innerHeight) - SCREEN_MARGIN);
+
+/** In half steps of the map's size: whole steps alone leave a small window with a very small map. */
+const canvasSide = computed(() => {
+  const half = mapPixels.value / 2;
+  return `${Math.max(2, Math.floor(fit.value / half)) * half}px`;
+});
+
+function measure(): void {
+  fit.value = Math.min(window.innerWidth - KEY_WIDTH, window.innerHeight) - SCREEN_MARGIN;
+}
+
+onMounted(() => {
+  game.attachTownCanvas(canvasRef.value);
+  mapPixels.value = canvasRef.value?.width ?? 1;
+  window.addEventListener('resize', measure);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measure);
+  game.attachTownCanvas(null);
+});
+</script>
+
+<style scoped>
+.town {
+  flex-direction: row;
+  flex-wrap: wrap;
+  background: rgba(7, 8, 12, 0.92);
+}
+
+.town-canvas {
+  flex: none;
+  width: var(--side);
+  height: var(--side);
+  image-rendering: pixelated;
+}
+
+.town-key {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 4);
+  max-width: calc(var(--u) * 100);
+}
+
+.town-title {
+  font-size: calc(var(--u) * 10);
+  line-height: 1;
+}
+
+.town-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u);
+  color: var(--bone-dim);
+  list-style: none;
+}
+
+.town-legend li {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+}
+
+.town-swatch {
+  width: calc(var(--u) * 5);
+  height: calc(var(--u) * 5);
+  background: var(--swatch);
+}
+
+.town-tick {
+  color: var(--sick);
+}
+</style>

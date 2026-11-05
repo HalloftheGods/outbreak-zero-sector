@@ -1,0 +1,145 @@
+import { existsSync } from 'node:fs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PLAYLISTS, Soundtrack } from '../src/audio/soundtrack.ts';
+
+class FakeElement {
+  currentTime = 0;
+  paused = true;
+  preload = '';
+  refuses = false;
+  private readonly listeners = new Map<string, () => void>();
+
+  constructor(readonly src: string) {}
+
+  play(): Promise<void> {
+    if (this.refuses) return Promise.reject(new Error('NotAllowedError'));
+    this.paused = false;
+    return Promise.resolve();
+  }
+
+  pause(): void {
+    this.paused = true;
+  }
+
+  addEventListener(type: string, listener: () => void): void {
+    this.listeners.set(type, listener);
+  }
+
+  fire(type: string): void {
+    this.listeners.get(type)?.();
+  }
+}
+
+function fakeContext() {
+  const node = () => ({ connect: vi.fn(), gain: { value: 0, setTargetAtTime: vi.fn() } });
+  return { currentTime: 0, createGain: node, createMediaElementSource: node } as unknown as AudioContext;
+}
+
+describe('the soundtrack', () => {
+  let made: FakeElement[];
+  let available: boolean[];
+  let music: Soundtrack;
+  const playing = () => made.filter((element) => !element.paused).map((element) => element.src);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    made = [];
+    available = [];
+    music = new Soundtrack(fakeContext(), {} as AudioNode, (on) => available.push(on), ((src: string) => {
+      const element = new FakeElement(src);
+      made.push(element);
+      return element;
+    }) as never);
+  });
+
+  it('has a file behind every track it names', () => {
+    const files = Object.values(PLAYLISTS).flatMap((playlist) => playlist.files);
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) expect(existsSync(`public/music/${file}`), file).toBe(true);
+  });
+
+  it('plays the scene, and lets the last one fade before stopping it', () => {
+    music.setScene('menu');
+    expect(playing()).toEqual(['music/silent-ruins-variation.mp3']);
+    music.setScene('intermission');
+    expect(playing()).toHaveLength(2);
+    vi.runAllTimers();
+    expect(playing()).toEqual(['music/silent-ruins.mp3']);
+  });
+
+  it('does not restart a track when the scene is set again', () => {
+    music.setScene('intermission');
+    made[0].currentTime = 40;
+    music.setScene('intermission');
+    expect(made).toHaveLength(1);
+    expect(made[0].currentTime).toBe(40);
+  });
+
+  it('takes the lull up where it stopped, but starts each horde from the top on the other take', () => {
+    music.setScene('intermission');
+    const lull = made[0];
+    lull.currentTime = 40;
+    music.setScene('wave');
+    const firstHorde = made[1];
+    firstHorde.currentTime = 30;
+    music.setScene('intermission');
+    expect(lull.currentTime).toBe(40);
+    music.setScene('wave');
+    expect(made[2].src).not.toBe(firstHorde.src);
+    music.setScene('intermission');
+    music.setScene('wave');
+    expect(firstHorde.currentTime).toBe(0);
+  });
+
+  it('falls silent for game over', () => {
+    music.setScene('wave');
+    music.setScene('gameover');
+    vi.runAllTimers();
+    expect(playing()).toEqual([]);
+  });
+
+  it('survives a fade cut short by coming straight back', () => {
+    music.setScene('intermission');
+    music.setScene('wave');
+    music.setScene('intermission');
+    vi.runAllTimers();
+    expect(playing()).toEqual(['music/silent-ruins.mp3']);
+  });
+
+  it('moves on when a track ends, and ignores the end of one it has left', () => {
+    music.setScene('wave');
+    const first = made[0];
+    first.fire('ended');
+    expect(made[1].paused).toBe(false);
+    first.fire('ended');
+    expect(made).toHaveLength(2);
+  });
+
+  it('tries again after a browser refused to start before a gesture', async () => {
+    music = new Soundtrack(fakeContext(), {} as AudioNode, () => undefined, ((src: string) => {
+      const element = new FakeElement(src);
+      element.refuses = true;
+      made.push(element);
+      return element;
+    }) as never);
+    music.setScene('menu');
+    await Promise.resolve();
+    expect(playing()).toEqual([]);
+    made[0].refuses = false;
+    music.retry();
+    expect(playing()).toHaveLength(1);
+  });
+
+  it('says when it can carry the music, and when a file failed', () => {
+    music.setScene('menu');
+    made[0].fire('playing');
+    made[0].fire('error');
+    expect(available).toEqual([true, false]);
+  });
+
+  it('stops everything on dispose', () => {
+    music.setScene('menu');
+    music.dispose();
+    expect(playing()).toEqual([]);
+  });
+});

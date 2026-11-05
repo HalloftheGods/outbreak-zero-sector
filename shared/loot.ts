@@ -1,0 +1,204 @@
+import {
+  AMMO_PICKUPS,
+  AMMO_POPULATION_SHARE,
+  PLAYER_RADIUS,
+  RESTOCK_ITEMS,
+  RESTOCK_MIN_DISTANCE,
+  ROAMER_MIX,
+  STANDING_POPULATION,
+  WEAPONS,
+  ZOMBIES,
+} from './constants.ts';
+import type { Point } from './flow-field.ts';
+import { isAmmoPickup, spawnPickup } from './pickups.ts';
+import { BUILDING_DEFS, TILE_SIZE } from './protocol.ts';
+import type { BuildingInstance, BuildingKind, PickupType, WeaponId, WorldMap } from './protocol.ts';
+import { randInt, shuffle } from './rng.ts';
+import type { Rng } from './rng.ts';
+import type { PickupState, SimState } from './sim-state.ts';
+import { blockedTiles, buildingAt, buildingBox, circleHitsSolid, doorBox, isSolidProp, propBox } from './world-query.ts';
+
+export interface LootRule {
+  /** How many items a building of this kind holds, inclusive. */
+  readonly items: readonly [number, number];
+  /** Relative odds of each item. */
+  readonly table: Partial<Record<PickupType, number>>;
+  /** Always here, on top of `items`. */
+  readonly fixed?: readonly PickupType[];
+  /** Ammo here is a half-empty box. */
+  readonly smallAmmo?: boolean;
+}
+
+export const LOOT_RULES: Record<BuildingKind, LootRule> = {
+  pharmacy: { items: [2, 4], table: { bandage: 5, medkit: 3, pistol_ammo: 0.5 } },
+  clinic: { items: [3, 4], table: { bandage: 4, medkit: 4 } },
+  police: { items: [3, 4], fixed: ['carbine'], table: { pistol_ammo: 3, carbine_ammo: 4, shells: 1 } },
+  gun_shop: { items: [3, 4], fixed: ['shotgun'], table: { pistol_ammo: 3, shells: 3, carbine_ammo: 1 } },
+  garage: { items: [0, 2], table: { pistol_ammo: 3, shells: 1, bandage: 1 } },
+  warehouse: { items: [0, 2], table: { pistol_ammo: 3, carbine_ammo: 1, shells: 1, bandage: 1 } },
+  grocery: { items: [0, 2], table: { bandage: 3, pistol_ammo: 1 }, smallAmmo: true },
+  diner: { items: [0, 1], table: { bandage: 2, pistol_ammo: 1 }, smallAmmo: true },
+  house: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2 }, smallAmmo: true },
+  apartment: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2 }, smallAmmo: true },
+};
+
+/** Tiles in front of a door kept free of loot. */
+const DOOR_CLEAR_TILES = 3;
+/** A spot this close to a piece of furniture counts as next to it. */
+const NEXT_TO_FURNITURE = 14;
+const SPOT_CLEARANCE = PLAYER_RADIUS;
+
+const spotCache = new WeakMap<WorldMap, Map<string, readonly Point[]>>();
+
+/** Fraction of a shot that lands on something. Spread and overkill eat the rest. */
+const SHOT_EFFICIENCY = 0.75;
+const WALKER_SHARE = 1 - ROAMER_MIX.bloater - ROAMER_MIX.runner;
+const AVERAGE_ROAMER_HEALTH = WALKER_SHARE * ZOMBIES.walker.health + ROAMER_MIX.runner * ZOMBIES.runner.health + ROAMER_MIX.bloater * ZOMBIES.bloater.health;
+const POPULATION_HEALTH = STANDING_POPULATION * AVERAGE_ROAMER_HEALTH;
+/** Damage all the map's ammo should add up to, on paper. */
+const AMMO_DAMAGE_BUDGET = (POPULATION_HEALTH * AMMO_POPULATION_SHARE) / SHOT_EFFICIENCY;
+
+function roundDamage(weapon: WeaponId): number {
+  const { damage, pellets } = WEAPONS[weapon];
+  // A shotgun's cone is wide, so about half of it finds the target.
+  return damage * Math.max(1, pellets / 2);
+}
+
+/** What one pickup's rounds are worth in damage, if every one of them is fired. */
+function damageOf(item: Pick<PickupState, 'type' | 'rounds'>): number {
+  if (isAmmoPickup(item.type)) return item.rounds * roundDamage(AMMO_PICKUPS[item.type].weapon);
+  const isGun = item.type === 'carbine' || item.type === 'shotgun';
+  return isGun ? WEAPONS[item.type as WeaponId].foundAmmo * roundDamage(item.type as WeaponId) : 0;
+}
+
+/** Share of the standing population the given loot could kill. Exported for the balance spec. */
+export function ammoKillShare(items: readonly Pick<PickupState, 'type' | 'rounds'>[]): number {
+  const total = items.reduce((sum, item) => sum + damageOf(item), 0);
+  return (total * SHOT_EFFICIENCY) / POPULATION_HEALTH;
+}
+
+function furnitureIn(map: WorldMap): Map<string, ReturnType<typeof propBox>[]> {
+  const found = new Map<string, ReturnType<typeof propBox>[]>();
+  for (const prop of map.props) {
+    if (!isSolidProp(prop)) continue;
+    const owner = buildingAt(map, prop.x, prop.y - 1);
+    if (!owner) continue;
+    const list = found.get(owner.id);
+    if (list) list.push(propBox(prop));
+    else found.set(owner.id, [propBox(prop)]);
+  }
+  return found;
+}
+
+function floorSpots(map: WorldMap, building: BuildingInstance): Point[] {
+  const { x0, y0, x1, y1 } = buildingBox(building);
+  const door = doorBox(building);
+  const blocked = blockedTiles(map);
+  const spots: Point[] = [];
+  for (let y = y0; y < y1; y += TILE_SIZE) {
+    for (let x = x0; x < x1; x += TILE_SIZE) {
+      const free = blocked[(y / TILE_SIZE) * map.cols + x / TILE_SIZE] === 0;
+      const inDoorway = x >= door.x0 && x < door.x1 && y >= y1 - DOOR_CLEAR_TILES * TILE_SIZE;
+      const spot = { x: x + TILE_SIZE / 2, y: y + TILE_SIZE / 2 };
+      const usable = free && !inDoorway && !circleHitsSolid(map, spot.x, spot.y, SPOT_CLEARANCE);
+      if (usable) spots.push(spot);
+    }
+  }
+  return spots;
+}
+
+/** Floor beside the furniture of each building, and any open floor where a room has none. */
+export function lootSpots(map: WorldMap, building: BuildingInstance): readonly Point[] {
+  let cache = spotCache.get(map);
+  if (!cache) {
+    cache = new Map();
+    const furniture = furnitureIn(map);
+    for (const each of map.buildings) {
+      const floor = floorSpots(map, each);
+      const boxes = furniture.get(each.id) ?? [];
+      const beside = floor.filter((spot) =>
+        boxes.some((box) => {
+          const dx = spot.x - Math.max(box.x0, Math.min(spot.x, box.x1));
+          const dy = spot.y - Math.max(box.y0, Math.min(spot.y, box.y1));
+          return Math.hypot(dx, dy) <= NEXT_TO_FURNITURE;
+        }),
+      );
+      cache.set(each.id, beside.length > 0 ? beside : floor);
+    }
+    spotCache.set(map, cache);
+  }
+  return cache.get(building.id) ?? [];
+}
+
+function rollItem(rng: Rng, rule: LootRule): PickupType {
+  const entries = Object.entries(rule.table) as [PickupType, number][];
+  let roll = rng() * entries.reduce((sum, [, weight]) => sum + weight, 0);
+  for (const [type, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return type;
+  }
+  return entries[0][0];
+}
+
+function roundsIn(type: PickupType, rule: LootRule): number {
+  if (!isAmmoPickup(type)) return 0;
+  const { rounds } = AMMO_PICKUPS[type];
+  return rule.smallAmmo ? Math.ceil(rounds / 2) : rounds;
+}
+
+function stock(sim: SimState, building: BuildingInstance, items: readonly PickupType[]): void {
+  const rule = LOOT_RULES[building.kind];
+  const spots = shuffle(sim.rng, [...lootSpots(sim.map, building)]);
+  items.slice(0, spots.length).forEach((type, index) => {
+    spawnPickup(sim, type, spots[index].x, spots[index].y, roundsIn(type, rule));
+  });
+}
+
+/** Odd finds go first when the map holds more ammo than a run should have. */
+function trimAmmo(sim: SimState): void {
+  const removable = shuffle(sim.rng, sim.pickups.filter((item) => isAmmoPickup(item.type)));
+  let total = sim.pickups.reduce((sum, item) => sum + damageOf(item), 0);
+  while (total > AMMO_DAMAGE_BUDGET && removable.length > 0) {
+    const item = removable.pop() as PickupState;
+    total -= damageOf(item);
+    sim.pickups.splice(sim.pickups.indexOf(item), 1);
+  }
+}
+
+/** Stocks the town for a new run. */
+export function placeTownLoot(sim: SimState): void {
+  for (const building of sim.map.buildings) {
+    const rule = LOOT_RULES[building.kind];
+    const count = Math.max(0, randInt(sim.rng, rule.items[0], rule.items[1]));
+    const rolled = Array.from({ length: count }, () => rollItem(sim.rng, rule));
+    stock(sim, building, [...(rule.fixed ?? []), ...rolled]);
+  }
+  trimAmmo(sim);
+}
+
+function gunsMissing(sim: SimState): Set<string> {
+  const missing = new Set<string>(['carbine', 'shotgun']);
+  for (const item of sim.pickups) missing.delete(item.type);
+  for (const p of sim.players) {
+    for (const gun of p.owned) missing.delete(gun);
+  }
+  return missing;
+}
+
+/** A little more, somewhere far off. A gun lost with a dead teammate returns to its shop. */
+export function restockLoot(sim: SimState): void {
+  const standing = sim.players.filter((p) => p.status !== 'dead');
+  const farOff = (building: BuildingInstance): boolean => {
+    const { w, h } = BUILDING_DEFS[building.kind];
+    return standing.every((p) => Math.hypot(building.x + w / 2 - p.x, building.y + h / 2 - p.y) >= RESTOCK_MIN_DISTANCE);
+  };
+  const candidates = shuffle(sim.rng, sim.map.buildings.filter(farOff));
+  for (const building of candidates.slice(0, RESTOCK_ITEMS)) {
+    stock(sim, building, [rollItem(sim.rng, LOOT_RULES[building.kind])]);
+  }
+  const lost = gunsMissing(sim);
+  for (const building of candidates) {
+    const gun = LOOT_RULES[building.kind].fixed?.find((type) => lost.has(type));
+    if (gun) stock(sim, building, [gun]);
+  }
+}

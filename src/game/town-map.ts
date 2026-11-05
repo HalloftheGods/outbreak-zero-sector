@@ -1,0 +1,224 @@
+import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
+import type { BuildingInstance, BuildingKind, EntityId, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
+import { dirFromAngle } from '../art/types.ts';
+import { drawOutlinedText, FONT_HEIGHT, textWidth } from '../engine/bitmap-font.ts';
+import { drawArrow } from '../engine/overlay-renderer.ts';
+import { isLandmark } from './run-notices.ts';
+
+/** Map pixels per world tile. 200 tiles makes a 400px map, which scales up by whole numbers. */
+const TILE_PX = 2;
+const WORLD_PER_PX = TILE_SIZE / TILE_PX;
+
+const ROAD: readonly [number, number, number] = [40, 41, 47];
+const PAVEMENT: readonly [number, number, number] = [62, 62, 66];
+const TILE_RGB: Record<TileKind, readonly [number, number, number]> = {
+  asphalt: ROAD,
+  asphalt_cracked: ROAD,
+  lane_h: ROAD,
+  lane_v: ROAD,
+  crosswalk_h: ROAD,
+  crosswalk_v: ROAD,
+  parking_line: ROAD,
+  sidewalk: PAVEMENT,
+  curb_n: PAVEMENT,
+  curb_s: PAVEMENT,
+  curb_e: PAVEMENT,
+  curb_w: PAVEMENT,
+  grass: [30, 44, 30],
+  dirt: [44, 38, 28],
+  floor_wood: PAVEMENT,
+  floor_tile: PAVEMENT,
+  floor_concrete: PAVEMENT,
+  floor_carpet: PAVEMENT,
+};
+
+const MEDICAL = '#b04a42';
+const ARMS = '#c8923a';
+const LAW = '#4a78a8';
+const FOOD = '#5c9450';
+const WORK = '#86745a';
+const HOMES = '#4c4c56';
+
+const BUILDING_COLOR: Record<BuildingKind, string> = {
+  pharmacy: MEDICAL,
+  clinic: MEDICAL,
+  police: LAW,
+  gun_shop: ARMS,
+  grocery: FOOD,
+  diner: FOOD,
+  garage: WORK,
+  warehouse: WORK,
+  house: HOMES,
+  apartment: HOMES,
+};
+
+/** What the colours mean, for the key beside the map. */
+export const TOWN_LEGEND: readonly (readonly [string, string])[] = [
+  [MEDICAL, 'Medical'],
+  [LAW, 'Police'],
+  [ARMS, 'Guns'],
+  [WORK, 'Garages and yards'],
+  [FOOD, 'Food'],
+  [HOMES, 'Homes'],
+];
+
+const EDGE_COLOR = '#0b0c10';
+const DISTRICT_COLOR = '#938d7a';
+const LABEL_COLOR = '#e4dcc3';
+const TICK_COLOR = '#b6e04a';
+const SELF_COLOR = '#ffffff';
+const TEAM_COLOR = '#e8a33d';
+const DOWNED_COLOR = '#e0463a';
+
+const TICK_PIXELS: readonly (readonly [number, number])[] = [[0, 2], [1, 3], [2, 2], [3, 1], [4, 0]];
+/** Label positions tried in turn around a building until one is clear. */
+const LABEL_NUDGES: readonly number[] = [0, 7, -7, 14, -14];
+
+interface LabelBox {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+function overlaps(a: LabelBox, b: LabelBox): boolean {
+  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+}
+
+function paintTiles(ctx: CanvasRenderingContext2D, map: WorldMap, width: number, height: number): void {
+  const image = ctx.createImageData(width, height);
+  for (let y = 0; y < height; y += 1) {
+    const row = Math.floor(y / TILE_PX) * map.cols;
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b] = TILE_RGB[TILE_KINDS[map.tiles[row + Math.floor(x / TILE_PX)]]];
+      image.data.set([r, g, b, 255], (y * width + x) * 4);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function footprint(building: BuildingInstance): LabelBox {
+  const { w, h } = BUILDING_DEFS[building.kind];
+  const x0 = Math.round(building.x / WORLD_PER_PX);
+  const y0 = Math.round(building.y / WORLD_PER_PX);
+  return { x0, y0, x1: x0 + Math.round(w / WORLD_PER_PX), y1: y0 + Math.round(h / WORLD_PER_PX) };
+}
+
+function paintBuildings(ctx: CanvasRenderingContext2D, map: WorldMap): void {
+  for (const building of map.buildings) {
+    const box = footprint(building);
+    ctx.fillStyle = EDGE_COLOR;
+    ctx.fillRect(box.x0 - 1, box.y0 - 1, box.x1 - box.x0 + 2, box.y1 - box.y0 + 2);
+    ctx.fillStyle = BUILDING_COLOR[building.kind];
+    ctx.fillRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
+  }
+}
+
+/** Writes text at the first spot that does not sit on an earlier label. */
+function placeLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  y: number,
+  color: string,
+  placed: LabelBox[],
+): void {
+  const half = Math.ceil(textWidth(text) / 2) + 1;
+  for (const nudge of LABEL_NUDGES) {
+    const top = y + nudge;
+    const box = { x0: centerX - half, y0: top - 1, x1: centerX + half, y1: top + FONT_HEIGHT + 1 };
+    const onMap = box.x0 >= 0 && box.y0 >= 0 && box.x1 <= ctx.canvas.width && box.y1 <= ctx.canvas.height;
+    const clear = onMap && !placed.some((other) => overlaps(box, other));
+    if (clear) {
+      placed.push(box);
+      drawOutlinedText(ctx, text, centerX, top, color);
+      return;
+    }
+  }
+}
+
+/** The town as a player would sketch it: streets, buildings by use, names, and where they have been. */
+export class TownMapView {
+  readonly width: number;
+  readonly height: number;
+  private readonly map: WorldMap;
+  private readonly base: HTMLCanvasElement;
+  private readonly visited = new Set<string>();
+
+  constructor(map: WorldMap) {
+    this.map = map;
+    this.width = map.cols * TILE_PX;
+    this.height = map.rows * TILE_PX;
+    this.base = document.createElement('canvas');
+    this.base.width = this.width;
+    this.base.height = this.height;
+    this.paintBase();
+  }
+
+  private paintBase(): void {
+    const ctx = this.base.getContext('2d')!;
+    paintTiles(ctx, this.map, this.width, this.height);
+    paintBuildings(ctx, this.map);
+    const placed: LabelBox[] = [];
+    for (const building of this.map.buildings) {
+      if (!isLandmark(building.kind)) continue;
+      const box = footprint(building);
+      placeLabel(ctx, BUILDING_DEFS[building.kind].label, Math.round((box.x0 + box.x1) / 2), box.y1 + 3, LABEL_COLOR, placed);
+    }
+    for (const district of this.map.districts) {
+      placeLabel(ctx, district.name, Math.round(district.x / WORLD_PER_PX), Math.round(district.y / WORLD_PER_PX), DISTRICT_COLOR, placed);
+    }
+  }
+
+  /** The player has been inside. Reset by making a new view for a new run. */
+  markVisited(id: string): void {
+    this.visited.add(id);
+  }
+
+  clearVisited(): void {
+    this.visited.clear();
+  }
+
+  hasVisited(id: string): boolean {
+    return this.visited.has(id);
+  }
+
+  building(id: string): BuildingInstance | null {
+    return this.map.buildings.find((building) => building.id === id) ?? null;
+  }
+
+  private drawTick(ctx: CanvasRenderingContext2D, building: BuildingInstance): void {
+    const box = footprint(building);
+    const x = box.x1 - 7;
+    const y = box.y0 + 1;
+    ctx.fillStyle = EDGE_COLOR;
+    ctx.fillRect(x - 1, y - 1, 7, 6);
+    ctx.fillStyle = TICK_COLOR;
+    for (const [dx, dy] of TICK_PIXELS) ctx.fillRect(x + dx, y + dy, 1, 1);
+  }
+
+  private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerEntity, isLocal: boolean): void {
+    const x = Math.round(player.x / WORLD_PER_PX);
+    const y = Math.round(player.y / WORLD_PER_PX);
+    if (isLocal) {
+      drawArrow(ctx, { x, y, dir: dirFromAngle(player.angle) }, SELF_COLOR);
+      return;
+    }
+    ctx.fillStyle = EDGE_COLOR;
+    ctx.fillRect(x - 2, y - 2, 5, 5);
+    ctx.fillStyle = player.status === 'alive' ? TEAM_COLOR : DOWNED_COLOR;
+    ctx.fillRect(x - 1, y - 1, 3, 3);
+  }
+
+  paint(ctx: CanvasRenderingContext2D, players: readonly PlayerEntity[], localId: EntityId | null): void {
+    ctx.drawImage(this.base, 0, 0);
+    for (const id of this.visited) {
+      const building = this.building(id);
+      if (building) this.drawTick(ctx, building);
+    }
+    for (const player of players) {
+      const stillOnTheMap = player.status !== 'dead';
+      if (stillOnTheMap) this.drawPlayer(ctx, player, player.id === localId);
+    }
+  }
+}

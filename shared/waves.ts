@@ -1,0 +1,184 @@
+import {
+  HORDE_MAX_SEC,
+  HORDE_SPEED_SCALE,
+  INTERMISSION_SEC,
+  SPAWN_MAX_DISTANCE,
+  SPAWN_MIN_DISTANCE,
+  TICK_DT,
+  ZOMBIES,
+  ZOMBIE_CAP,
+} from './constants.ts';
+import { restockLoot } from './loot.ts';
+import { returnDeadPlayers } from './player-health.ts';
+import type { ZombieType } from './protocol.ts';
+import { pick, randRange, shuffle } from './rng.ts';
+import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
+import { emit, entityId, hiddenFromEveryone, standingPlayers } from './sim-state.ts';
+import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
+import { SIGHT_CHECK_TICKS, backToRoaming } from './zombie-senses.ts';
+
+const SPAWN_TRIES_PER_TICK = 12;
+
+/** The whole horde in spawn order. Exported so balance is testable without running one. */
+export function waveRoster(wave: number, rng: () => number): ZombieType[] {
+  const total = 5 + wave * 3;
+  const brutes = wave % 5 === 0 ? wave / 5 : 0;
+  const bloaters = wave >= 3 ? Math.min(8, 1 + Math.floor((wave - 3) / 2)) : 0;
+  const runners = wave >= 2 ? Math.floor(total * Math.min(0.4, 0.14 + (wave - 2) * 0.04)) : 0;
+  const walkers = Math.max(0, total - runners - bloaters - brutes);
+  const roster: ZombieType[] = [
+    ...Array<ZombieType>(walkers).fill('walker'),
+    ...Array<ZombieType>(runners).fill('runner'),
+    ...Array<ZombieType>(bloaters).fill('bloater'),
+  ];
+  shuffle(rng, roster);
+  // Brutes arrive after the horde has started to bite, not first.
+  roster.splice(Math.floor(roster.length / 2), 0, ...Array<ZombieType>(brutes).fill('brute'));
+  return roster;
+}
+
+const healthScale = (wave: number): number => 1 + 0.07 * Math.max(0, wave - 1);
+const speedScale = (wave: number): number => 1 + Math.min(0.3, 0.02 * Math.max(0, wave - 1));
+const spawnInterval = (wave: number): number => Math.max(0.28, 1.15 - 0.07 * wave);
+
+/** A new zombie knows nothing: it starts roaming wherever it stands. */
+export function spawnZombie(sim: SimState, type: ZombieType, x: number, y: number): void {
+  const stats = ZOMBIES[type];
+  const health = Math.round(stats.health * healthScale(sim.wave));
+  sim.zombies.push({
+    id: entityId(sim, 'z'),
+    type,
+    x,
+    y,
+    angle: 0,
+    health,
+    maxHealth: health,
+    attacking: false,
+    radius: stats.radius,
+    // Slight per-body variation stops a crowd marching in lockstep.
+    speed: stats.speed * speedScale(sim.wave) * randRange(sim.rng, 0.92, 1.08),
+    damage: stats.damage,
+    points: stats.points,
+    reach: stats.reach,
+    windupSec: stats.windupSec,
+    cooldownSec: stats.cooldownSec,
+    windupLeft: 0,
+    recoveryLeft: 0,
+    cooldownLeft: 0,
+    knockX: 0,
+    knockY: 0,
+    staggerImmuneLeft: 0,
+    sidestepLeft: 0,
+    sidestepSide: 1,
+    mode: 'wander',
+    horde: false,
+    interestLeft: 0,
+    wanderLeft: 0,
+    wanderX: 0,
+    wanderY: 0,
+    home: buildingAt(sim.map, x, y)?.id ?? null,
+    senseOffset: sim.nextEntity % SIGHT_CHECK_TICKS,
+  });
+}
+
+function spawnPoint(sim: SimState, anchors: readonly PlayerState[], radius: number): { x: number; y: number } | null {
+  const { map } = sim;
+  for (let attempt = 0; attempt < SPAWN_TRIES_PER_TICK; attempt++) {
+    const anchor = pick(sim.rng, anchors);
+    const angle = sim.rng() * Math.PI * 2;
+    const distance = randRange(sim.rng, SPAWN_MIN_DISTANCE, SPAWN_MAX_DISTANCE);
+    const x = anchor.x + Math.cos(angle) * distance;
+    const y = anchor.y + Math.sin(angle) * distance;
+    const onMap = x > radius && y > radius && x < map.width - radius && y < map.height - radius;
+    if (!onMap || isBlockedAt(map, x, y) || circleHitsSolid(map, x, y, radius + 1)) continue;
+    const outdoors = buildingAt(map, x, y) === null;
+    const outOfSight = anchors.every((p) => Math.hypot(p.x - x, p.y - y) >= SPAWN_MIN_DISTANCE);
+    if (outdoors && outOfSight) return { x, y };
+  }
+  return null;
+}
+
+function trickleSpawns(sim: SimState): void {
+  sim.spawnTimer -= TICK_DT;
+  const anchors = standingPlayers(sim);
+  while (sim.spawnTimer <= 0 && sim.spawnQueue.length > 0 && sim.zombies.length < ZOMBIE_CAP && anchors.length > 0) {
+    const type = sim.spawnQueue[sim.spawnQueue.length - 1];
+    const point = spawnPoint(sim, anchors, ZOMBIES[type].radius);
+    if (!point) break;
+    sim.spawnQueue.pop();
+    spawnZombie(sim, type, point.x, point.y);
+    const zombie = sim.zombies[sim.zombies.length - 1];
+    zombie.horde = true;
+    zombie.mode = 'hunt';
+    zombie.speed *= HORDE_SPEED_SCALE;
+    sim.spawnTimer += spawnInterval(sim.wave);
+  }
+  if (sim.spawnTimer < 0) sim.spawnTimer = 0;
+}
+
+function startHorde(sim: SimState): void {
+  sim.wave += 1;
+  sim.phase = 'wave';
+  sim.intermissionLeft = 0;
+  sim.hordeLeft = HORDE_MAX_SEC;
+  // Only what the cap has room for is called: anything more would be counted and never come.
+  const room = Math.max(0, ZOMBIE_CAP - sim.zombies.length);
+  sim.spawnQueue = waveRoster(sim.wave, sim.rng).slice(0, room).reverse();
+  sim.spawnTimer = 0;
+  returnDeadPlayers(sim);
+  emit(sim, { type: 'wave_start', wave: sim.wave, hostiles: sim.spawnQueue.length });
+}
+
+/**
+ * Bodies past the town's level drift off where nobody can see, newest first, so survivors of
+ * uncleared hordes never fill the cap and the guards placed in the buildings stay put.
+ */
+function thinRoamers(sim: SimState): void {
+  let excess = sim.zombies.filter((z) => !z.horde).length - sim.populationTarget;
+  const leaving = new Set<ZombieState>();
+  for (let i = sim.zombies.length - 1; i >= 0 && excess > 0; i--) {
+    const z = sim.zombies[i];
+    // Past the corner of the view is enough: a crowd trailing an evasive player must count too.
+    const staysPut = z.horde || !hiddenFromEveryone(sim, z, SPAWN_MIN_DISTANCE);
+    if (staysPut) continue;
+    leaving.add(z);
+    excess -= 1;
+  }
+  sim.zombies = sim.zombies.filter((z) => !leaving.has(z));
+}
+
+/** The hunt is off: whatever is left of the horde goes back to roaming the town. */
+function endHorde(sim: SimState): void {
+  sim.spawnQueue = [];
+  for (const z of sim.zombies) {
+    if (!z.horde) continue;
+    z.horde = false;
+    z.speed /= HORDE_SPEED_SCALE;
+    backToRoaming(sim, z);
+  }
+  thinRoamers(sim);
+  emit(sim, { type: 'wave_clear', wave: sim.wave });
+  restockLoot(sim);
+  sim.phase = 'intermission';
+  sim.intermissionLeft = INTERMISSION_SEC;
+  emit(sim, { type: 'wave_intermission', wave: sim.wave + 1, seconds: INTERMISSION_SEC });
+}
+
+/** Horde zombies alive or still to come. */
+export function hordeHostiles(sim: SimState): number {
+  if (sim.phase !== 'wave') return 0;
+  return sim.spawnQueue.length + sim.zombies.filter((z) => z.horde && z.health > 0).length;
+}
+
+export function updateWaves(sim: SimState): void {
+  if (sim.phase === 'intermission') {
+    sim.intermissionLeft -= TICK_DT;
+    if (sim.intermissionLeft <= 1e-9) startHorde(sim);
+    return;
+  }
+  if (sim.phase !== 'wave') return;
+  sim.hordeLeft -= TICK_DT;
+  trickleSpawns(sim);
+  const hordeOver = hordeHostiles(sim) === 0 || sim.hordeLeft <= 0;
+  if (hordeOver) endHorde(sim);
+}

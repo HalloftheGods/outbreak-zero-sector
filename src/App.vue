@@ -1,0 +1,79 @@
+<template>
+  <main class="game-root" :class="{ 'is-aiming': aiming }">
+    <canvas ref="canvasRef" class="game-canvas" />
+
+    <TitleScreen v-if="ui.screen === 'title'" :ui />
+
+    <template v-else-if="ui.screen === 'game'">
+      <template v-if="ui.hud && ui.art">
+        <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" />
+        <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
+      </template>
+      <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
+      <TownMap v-if="ui.mapOpen" :mode="ui.mode" />
+      <PauseMenu v-if="ui.paused" :ui :mode="ui.mode" />
+    </template>
+
+    <GameOverScreen
+      v-else-if="ui.screen === 'gameover' && ui.result"
+      :result="ui.result"
+      :art="ui.art"
+      :restarting="ui.restarting"
+    />
+
+    <ConnectionLost v-else-if="ui.screen === 'lost'" :reason="ui.lostReason" />
+
+    <StudioSplash v-if="splashing" @done="splashing = false" />
+  </main>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, provide, ref, useTemplateRef } from 'vue';
+import ConnectionLost from './components/ConnectionLost.vue';
+import DownedOverlay from './components/DownedOverlay.vue';
+import GameOverScreen from './components/GameOverScreen.vue';
+import HudOverlay from './components/HudOverlay.vue';
+import PauseMenu from './components/PauseMenu.vue';
+import StudioSplash from './components/StudioSplash.vue';
+import TitleScreen from './components/TitleScreen.vue';
+import TownMap from './components/TownMap.vue';
+import { GAME_KEY } from './components/use-game.ts';
+import WaveBanner from './components/WaveBanner.vue';
+import { GameController } from './game/game-controller.ts';
+import { shouldShowSplash } from './game/studio-splash.ts';
+
+const game = new GameController();
+const ui = game.ui;
+const splashing = ref(shouldShowSplash(window.location.search));
+const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
+const aiming = computed(() => ui.value.screen === 'game' && !ui.value.paused && !ui.value.mapOpen);
+
+provide(GAME_KEY, game);
+
+onMounted(() => {
+  if (canvasRef.value) game.mount(canvasRef.value);
+  if (import.meta.env.DEV) window.__outbreak = game;
+});
+
+onBeforeUnmount(() => game.dispose());
+</script>
+
+<style scoped>
+.game-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.game-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+}
+
+.is-aiming {
+  cursor: none;
+}
+</style>

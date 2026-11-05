@@ -1,0 +1,191 @@
+:root {
+  --u: 2px;
+  --ink: #0b0c10;
+  --ink-raised: #17181f;
+  --ink-line: #33343c;
+  --bone: #e4dcc3;
+  --bone-dim: #938d7a;
+  --blood: #b3261e;
+  --blood-bright: #e0463a;
+  --sick: #8fbf3a;
+  --amber: #e8a33d;
+}
+
+html,
+body {
+  background: var(--ink);
+  color: var(--bone);
+  font-family: 'Silkscreen', monospace;
+  font-size: calc(var(--u) * 8);
+  line-height: 1.25;
+}
+
+/* Corners stay notched because each side is its own hard offset shadow. */
+.px-frame {
+  --edge: var(--bone-dim);
+  box-shadow:
+    calc(var(--u) * -1) 0 0 0 var(--edge),
+    var(--u) 0 0 0 var(--edge),
+    0 calc(var(--u) * -1) 0 0 var(--edge),
+    0 var(--u) 0 0 var(--edge);
+}
+
+.px-panel {
+  background: var(--ink);
+  padding: calc(var(--u) * 6);
+}
+
+.px-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 6);
+  padding: calc(var(--u) * 6);
+  overflow-y: auto;
+  background: rgba(7, 8, 12, 0.6);
+}
+
+.px-heading {
+  font-size: calc(var(--u) * 16);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: var(--bone);
+}
+
+.px-heading.is-danger {
+  color: var(--blood-bright);
+}
+
+.px-note {
+  color: var(--bone-dim);
+  text-align: center;
+  max-width: calc(var(--u) * 180);
+}
+
+.px-label {
+  display: block;
+  color: var(--bone-dim);
+  margin-bottom: calc(var(--u) * 2);
+}
+
+.px-button {
+  --edge: var(--bone);
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: calc(var(--u) * 3) calc(var(--u) * 6);
+  background: var(--ink-raised);
+  color: var(--bone);
+  font: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.px-button:hover:not(:disabled),
+.px-button:focus-visible {
+  --edge: var(--amber);
+  outline: none;
+  background: var(--amber);
+  color: var(--ink);
+}
+
+.px-button:active:not(:disabled) {
+  transform: translateY(var(--u));
+}
+
+.px-button:disabled {
+  --edge: var(--ink-line);
+  color: var(--bone-dim);
+  cursor: default;
+}
+
+.px-button.is-primary {
+  --edge: var(--blood-bright);
+  background: var(--blood);
+}
+
+.px-button.is-primary:hover:not(:disabled),
+.px-button.is-primary:focus-visible {
+  --edge: var(--bone);
+  background: var(--blood-bright);
+  color: var(--ink);
+}
+
+.px-input {
+  --edge: var(--ink-line);
+  width: 100%;
+  border: 0;
+  padding: calc(var(--u) * 2) calc(var(--u) * 3);
+  background: var(--ink-raised);
+  color: var(--bone);
+  font: inherit;
+  outline: none;
+  user-select: text;
+}
+
+.px-input:focus {
+  --edge: var(--amber);
+}
+
+.px-input::placeholder {
+  color: var(--bone-dim);
+}
+
+.px-slider {
+  appearance: none;
+  width: 100%;
+  height: calc(var(--u) * 3);
+  background: var(--ink-line);
+  cursor: pointer;
+}
+
+.px-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: calc(var(--u) * 4);
+  height: calc(var(--u) * 7);
+  background: var(--bone);
+}
+
+.px-slider::-moz-range-thumb {
+  width: calc(var(--u) * 4);
+  height: calc(var(--u) * 7);
+  border: 0;
+  border-radius: 0;
+  background: var(--bone);
+}
+
+.px-slider:focus-visible::-webkit-slider-thumb {
+  background: var(--amber);
+}
+
+.px-meter {
+  height: calc(var(--u) * 3);
+  background: var(--ink-line);
+}
+
+.px-meter > span {
+  display: block;
+  width: var(--fill, 100%);
+  height: 100%;
+  background: var(--sick);
+}
+
+@keyframes px-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes px-blink {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-screen, .px-blink {
+    animation: none !important;
+  }
+}
