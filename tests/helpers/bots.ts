@@ -1,8 +1,12 @@
-import { MEDKIT_MAX, PLAYER_RADIUS, WEAPONS } from '../../shared/constants.ts';
+import { EXIT_RADIUS, MEDKIT_MAX, PLAYER_RADIUS, WEAPONS } from '../../shared/constants.ts';
+import { containerInReach, townContainers } from '../../shared/containers.ts';
+import type { Container } from '../../shared/containers.ts';
 import { FlowField } from '../../shared/flow-field.ts';
+import type { Point } from '../../shared/flow-field.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { BuildingInstance, ClientInputPacket, PickupEntity, PlayerEntity, SnapshotPacket, WeaponId, WorldMap, ZombieEntity } from '../../shared/protocol.ts';
-import { buildingBox, doorBox, segmentHitsSolid } from '../../shared/world-map.ts';
+import { buildingBox, doorBox, generateWorldMap, segmentHitsSolid } from '../../shared/world-map.ts';
+import { buildingAt, circleHitsSolid } from '../../shared/world-query.ts';
 
 const KEEP_AWAY = 70;
 const ENGAGE = 170;
@@ -61,6 +65,7 @@ export class CirclingBot {
       weapon: this.bestGun(me),
       melee: false,
       heal: false,
+      search: false,
     };
   }
 
@@ -105,6 +110,36 @@ const SHOVE_RANGE = 26;
 const SHOVE_EVERY_TICKS = 22;
 const HEAL_BELOW = 55;
 const TICKS_BEFORE_UNSTICK = 45;
+/** On the way to the van, only what lies this close is worth the detour. */
+const DETOUR_RANGE = 90;
+/** Far enough inside the van's circle that a shove back does not put it outside. */
+const BOARDED_RANGE = EXIT_RADIUS * 0.6;
+const VAN_APPROACH = PLAYER_RADIUS + 8;
+const COMMITTED = 0.7;
+/** With this many rounds to fire and its health up, it has better things to do than open drawers. */
+const ROUNDS_ENOUGH = 40;
+/** It leaves the drawers alone with anything it can see this close. */
+const SEARCH_SAFE_RANGE = 120;
+/** A shop's shelves are not worth the night: it goes through this many in a building, then moves on. */
+const SEARCHES_PER_BUILDING = 3;
+/** Anything it has been after for this long, it stops being after. */
+const GOAL_PATIENCE_TICKS = 600;
+const SPOT_STEP = 4;
+const SPOT_MARGIN = 24;
+
+interface Goal extends Point {
+  readonly key: string;
+  /** Set when the point of going there is to search. */
+  readonly container?: Container;
+}
+
+const containerKey = ({ id }: Container): string => `container-${id}`;
+
+const isGun = (type: PickupEntity['type']): boolean => type === 'carbine' || type === 'shotgun';
+/** Everyone knows where the guns were kept. */
+const sellsWhatItLacks = (me: PlayerEntity, building: BuildingInstance): boolean =>
+  (building.kind === 'police' && !me.owned.includes('carbine')) || (building.kind === 'gun_shop' && !me.owned.includes('shotgun'));
+const usableRounds = (me: PlayerEntity): number => me.ammo + me.owned.reduce((sum, gun) => sum + me.ammoBag[gun], 0);
 
 /** True if this item would do anything for the player right now. */
 function wanted(me: PlayerEntity, item: PickupEntity): boolean {
@@ -113,18 +148,26 @@ function wanted(me: PlayerEntity, item: PickupEntity): boolean {
   if (item.type === 'pistol_ammo') return me.ammoBag.pistol < WEAPONS.pistol.reserveCap;
   if (item.type === 'carbine_ammo') return me.ammoBag.carbine < WEAPONS.carbine.reserveCap;
   if (item.type === 'shells') return me.ammoBag.shotgun < WEAPONS.shotgun.reserveCap;
-  return !me.owned.includes(item.type);
+  if (item.type === 'knife') return !me.knife;
+  return isGun(item.type) && !me.owned.includes(item.type as WeaponId);
 }
 
 /**
  * Plays the game as intended: walks building to building taking what it needs, keeps
  * moving through trouble, shoots only what is about to reach it, shoves when it can.
+ * With `leavesTown` it also heads for the van once there is one, and follows the run to the next town.
  */
 export class ScavengerBot {
   private readonly id: string;
-  private readonly map: WorldMap;
-  private readonly nav: FlowField;
+  private readonly leavesTown: boolean;
+  private map: WorldMap;
+  private nav: FlowField;
   private readonly searched = new Set<string>();
+  /** Goals it spent too long on, and where it stands to reach the containers it has looked at. */
+  private readonly abandoned = new Set<string>();
+  private readonly spots = new Map<number, Point | null>();
+  private goalTicks = 0;
+  private holdingSearch = false;
   private seq = 0;
   private tick = 0;
   private lastShove = -SHOVE_EVERY_TICKS;
@@ -136,16 +179,66 @@ export class ScavengerBot {
   private unstickY = 0;
   private unstickLeft = 0;
 
-  constructor(id: string, map: WorldMap) {
+  constructor(id: string, map: WorldMap, leavesTown = false) {
     this.id = id;
     this.map = map;
     this.nav = new FlowField(map);
+    this.leavesTown = leavesTown;
+  }
+
+  /** Everything it knew about the old town is no use in the new one. */
+  private followToTown(mapSeed: number): void {
+    if (mapSeed === this.map.seed) return;
+    this.map = generateWorldMap(mapSeed);
+    this.nav = new FlowField(this.map);
+    this.searched.clear();
+    this.abandoned.clear();
+    this.spots.clear();
+    this.goalKey = '';
+  }
+
+  /** Open floor in the container's own room from which it, and nothing else, is what gets searched. */
+  private spotBeside(container: Container): Point | null {
+    const known = this.spots.get(container.id);
+    if (known !== undefined) return known;
+    const { x0, y0, x1, y1 } = container.box;
+    let found: Point | null = null;
+    for (let y = y1 + SPOT_MARGIN; y >= y0 - SPOT_MARGIN && !found; y -= SPOT_STEP) {
+      for (let x = x0 - SPOT_MARGIN; x <= x1 + SPOT_MARGIN && !found; x += SPOT_STEP) {
+        const sameRoom = (buildingAt(this.map, x, y)?.id ?? undefined) === container.building;
+        const reaches = sameRoom && containerInReach(this.map, x, y, (id) => id !== container.id) !== null;
+        if (reaches && !circleHitsSolid(this.map, x, y, PLAYER_RADIUS)) found = { x, y };
+      }
+    }
+    this.spots.set(container.id, found);
+    return found;
+  }
+
+  /** The nearest thing here still worth going through: this building's furniture, or a car at the kerb. */
+  private nextContainer(me: PlayerEntity, opened: ReadonlySet<number>): Container | null {
+    const stocked = usableRounds(me) >= ROUNDS_ENOUGH && me.health >= HEAL_BELOW;
+    if (stocked) return null;
+    const here = townContainers(this.map).filter((c) => (c.building ?? null) === me.indoors);
+    const spent = me.indoors !== null && here.filter((c) => opened.has(c.id)).length >= SEARCHES_PER_BUILDING;
+    if (spent) return null;
+    let best: Container | null = null;
+    let bestDistance = me.indoors ? Infinity : DETOUR_RANGE;
+    for (const container of here) {
+      const distance = Math.hypot(container.x - me.x, container.y - me.y);
+      const open = opened.has(container.id) || this.abandoned.has(containerKey(container));
+      if (!open && distance < bestDistance) {
+        bestDistance = distance;
+        best = container;
+      }
+    }
+    return best;
   }
 
   private nearestBuilding(me: PlayerEntity): BuildingInstance | null {
     let best: BuildingInstance | null = null;
     let bestDistance = Infinity;
-    for (const building of this.map.buildings) {
+    const shops = this.map.buildings.filter((building) => !this.searched.has(building.id) && sellsWhatItLacks(me, building));
+    for (const building of shops.length > 0 ? shops : this.map.buildings) {
       if (this.searched.has(building.id)) continue;
       const door = doorBox(building);
       const distance = Math.hypot(door.x0 - me.x, door.y1 - me.y);
@@ -157,18 +250,32 @@ export class ScavengerBot {
     return best;
   }
 
-  private goal(me: PlayerEntity, snapshot: SnapshotPacket): { x: number; y: number; key: string } {
+  private goal(me: PlayerEntity, snapshot: SnapshotPacket, opened: ReadonlySet<number>): Goal {
     if (me.indoors) this.searched.add(me.indoors);
+    const exit = this.leavesTown ? snapshot.exit : null;
+    const container = exit ? null : this.nextContainer(me, opened);
     let loot: PickupEntity | null = null;
     let bestDistance = Infinity;
     for (const item of snapshot.pickups) {
-      const distance = Math.hypot(item.x - me.x, item.y - me.y);
-      if (wanted(me, item) && distance < bestDistance) {
+      // What it set out for looks nearer than it is, or a doorway between two boxes holds it for good.
+      const distance = Math.hypot(item.x - me.x, item.y - me.y) * (item.id === this.goalKey ? COMMITTED : 1);
+      const walledOff = exit !== null && segmentHitsSolid(this.map, me.x, me.y, item.x, item.y);
+      // What is shut in this room comes before anything but a gun seen lying across town.
+      const worthTheWalk = exit === null && (container === null || isGun(item.type) || item.id === this.goalKey);
+      const inRange = worthTheWalk || distance < DETOUR_RANGE;
+      const giveUp = this.abandoned.has(item.id);
+      if (wanted(me, item) && distance < bestDistance && !walledOff && inRange && !giveUp) {
         bestDistance = distance;
         loot = item;
       }
     }
     if (loot) return { x: loot.x, y: loot.y, key: loot.id };
+    // The van's spot is on its solid body, which no path ends at: the open ground in front of it is.
+    if (exit) return { x: exit.x, y: exit.y + VAN_APPROACH, key: 'exit' };
+
+    const spot = container ? this.spotBeside(container) : null;
+    if (container && spot) return { ...spot, key: containerKey(container), container };
+    if (container) this.abandoned.add(containerKey(container));
 
     const building = this.nearestBuilding(me) ?? this.map.buildings[this.tick % this.map.buildings.length];
     if (this.searched.size >= this.map.buildings.length) this.searched.clear();
@@ -183,11 +290,14 @@ export class ScavengerBot {
     return loaded[loaded.length - 1];
   }
 
-  private steer(me: PlayerEntity, goal: { x: number; y: number; key: string }): { x: number; y: number } {
+  private steer(me: PlayerEntity, goal: Goal): Point {
     if (goal.key !== this.goalKey) {
       this.goalKey = goal.key;
+      this.goalTicks = 0;
       this.nav.recompute([goal]);
     }
+    this.goalTicks += 1;
+    if (this.goalTicks > GOAL_PATIENCE_TICKS) this.abandoned.add(goal.key);
     const moved = Math.hypot(me.x - this.lastX, me.y - this.lastY);
     this.lastX = me.x;
     this.lastY = me.y;
@@ -210,6 +320,7 @@ export class ScavengerBot {
   think(snapshot: SnapshotPacket): ClientInputPacket | null {
     const me = snapshot.players.find((p) => p.id === this.id);
     if (!me) return null;
+    if (this.leavesTown) this.followToTown(snapshot.mapSeed);
     this.tick += 1;
     this.seq += 1;
 
@@ -221,14 +332,26 @@ export class ScavengerBot {
     const shove = canHit && distance < SHOVE_RANGE && this.tick - this.lastShove >= SHOVE_EVERY_TICKS;
     if (shove) this.lastShove = this.tick;
 
-    let heading = this.steer(me, this.goal(me, snapshot));
-    if (target && canHit && distance < 40) {
+    const opened = new Set(snapshot.openedContainers);
+    const goal = this.goal(me, snapshot, opened);
+    let heading = this.steer(me, goal);
+    const inReach = goal.container !== undefined && containerInReach(this.map, me.x, me.y, (id) => opened.has(id)) !== null;
+    const searching = inReach && !(canHit && distance < SEARCH_SAFE_RANGE);
+    if (searching) this.stuckTicks = 0;
+    // The key wants letting go between containers, and after anything that cut a search short.
+    const spent = this.holdingSearch && me.search === 0;
+    this.holdingSearch = searching && !spent;
+    const exit = this.leavesTown ? snapshot.exit : null;
+    const boarding = exit !== null && Math.hypot(exit.x - me.x, exit.y - me.y) <= BOARDED_RANGE;
+    const closingIn = target !== null && canHit && distance < 40;
+    if (closingIn && !boarding) {
       // Backing off while the wind-up runs out beats walking through it.
       heading = { x: me.x - target.x, y: me.y - target.y };
     }
     const length = Math.hypot(heading.x, heading.y) || 1;
-    const dirX = heading.x / length;
-    const dirY = heading.y / length;
+    const standing = boarding || searching;
+    const dirX = standing ? 0 : heading.x / length;
+    const dirY = standing ? 0 : heading.y / length;
     return {
       seq: this.seq,
       up: dirY < -0.3,
@@ -241,6 +364,7 @@ export class ScavengerBot {
       weapon: this.gunFor(me),
       melee: shove,
       heal: me.health < HEAL_BELOW && me.medkits > 0,
+      search: this.holdingSearch,
     };
   }
 }
@@ -271,6 +395,7 @@ export class TriggerBot {
       weapon: null,
       melee: false,
       heal: false,
+      search: false,
     };
   }
 }

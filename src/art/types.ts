@@ -1,4 +1,5 @@
 import type { BuildingKind, PickupType, PropKind, TileKind, WeaponId, ZombieType } from '../../shared/protocol.ts';
+import type { ContainerArt, ContainerLook } from './containers.ts';
 
 /**
  * A baked image. Art is pure data so it builds in Node (contact sheets, tests)
@@ -38,6 +39,10 @@ export interface SurvivorArt {
   readonly weapons: Record<WeaponId, SurvivorWeaponArt>;
   readonly downed: Clip;
   readonly dead: Clip;
+  /** The figure the title screen shows. */
+  readonly portrait: PixelSprite;
+  /** Pixels this survivor's gun sits below the standard build's, for the muzzle flash. */
+  readonly gunDrop: number;
 }
 
 export interface ZombieArt {
@@ -62,6 +67,9 @@ export interface EnvironmentArt {
   readonly interior: { readonly wallFace: PixelSprite; readonly wallCap: PixelSprite; readonly doorMat: PixelSprite };
   /** fire_barrel flames, drawn over its prop. */
   readonly barrelFire: Clip;
+  /** The way out of a level, and its blinking hazard lights. */
+  readonly escapeVan: PixelSprite;
+  readonly escapeVanLights: Clip;
 }
 
 export interface FxArt {
@@ -81,6 +89,8 @@ export interface FxArt {
 
 export interface UiArt {
   readonly crosshair: PixelSprite;
+  /** The crosshair over a zombie's head. */
+  readonly crosshairHead: PixelSprite;
   readonly weaponIcons: Record<WeaponId, PixelSprite>;
   readonly pickupIcons: Record<PickupType, PixelSprite>;
   readonly heart: PixelSprite;
@@ -96,6 +106,8 @@ export interface ArtBook {
   readonly environment: EnvironmentArt;
   /** Floating ground pickups with a bob, looped. */
   readonly pickups: Record<PickupType, Clip>;
+  /** Searchable furniture and vehicles, shut and searched, each drawn in place of its prop. */
+  readonly containers: Record<ContainerLook, ContainerArt>;
   readonly fx: FxArt;
   readonly ui: UiArt;
 }

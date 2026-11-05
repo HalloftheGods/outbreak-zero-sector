@@ -47,7 +47,7 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['counter', 16, 60],
   ],
   diner: [
-    ['counter', 32, NORTH_DEEP], ['counter', 106, NORTH_DEEP],
+    ['fridge', 14, NORTH_WALL], ['counter', 32, NORTH_DEEP], ['fridge', 85, NORTH_WALL], ['counter', 106, NORTH_DEEP],
     ['table', 72, 64], ['table', 128, 64],
     ['sofa', 12, 90, 0.6],
   ],
@@ -66,6 +66,7 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
   ],
   house: [
     ['bed', 16, NORTH_BED],
+    ['fridge', 44, NORTH_WALL],
     ['sofa', 64, 20],
     ['table', 72, 64],
     ['locker', 16, 90, 0.5],
@@ -73,6 +74,7 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
   apartment: [
     ['bed', 16, NORTH_BED], ['bed', 124, NORTH_BED],
     ['sofa', 64, 20],
+    ['fridge', 104, NORTH_WALL], ['fridge', 136, 116],
     ['table', 16, 80], ['table', 120, 80],
     ['locker', 48, NORTH_WALL], ['shelf', 16, 116, 0.5],
   ],

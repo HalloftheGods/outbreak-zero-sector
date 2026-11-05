@@ -1,4 +1,6 @@
+import type { DifficultyId } from '../../shared/difficulty.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
+import type { BenchAction } from '../../shared/workbench.ts';
 
 export type TransportKind = 'solo' | 'coop';
 
@@ -11,8 +13,10 @@ export interface GameTransport {
   onSnapshot: (packet: SnapshotPacket) => void;
   /** Fires at most once, and never after disconnect(). */
   onClosed: (reason: string) => void;
-  connect(name: string): void;
+  /** Solo plays on this difficulty; in co-op the server uses it only if this player is first into the room. */
+  connect(name: string, difficulty?: DifficultyId, character?: number): void;
   sendInput(input: ClientInputPacket): void;
+  sendBench(action: BenchAction): void;
   requestRestart(): void;
   setPaused(paused: boolean): void;
   disconnect(): void;

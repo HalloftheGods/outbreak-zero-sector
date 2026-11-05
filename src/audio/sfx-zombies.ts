@@ -6,6 +6,14 @@ export const fleshHit: Recipe = (v) => {
   noise(v, { at: 0.02, filter: 'bandpass', freq: 450, freq1: 220, q: 4, decay: 0.12, gain: 0.25 });
 };
 
+/** A sharp crack of bone with a wet pop behind it, so it reads over the plain flesh hit. */
+export const headshot: Recipe = (v) => {
+  noise(v, { filter: 'highpass', freq: 2400, decay: 0.03, gain: 0.7 });
+  tone(v, { type: 'square', f0: 950, f1: 200, decay: 0.05, gain: 0.3 });
+  noise(v, { at: 0.02, filter: 'bandpass', freq: 750, freq1: 260, q: 3, decay: 0.14, gain: 0.5 });
+  tone(v, { at: 0.03, type: 'sine', f0: 125, f1: 45, decay: 0.12, gain: 0.4 });
+};
+
 export const claw: Recipe = (v) => {
   noise(v, { filter: 'bandpass', freq: 800, freq1: 3200, q: 1, attack: 0.05, decay: 0.1, gain: 0.3 });
   noise(v, { at: 0.07, filter: 'highpass', freq: 2500, decay: 0.07, gain: 0.2 });

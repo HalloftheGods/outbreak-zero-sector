@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { characterOf } from '../shared/characters.ts';
 import {
   BLOATER_BURST_PLAYER_DAMAGE,
   BLOATER_BURST_RADIUS,
@@ -149,7 +150,7 @@ describe('awareness', () => {
   });
 
   it('notices a player in plain sight, once', () => {
-    const { sim, zombie } = roamerBeside(ZOMBIE_SIGHT_RANGE - 30);
+    const { sim, zombie } = roamerBeside(ZOMBIE_SIGHT_RANGE * characterOf(0).sightRange - 30);
     steps(sim, 10);
     expect(zombie.mode).toBe('hunt');
     const alerts = eventsOf(sim.snapshot(), 'zombie_alert');

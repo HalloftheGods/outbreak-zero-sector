@@ -2,8 +2,10 @@
   <section class="hud">
     <header class="hud-top">
       <div class="hud-chip">
+        <span class="hud-sub">{{ levelLine(hud.level) }}</span>
         <span class="hud-wave" :class="horde.loud ? 'is-threat' : 'is-quiet'">{{ horde.title }}</span>
         <span v-if="horde.detail" class="hud-sub is-threat">{{ horde.detail }}</span>
+        <span class="hud-sub" :class="{ 'is-van': hud.exitOpen }">{{ levelGoal(hud) }}</span>
       </div>
       <div class="hud-chip hud-score">
         <span>{{ hud.score }}</span>
@@ -17,6 +19,7 @@
     <ul v-if="hud.teammates.length" class="hud-team">
       <li v-for="mate in hud.teammates" :key="mate.id" class="hud-chip">
         <span :class="{ 'is-threat': mate.status !== 'alive' }">{{ mate.name }}</span>
+        <span class="hud-sub">{{ mate.character }}</span>
         <span v-if="mate.status !== 'alive'" class="hud-sub is-threat">{{ mate.status }}</span>
         <div v-else class="px-meter hud-team-meter" :style="fill(mate.health, mate.maxHealth)"><span /></div>
       </li>
@@ -31,6 +34,10 @@
           <span>{{ hud.medkits }}</span>
           <span class="hud-slot-key">H</span>
         </div>
+        <div v-if="hud.knife" class="hud-chip hud-knife">
+          <SpriteImg :sprite="art.ui.pickupIcons.knife" />
+          <span class="hud-slot-key">F</span>
+        </div>
         <div class="hud-chip hud-health" :class="{ 'is-low': isLow }">
           <SpriteImg :sprite="art.ui.heart" />
           <div class="px-meter hud-health-meter" :style="fill(hud.health, hud.maxHealth)"><span /></div>
@@ -44,6 +51,7 @@
             <span class="hud-slot-key">{{ index + 1 }}</span>
             <SpriteImg :sprite="art.ui.weaponIcons[weapon]" />
             <span v-if="hud.owned.includes(weapon)" class="hud-slot-rounds">{{ gunRounds(hud, weapon) }}</span>
+            <GunFitPips :fit="hud.gear?.fits[weapon]" />
           </li>
         </ul>
         <div class="hud-ammo" :class="`is-${ammo}`">
@@ -53,7 +61,7 @@
         <div v-if="hud.reload > 0" class="px-meter hud-reload" :style="fill(hud.reload, 1)"><span /></div>
         <template v-else-if="ammo === 'empty'">
           <strong class="hud-empty">Empty</strong>
-          <span class="hud-sub">F: Shove</span>
+          <span class="hud-sub">F: {{ hud.knife ? 'Shove & Stab' : 'Shove' }}</span>
         </template>
         <span v-else-if="swapKey !== null" class="hud-sub is-threat">Press {{ swapKey }}</span>
         <span v-else-if="hud.ammo === 0" class="hud-sub is-threat">Press R</span>
@@ -69,7 +77,9 @@ import type { WeaponId } from '../../shared/protocol.ts';
 import type { ArtBook } from '../art/types.ts';
 import { ammoState, gunRounds, hordeStatus, switchKey } from '../game/hud-state.ts';
 import type { HudState, PlaceBanner } from '../game/hud-state.ts';
+import { levelGoal, levelLine } from '../game/level-hud.ts';
 import type { TransportKind } from '../network/transport.ts';
+import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
 
 const LOW_HEALTH = 0.34;
@@ -170,6 +180,10 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
   color: var(--sick);
 }
 
+.is-van {
+  color: var(--amber);
+}
+
 .hud-score {
   align-items: flex-end;
   color: var(--amber);
@@ -179,7 +193,7 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 .hud-team {
   position: absolute;
   left: calc(var(--u) * 5);
-  top: calc(var(--u) * 28);
+  top: calc(var(--u) * 56);
   display: flex;
   flex-direction: column;
   gap: calc(var(--u) * 2);
@@ -198,7 +212,8 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
   gap: calc(var(--u) * 2);
 }
 
-.hud-medkits {
+.hud-medkits,
+.hud-knife {
   flex-direction: row;
   align-items: center;
   gap: calc(var(--u) * 2);

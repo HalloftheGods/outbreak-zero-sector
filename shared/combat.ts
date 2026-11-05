@@ -6,6 +6,7 @@ import {
   PLAYER_RADIUS,
   TICK_DT,
 } from './constants.ts';
+import { headOnBulletPlane, headshotMultiplier } from './headshots.ts';
 import type { EntityId } from './protocol.ts';
 import { maybeDropOnKill } from './pickups.ts';
 import { hurtPlayer } from './player-health.ts';
@@ -52,7 +53,7 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
     killerId,
     points: z.points,
   });
-  maybeDropOnKill(sim, z.x, z.y);
+  maybeDropOnKill(sim, z.x, z.y, killer);
   if (z.type === 'bloater') burst(sim, z, killerId);
 }
 
@@ -101,6 +102,15 @@ function segmentEntersCircle(
   return t >= 0 && t <= 1 ? t : Infinity;
 }
 
+/** Fraction along the path where it enters the head this bullet was aimed at, or Infinity. */
+function aimedHeadOnPath(sim: SimState, b: BulletState, dx: number, dy: number): number {
+  const aimed = b.headTarget;
+  const headStillThere = aimed && aimed.health > 0;
+  if (!headStillThere) return Infinity;
+  const head = headOnBulletPlane(sim, aimed);
+  return segmentEntersCircle(b.x, b.y, dx, dy, head.x, head.y, head.radius + BULLET_RADIUS);
+}
+
 function firstZombieOnPath(sim: SimState, b: BulletState, dx: number, dy: number): { zombie: ZombieState; t: number } | null {
   nearby.length = 0;
   sim.grid.query(b.x + dx / 2, b.y + dy / 2, Math.hypot(dx, dy) / 2 + BULLET_RADIUS, nearby);
@@ -114,6 +124,9 @@ function firstZombieOnPath(sim: SimState, b: BulletState, dx: number, dy: number
       zombie = z;
     }
   }
+  const headT = aimedHeadOnPath(sim, b, dx, dy);
+  const headFirst = headT < best;
+  if (headFirst) return { zombie: b.headTarget as ZombieState, t: headT };
   return zombie ? { zombie, t: best } : null;
 }
 
@@ -129,8 +142,10 @@ function advanceBullet(sim: SimState, b: BulletState): boolean {
   const wallT = wall ? Math.hypot(wall.x - b.x, wall.y - b.y) / length : Infinity;
   const target = firstZombieOnPath(sim, b, dx, dy);
 
-  if (target && target.t <= wallT) {
-    damageZombie(sim, target.zombie, b.damage, angle, b.shooterId);
+  const struck = target !== null && target.t <= wallT;
+  if (struck) {
+    const damage = b.damage * headshotMultiplier(sim, b, target.zombie, angle);
+    damageZombie(sim, target.zombie, damage, angle, b.shooterId);
     return false;
   }
   if (wall) {

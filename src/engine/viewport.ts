@@ -24,3 +24,12 @@ export function computeViewport(cssW: number, cssH: number, dpr: number): Viewpo
 export function uiUnit(cssW: number, cssH: number): number {
   return Math.max(1.5, Math.round(Math.min(cssW / TARGET_VIEW_W, cssH / TARGET_VIEW_H)) / 2);
 }
+
+/** The window a title page is laid out for, in UI units: the logo and menu with room to breathe. */
+const TITLE_VIEW_W = 400;
+const TITLE_VIEW_H = 360;
+
+/** The title has the whole window, where the HUD hugs its edges, so it can stand larger. Steps by half a unit. */
+export function titleUnit(cssW: number, cssH: number): number {
+  return Math.max(1.5, Math.floor(Math.min(cssW / TITLE_VIEW_W, cssH / TITLE_VIEW_H) * 2) / 2);
+}

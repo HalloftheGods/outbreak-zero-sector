@@ -1,4 +1,6 @@
 import { MEDKIT_MAX, PICKUP_RADIUS, WEAPONS } from '../../shared/constants.ts';
+import { PART_CARRY_CAP } from '../../shared/gun-upgrade-data.ts';
+import { isPartPickup } from '../../shared/gun-upgrades.ts';
 import type {
   BuildingKind,
   EntityId,
@@ -8,10 +10,12 @@ import type {
   PlayerEntity,
   WeaponId,
 } from '../../shared/protocol.ts';
-import type { Banner, PlaceBanner, UiState } from './hud-state.ts';
+import type { Banner, LevelCard, PlaceBanner, UiState } from './hud-state.ts';
+import { levelTitle } from './level-hud.ts';
 
 const BANNER_MS = 2600;
 const PLACE_BANNER_MS = 2200;
+const LEVEL_CARD_MS = 4200;
 /** A refused item on the floor says so once, and again only if the player lingers. */
 const REFUSAL_REPEAT_MS = 2500;
 
@@ -56,18 +60,25 @@ export function refusalNote(player: PlayerEntity, type: PickupType): string | nu
   const noRoomForAmmo = gun !== undefined && player.ammoBag[gun] >= WEAPONS[gun].reserveCap;
   const wastedBandage = type === 'bandage' && player.health >= player.maxHealth;
   const noRoomForMedkit = type === 'medkit' && player.medkits >= MEDKIT_MAX;
+  const secondKnife = type === 'knife' && player.knife;
+  const noRoomForPart = isPartPickup(type) && (player.gear?.parts[type] ?? 0) >= PART_CARRY_CAP;
+  if (noRoomForPart) return 'PARTS FULL';
   if (noRoomForAmmo) return 'AMMO FULL';
   if (wastedBandage) return 'HEALTH FULL';
+  if (secondKnife) return 'ALREADY ARMED';
   return noRoomForMedkit ? 'MEDKITS FULL' : null;
 }
 
-/** The loud banner for a horde event, or null for anything else. */
+const SET_BANNERS: Partial<Record<GameEvent['type'], Omit<Banner, 'key'>>> = {
+  wave_clear: { title: 'THE HORDE MOVES ON', subtitle: 'FOR NOW', tone: 'quiet' },
+  exit_open: { title: 'THE VAN IS HERE', subtitle: 'GET EVERYONE ON BOARD', tone: 'hope' },
+};
+
+/** The loud banner for a horde or the van, or null for anything else. */
 export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
-  switch (event.type) {
-    case 'wave_start': return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
-    case 'wave_clear': return { title: 'THE HORDE MOVES ON', subtitle: 'FOR NOW', tone: 'quiet' };
-    default: return null;
-  }
+  const hordeCame = event.type === 'wave_start';
+  if (hordeCame) return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
+  return SET_BANNERS[event.type] ?? null;
 }
 
 /** Banners, place labels and the words over the player's head: timing and wording, no drawing. */
@@ -76,6 +87,8 @@ export class RunNotices {
   private bannerUntilMs = 0;
   private placeKey = 0;
   private placeUntilMs = 0;
+  private levelCardKey = 0;
+  private levelCardUntilMs = 0;
   private indoors: string | null = null;
   private refusedId: EntityId | null = null;
   private refusedAtMs = 0;
@@ -83,6 +96,7 @@ export class RunNotices {
   reset(): void {
     this.bannerUntilMs = 0;
     this.placeUntilMs = 0;
+    this.levelCardUntilMs = 0;
     this.indoors = null;
     this.refusedId = null;
   }
@@ -97,6 +111,12 @@ export class RunNotices {
     this.placeKey += 1;
     this.placeUntilMs = now + PLACE_BANNER_MS;
     return { key: this.placeKey, label };
+  }
+
+  levelCard(level: number, now: number): LevelCard {
+    this.levelCardKey += 1;
+    this.levelCardUntilMs = now + LEVEL_CARD_MS;
+    return { ...levelTitle(level), key: this.levelCardKey };
   }
 
   /** The building id the player has just stepped into, or null if nothing changed. */
@@ -127,6 +147,11 @@ export class RunNotices {
   expired(ui: UiState, now: number): Partial<UiState> {
     const bannerDone = ui.banner !== null && now > this.bannerUntilMs;
     const placeDone = ui.place !== null && now > this.placeUntilMs;
-    return { ...(bannerDone ? { banner: null } : {}), ...(placeDone ? { place: null } : {}) };
+    const levelCardDone = ui.levelCard !== null && now > this.levelCardUntilMs;
+    return {
+      ...(bannerDone ? { banner: null } : {}),
+      ...(placeDone ? { place: null } : {}),
+      ...(levelCardDone ? { levelCard: null } : {}),
+    };
   }
 }

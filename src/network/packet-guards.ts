@@ -1,6 +1,9 @@
+import { isDifficultyId } from '../../shared/difficulty.ts';
+import { PART_ORDER } from '../../shared/gun-upgrade-data.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type {
   BulletEntity,
+  ExitEntity,
   GameEvent,
   GameOverStats,
   PickupEntity,
@@ -10,19 +13,21 @@ import type {
   WelcomePacket,
   ZombieEntity,
 } from '../../shared/protocol.ts';
+import { isBenchView, isPlayerGear } from './bench-guards.ts';
 
 type Fields = Record<string, unknown>;
 
 const STATUSES: readonly unknown[] = ['alive', 'downed', 'dead'];
 const PHASES: readonly unknown[] = ['intermission', 'wave', 'gameover'];
+const OUTCOMES: readonly unknown[] = ['defeat', 'victory'];
 const ZOMBIE_TYPES: readonly unknown[] = ['walker', 'runner', 'bloater', 'brute'];
-const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun'];
+const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', ...PART_ORDER];
 const WEAPONS: readonly unknown[] = WEAPON_ORDER;
 const EVENT_TYPES: ReadonlySet<unknown> = new Set([
   'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
-  'zombie_hit', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
-  'player_downed', 'player_revived', 'player_dead', 'pickup', 'wave_intermission',
-  'wave_start', 'wave_clear', 'game_over',
+  'zombie_hit', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
+  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'wave_intermission',
+  'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over',
 ]);
 
 const isFields = (v: unknown): v is Fields => typeof v === 'object' && v !== null;
@@ -38,6 +43,7 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && isString(v.id)
     && isString(v.name)
     && typeof v.moving === 'boolean'
+    && typeof v.knife === 'boolean'
     && STATUSES.includes(v.status)
     && WEAPONS.includes(v.weapon)
     && Array.isArray(v.owned)
@@ -47,9 +53,10 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && isFields(v.mags)
     && hasNumbers(v.mags, WEAPON_ORDER)
     && (v.indoors === null || isString(v.indoors))
+    && (v.gear === undefined || isPlayerGear(v.gear))
     && hasNumbers(v, [
       'skin', 'x', 'y', 'angle', 'health', 'maxHealth', 'ammo', 'magSize', 'reserve', 'medkits',
-      'reload', 'bleedout', 'revive', 'score', 'kills', 'lastInputSeq',
+      'reload', 'search', 'bleedout', 'revive', 'score', 'kills', 'lastInputSeq',
     ]);
 }
 
@@ -81,9 +88,15 @@ export function isGameEvent(v: unknown): v is GameEvent {
   return !('x' in v) || (isNumber(v.x) && isNumber(v.y));
 }
 
+export function isExitEntity(v: unknown): v is ExitEntity {
+  return isFields(v) && hasNumbers(v, ['x', 'y', 'progress']);
+}
+
 export function isGameOverStats(v: unknown): v is GameOverStats {
   return isFields(v)
-    && hasNumbers(v, ['wave', 'durationSec'])
+    && OUTCOMES.includes(v.outcome)
+    && isDifficultyId(v.difficulty)
+    && hasNumbers(v, ['level', 'wave', 'durationSec'])
     && Array.isArray(v.players)
     && v.players.every((p) => isFields(p)
       && isString(p.id)
@@ -102,13 +115,17 @@ export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
   return isFields(v)
     && v.type === 'snapshot'
     && PHASES.includes(v.phase)
-    && hasNumbers(v, ['tick', 'wave', 'intermission', 'hostiles'])
+    && hasNumbers(v, ['tick', 'level', 'mapSeed', 'wave', 'intermission', 'hostiles'])
     && Array.isArray(v.players) && v.players.every(isPlayerEntity)
     && Array.isArray(v.zombies) && v.zombies.every(isZombieEntity)
     && Array.isArray(v.bullets) && v.bullets.every(isBulletEntity)
     && Array.isArray(v.pickups) && v.pickups.every(isPickupEntity)
+    && (v.exit === null || isExitEntity(v.exit))
+    && Array.isArray(v.openedContainers)
+    && v.openedContainers.every(isNumber)
     && Array.isArray(v.events) && v.events.every(isGameEvent)
-    && (v.gameOver === null || isGameOverStats(v.gameOver));
+    && (v.gameOver === null || isGameOverStats(v.gameOver))
+    && (v.bench === undefined || isBenchView(v.bench));
 }
 
 /** Returns null for anything that is not a well-formed server packet. */

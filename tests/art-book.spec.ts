@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { PROP_KINDS, SURVIVOR_SKIN_COUNT, TILE_KINDS, TILE_SIZE, WEAPON_ORDER } from '../shared/protocol.ts';
+import { PROP_DEFS, PROP_KINDS, SURVIVOR_SKIN_COUNT, TILE_KINDS, TILE_SIZE, WEAPON_ORDER } from '../shared/protocol.ts';
 import { buildArtBook } from '../src/art/index.ts';
 import { inPalette, toHex } from '../src/art/palette.ts';
 import type { ArtBook, Clip, DirClips, PixelSprite } from '../src/art/types.ts';
 
 const BUILD_BUDGET_MS = 3000;
+/** Enough that a searched piece differs at a glance, not by a stray pixel. */
+const MIN_CHANGED_PIXELS = 40;
 
 function isSprite(value: object): value is PixelSprite {
   return 'rgba' in value;
@@ -18,6 +20,27 @@ function collectSprites(value: unknown, path: string, out: [string, PixelSprite]
     return;
   }
   for (const [key, child] of Object.entries(value)) collectSprites(child, `${path}/${key}`, out);
+}
+
+/** The pixel at an offset from a sprite's anchor, as one number, or -1 where it is clear. */
+function pixelAt({ w, h, ax, ay, rgba }: PixelSprite, dx: number, dy: number): number {
+  const x = ax + dx;
+  const y = ay + dy;
+  const inside = x >= 0 && y >= 0 && x < w && y < h;
+  const at = (y * w + x) * 4;
+  const inked = inside && rgba[at + 3] !== 0;
+  return inked ? (rgba[at] << 16) | (rgba[at + 1] << 8) | rgba[at + 2] : -1;
+}
+
+/** How many pixels differ between two sprites laid on the same anchor. */
+function changedPixels(a: PixelSprite, b: PixelSprite): number {
+  let changed = 0;
+  for (let dy = -Math.max(a.ay, b.ay); dy < Math.max(a.h - a.ay, b.h - b.ay); dy++) {
+    for (let dx = -Math.max(a.ax, b.ax); dx < Math.max(a.w - a.ax, b.w - b.ax); dx++) {
+      changed += Number(pixelAt(a, dx, dy) !== pixelAt(b, dx, dy));
+    }
+  }
+  return changed;
 }
 
 function allDirClips(book: ArtBook): [string, DirClips][] {
@@ -124,6 +147,30 @@ describe('art book', () => {
 
   it('has a sprite for every prop', () => {
     expect(PROP_KINDS.filter((kind) => !book.environment.props[kind])).toEqual([]);
+  });
+
+  it('draws both states of every searchable prop whole, on its footprint, and tells them apart', () => {
+    const props = {
+      drawer: 'bed', locker: 'locker', fridge: 'fridge', cabinet: 'counter', bench: 'workbench', shelf: 'shelf',
+      box: 'crate_stack', car: 'car_sedan_h', car_v: 'car_sedan_v', wreck: 'car_wreck_h', van: 'van_h',
+    } as const;
+    expect(Object.keys(book.containers).sort()).toEqual(Object.keys(props).sort());
+    for (const [look, prop] of Object.entries(props)) {
+      const { closed, opened } = book.containers[look as keyof typeof props];
+      const { w, h } = PROP_DEFS[prop];
+      for (const state of [closed, opened]) {
+        expect(state.ay, look).toBeGreaterThanOrEqual(h);
+        expect(state.ax, look).toBeGreaterThanOrEqual(w / 2);
+        expect(state.w - state.ax, look).toBeGreaterThanOrEqual(w / 2);
+      }
+      expect(changedPixels(closed, opened), look).toBeGreaterThan(MIN_CHANGED_PIXELS);
+    }
+  });
+
+  it('stands a fridge exactly as big as a locker', () => {
+    const { fridge, locker } = book.environment.props;
+    expect(PROP_DEFS.fridge).toEqual(PROP_DEFS.locker);
+    expect([fridge.w, fridge.h, fridge.ax, fridge.ay]).toEqual([locker.w, locker.h, locker.ax, locker.ay]);
   });
 
   it('builds within budget', async () => {

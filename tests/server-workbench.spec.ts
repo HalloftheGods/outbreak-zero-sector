@@ -1,0 +1,87 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { startGameServer } from '../server/server.ts';
+import type { RunningGameServer } from '../server/server.ts';
+import { EXIT_HOLD_SEC } from '../shared/constants.ts';
+import type { SimState } from '../shared/sim-state.ts';
+import { alivePlayers } from '../shared/sim-state.ts';
+import { GameSimulation } from '../shared/simulation.ts';
+import { isSnapshotPacket } from '../src/network/packet-guards.ts';
+import { openLevelExit, stateOf } from './helpers/sim-harness.ts';
+import { TestClient } from './helpers/ws-client.ts';
+
+const SEED = 21;
+
+/** Everyone on their feet is at the van, a moment from leaving. */
+function nearlyAway(state: SimState): void {
+  state.zombies = [];
+  state.populationTarget = 0;
+  state.intermissionLeft = 1e6;
+  const exit = openLevelExit(state);
+  exit.hold = EXIT_HOLD_SEC - 0.15;
+  for (const p of alivePlayers(state)) {
+    p.x = exit.x;
+    p.y = exit.y;
+  }
+}
+
+describe('the workbench over a socket', () => {
+  let server: RunningGameServer;
+  const clients: TestClient[] = [];
+
+  async function room(): Promise<{ state: SimState; ann: TestClient; id: string }> {
+    const sim = new GameSimulation({ seed: SEED, workbench: 'timed' });
+    server = await startGameServer({ port: 0, simulation: sim });
+    const ann = new TestClient(server.port);
+    clients.push(ann);
+    const id = await ann.join('Ann');
+    await ann.until(() => ann.lastSnapshot);
+    return { state: stateOf(sim), ann, id };
+  }
+
+  afterEach(async () => {
+    for (const client of clients.splice(0)) client.socket.terminate();
+    await server.close();
+  });
+
+  it('fits what a client asks for, and a ready client moves the run on', async () => {
+    const { state, ann, id } = await room();
+    state.players[0].parts.barrel = 1;
+    nearlyAway(state);
+    const held = await ann.until(() => ann.lastSnapshot?.bench && ann.lastSnapshot);
+    expect(held.bench?.secondsLeft).toBeGreaterThan(0);
+    expect(isSnapshotPacket(held)).toBe(true);
+
+    ann.send({ type: 'bench', action: { kind: 'fit', weapon: 'pistol', upgrade: 'damage' } });
+    const fitted = await ann.until(() => {
+      const frame = ann.lastSnapshot;
+      return frame?.players[0].gear?.fits.pistol ? frame : undefined;
+    });
+    expect(isSnapshotPacket(fitted)).toBe(true);
+    expect(fitted.players.find((p) => p.id === id)?.gear?.parts.barrel).toBe(0);
+
+    ann.send({ type: 'bench', action: { kind: 'ready', ready: true } });
+    const moved = await ann.until(() => ann.lastSnapshot?.level === 2 && ann.lastSnapshot);
+    expect(moved.bench).toBeUndefined();
+  });
+
+  it('ignores a bench packet that makes no sense', async () => {
+    const { state, ann } = await room();
+    nearlyAway(state);
+    await ann.until(() => ann.lastSnapshot?.bench);
+    ann.send({ type: 'bench', action: { kind: 'ready', ready: 'soon' } });
+    ann.send({ type: 'bench', action: 'ready' });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(state.level).toBe(1);
+  });
+
+  it('accepts a part lying in view of a client', async () => {
+    const { state, ann } = await room();
+    const [p] = state.players;
+    state.pickups.push({ id: 'part', type: 'toolkit', x: p.x + 60, y: p.y, ttl: null, rounds: 0 });
+    const frame = await ann.until(() => {
+      const latest = ann.lastSnapshot;
+      return latest?.pickups.some((item) => item.id === 'part') ? latest : undefined;
+    });
+    expect(isSnapshotPacket(frame)).toBe(true);
+  });
+});

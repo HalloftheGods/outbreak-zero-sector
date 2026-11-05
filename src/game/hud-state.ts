@@ -1,3 +1,6 @@
+import { characterOf } from '../../shared/characters.ts';
+import type { PlayerGear } from '../../shared/gun-upgrades.ts';
+import { levelDef } from '../../shared/levels.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type {
   EntityId,
@@ -10,19 +13,23 @@ import type {
 } from '../../shared/protocol.ts';
 import type { ArtBook } from '../art/types.ts';
 import type { TransportKind } from '../network/transport.ts';
-import type { BestRun } from './storage.ts';
+import { benchHud } from './bench-view.ts';
+import type { BenchHud } from './bench-view.ts';
+import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 export type Screen = 'title' | 'game' | 'gameover' | 'lost';
 
 /** At or under this many rounds across every gun, the HUD starts to warn. */
 const LOW_AMMO_ROUNDS = 10;
 
-/** The title's co-op address box, where Enter means connect. */
+/** The co-op setup page's address box. */
 export const SERVER_FIELD_ID = 'server';
 
 export interface TeammateHud {
   readonly id: EntityId;
   readonly name: string;
+  /** Which survivor they are playing. */
+  readonly character: string;
   readonly health: number;
   readonly maxHealth: number;
   readonly status: PlayerStatus;
@@ -40,18 +47,25 @@ export interface HudState {
   readonly ammoBag: Readonly<Record<WeaponId, number>>;
   readonly mags: Readonly<Record<WeaponId, number>>;
   readonly medkits: number;
+  readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
   readonly kills: number;
   readonly bleedout: number;
   readonly revive: number;
   readonly phase: GamePhase;
+  readonly level: number;
+  /** The van has come for this town. */
+  readonly exitOpen: boolean;
   readonly wave: number;
   readonly intermission: number;
   readonly hostiles: number;
   readonly teammates: readonly TeammateHud[];
   /** Who the camera is on, when that is not you. */
   readonly spectating: string | null;
+  readonly gear: PlayerGear | null;
+  /** Set while the run is held at the workbench. */
+  readonly bench: BenchHud | null;
 }
 
 export interface Banner {
@@ -59,8 +73,16 @@ export interface Banner {
   readonly key: number;
   readonly title: string;
   readonly subtitle: string;
-  /** 'quiet' is for a horde moving on: nothing here is ever safe, so it gets no green. */
-  readonly tone: 'danger' | 'quiet';
+  /** 'quiet' is for a horde moving on: nothing here is ever safe, so it gets no green. 'hope' is the van. */
+  readonly tone: 'danger' | 'quiet' | 'hope';
+}
+
+/** Names a level as it starts. */
+export interface LevelCard {
+  readonly key: number;
+  readonly heading: string;
+  readonly title: string;
+  readonly goal: string;
 }
 
 /** A small label for the place the player just walked into. */
@@ -89,11 +111,13 @@ export interface UiState {
   readonly hud: HudState | null;
   readonly banner: Banner | null;
   readonly place: PlaceBanner | null;
+  readonly levelCard: LevelCard | null;
   readonly result: RunResult | null;
   readonly restarting: boolean;
   readonly lostReason: string;
   readonly signalWeak: boolean;
   readonly best: BestRun | null;
+  readonly leaderboard: readonly LeaderboardEntry[];
   readonly callsign: string;
   readonly serverAddress: string;
   readonly volume: number;
@@ -113,19 +137,24 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     ammoBag: local.ammoBag,
     mags: local.mags,
     medkits: local.medkits,
+    knife: local.knife,
     reload: local.reload,
     score: local.score,
     kills: local.kills,
     bleedout: local.bleedout,
     revive: local.revive,
     phase: snapshot.phase,
+    level: snapshot.level,
+    exitOpen: snapshot.exit !== null,
     wave: snapshot.wave,
     intermission: snapshot.intermission,
     hostiles: snapshot.hostiles,
     teammates: snapshot.players
       .filter((player) => player.id !== local.id)
-      .map(({ id, name, health, maxHealth, status }) => ({ id, name, health, maxHealth, status })),
+      .map(({ id, name, skin, health, maxHealth, status }) => ({ id, name, character: characterOf(skin).name, health, maxHealth, status })),
     spectating,
+    gear: local.gear ?? null,
+    bench: benchHud(snapshot, local),
   };
 }
 

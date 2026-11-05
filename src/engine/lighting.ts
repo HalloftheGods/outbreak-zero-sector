@@ -3,7 +3,7 @@ import type { Rgb, ScreenRect } from './light-field.ts';
 import type { OcclusionGrid } from './occlusion.ts';
 
 /** Moonlight. Whatever no lamp reaches is multiplied by this. */
-const AMBIENT: Rgb = [24, 28, 52];
+export const NIGHT_AMBIENT: Rgb = [24, 28, 52];
 /** Inside a building the moon does not reach: enough to read the room's shape, not its loot. */
 const ROOM_AMBIENT: Rgb = [26, 25, 31];
 /** Outdoors seen from inside, as a share of what it would be. */
@@ -46,13 +46,16 @@ export function parseColor(color: string): Rgb {
   return rgb;
 }
 
+/** The brightnesses that should come out flat under this sky: outdoors, in a room, and outdoors seen from one. */
+function flatLevels(ambient: Rgb): number[] {
+  const sky = Math.max(...ambient);
+  return [sky, Math.max(...ROOM_AMBIENT), Math.round(sky * OUTSIDE_FROM_ROOM)];
+}
+
 /** Bridges the LightField to the screen: rays in, one small canvas out, multiplied over the world. */
 export class Lighting {
-  private readonly field = new LightField([
-    Math.max(...AMBIENT),
-    Math.max(...ROOM_AMBIENT),
-    Math.round(Math.max(...AMBIENT) * OUTSIDE_FROM_ROOM),
-  ]);
+  private readonly field = new LightField(flatLevels(NIGHT_AMBIENT));
+  private ambient: Rgb = NIGHT_AMBIENT;
   private readonly canvas = document.createElement('canvas');
   private readonly ctx: CanvasRenderingContext2D;
   private readonly rays = new Float32Array(BEAM_RAYS + 1);
@@ -61,6 +64,12 @@ export class Lighting {
 
   constructor() {
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
+  }
+
+  /** Each level's sky. Once a level, since the field rebuilds its flat brightnesses. */
+  setAmbient(ambient: Rgb): void {
+    this.ambient = ambient;
+    this.field.setAnchors(flatLevels(ambient));
   }
 
   resize(width: number, height: number): void {
@@ -72,7 +81,7 @@ export class Lighting {
   }
 
   begin(left: number, top: number): void {
-    this.field.begin(left, top, AMBIENT);
+    this.field.begin(left, top, this.ambient);
   }
 
   /** Screen coordinates. Skips anything that cannot reach the view. */

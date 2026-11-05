@@ -14,6 +14,8 @@ import {
   WEAPONS,
 } from '../shared/constants.ts';
 import { damageZombie } from '../shared/combat.ts';
+import { containerLoot } from '../shared/container-loot.ts';
+import { isPartPickup } from '../shared/gun-upgrades.ts';
 import { LOOT_RULES, ammoKillShare, lootSpots, restockLoot } from '../shared/loot.ts';
 import { BUILDING_DEFS, BUILDING_KINDS } from '../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, PickupType } from '../shared/protocol.ts';
@@ -377,8 +379,9 @@ describe('town loot', () => {
     for (const [building, items] of inBuilding) {
       const rule = LOOT_RULES[building.kind];
       const allowed = [...Object.keys(rule.table), ...(rule.fixed ?? [])];
-      for (const item of items) expect(allowed).toContain(item.type);
-      expect(items.length).toBeLessThanOrEqual(rule.items[1] + (rule.fixed?.length ?? 0));
+      const ownLoot = items.filter((item) => !isPartPickup(item.type));
+      for (const item of ownLoot) expect(allowed).toContain(item.type);
+      expect(ownLoot.length).toBeLessThanOrEqual(rule.items[1] + (rule.fixed?.length ?? 0));
     }
   });
 
@@ -424,7 +427,7 @@ describe('town loot', () => {
 
   it.each(SEEDS)('seed %i: all the ammo on the map adds up to about the planned share of the population', (seed) => {
     const { state } = stocked(seed);
-    const share = ammoKillShare(state.pickups);
+    const share = ammoKillShare([...state.pickups, ...containerLoot(state)]);
     expect(share).toBeGreaterThan(AMMO_POPULATION_SHARE * 0.7);
     expect(share).toBeLessThanOrEqual(AMMO_POPULATION_SHARE * 1.02);
   });

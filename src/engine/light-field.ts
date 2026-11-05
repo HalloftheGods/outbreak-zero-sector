@@ -71,10 +71,15 @@ export class LightField {
   /** Per span of a cell row, 1 when every cell in it is one colour with no stipple. */
   private flatSpans = new Uint8Array(0);
   private spanCols = 0;
-  private readonly bands: LightBands;
+  private bands: LightBands;
 
   /** anchors are the flat brightnesses that should come out without a pattern. */
   constructor(anchors: readonly number[]) {
+    this.bands = buildLightBands(lightLevels(anchors));
+  }
+
+  /** A new ambient means new flat brightnesses. Once a level, not once a frame. */
+  setAnchors(anchors: readonly number[]): void {
     this.bands = buildLightBands(lightLevels(anchors));
   }
 

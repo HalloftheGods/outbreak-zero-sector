@@ -8,13 +8,15 @@ const player: PlayerEntity = {
   health: 100, maxHealth: 100, weapon: 'pistol', ammo: 12, magSize: 12, reserve: 12,
   owned: ['pistol'], ammoBag: { pistol: 12, carbine: 0, shotgun: 0 }, mags: { pistol: 12, carbine: 0, shotgun: 0 },
   medkits: 0, indoors: null,
-  reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 3,
+  reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 3, knife: false, search: 0,
 };
 
 const snapshot: SnapshotPacket = {
   type: 'snapshot',
   tick: 9,
   phase: 'wave',
+  level: 3,
+  mapSeed: 77,
   wave: 2,
   intermission: 0,
   hostiles: 1,
@@ -22,6 +24,8 @@ const snapshot: SnapshotPacket = {
   zombies: [{ id: 'z1', type: 'runner', x: 1, y: 1, angle: 0, health: 3, maxHealth: 3, attacking: false }],
   bullets: [{ id: 'b1', shooterId: 'p1', x: 0, y: 0, vx: 1, vy: 1 }],
   pickups: [{ id: 'k1', type: 'medkit', x: 0, y: 0 }],
+  exit: null,
+  openedContainers: [4, 9],
   events: [{ type: 'wave_clear', wave: 1 }],
   gameOver: null,
 };
@@ -46,17 +50,31 @@ describe('packet guards', () => {
     { type: 'melee', playerId: 'p1', x: 1, y: 1, angle: 0, hit: true },
     { type: 'heal', playerId: 'p1', x: 1, y: 1, amount: 50 },
     { type: 'zombie_alert', zombieId: 'z1', zombieType: 'walker', x: 1, y: 1 },
+    { type: 'exit_open', level: 1, x: 1, y: 1 },
+    { type: 'level_complete', level: 1 },
+    { type: 'level_start', level: 2 },
   ])('accepts a $type event', (event) => {
     expect(isGameEvent(event)).toBe(true);
   });
 
   it('accepts a game over block', () => {
-    const gameOver = { wave: 3, durationSec: 90, players: [{ id: 'p1', name: 'ANA', skin: 0, kills: 4, score: 80 }] };
+    const gameOver = { outcome: 'defeat', difficulty: 'stay_close', level: 2, wave: 3, durationSec: 90, players: [{ id: 'p1', name: 'ANA', skin: 0, kills: 4, score: 80 }] };
     expect(isSnapshotPacket(withField({ gameOver }))).toBe(true);
+    expect(isSnapshotPacket(withField({ gameOver: { ...gameOver, outcome: 'victory' } }))).toBe(true);
+  });
+
+  it('accepts an open exit', () => {
+    expect(isSnapshotPacket(withField({ exit: { x: 8, y: 8, progress: 0.5 } }))).toBe(true);
   });
 
   it.each([
     ['a missing tick', { tick: undefined }],
+    ['a missing level', { level: undefined }],
+    ['a missing map seed', { mapSeed: undefined }],
+    ['a missing exit', { exit: undefined }],
+    ['an exit with no position', { exit: { progress: 0 } }],
+    ['an unknown way to end', { gameOver: { outcome: 'draw', level: 1, wave: 0, durationSec: 0, players: [] } }],
+    ['stats with no level', { gameOver: { outcome: 'defeat', wave: 0, durationSec: 0, players: [] } }],
     ['a non-finite number', { hostiles: Number.NaN }],
     ['an unknown phase', { phase: 'lobby' }],
     ['entities that are not a list', { zombies: {} }],

@@ -1,5 +1,5 @@
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
-import type { BuildingInstance, BuildingKind, EntityId, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
+import type { BuildingInstance, BuildingKind, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT, textWidth } from '../engine/bitmap-font.ts';
 import { drawArrow } from '../engine/overlay-renderer.ts';
@@ -38,6 +38,7 @@ const LAW = '#4a78a8';
 const FOOD = '#5c9450';
 const WORK = '#86745a';
 const HOMES = '#4c4c56';
+export const EXIT_COLOR = '#ffc03c';
 
 const BUILDING_COLOR: Record<BuildingKind, string> = {
   pharmacy: MEDICAL,
@@ -60,6 +61,7 @@ export const TOWN_LEGEND: readonly (readonly [string, string])[] = [
   [WORK, 'Garages and yards'],
   [FOOD, 'Food'],
   [HOMES, 'Homes'],
+  [EXIT_COLOR, 'The van, once it comes'],
 ];
 
 const EDGE_COLOR = '#0b0c10';
@@ -210,12 +212,23 @@ export class TownMapView {
     ctx.fillRect(x - 1, y - 1, 3, 3);
   }
 
-  paint(ctx: CanvasRenderingContext2D, players: readonly PlayerEntity[], localId: EntityId | null): void {
+  private drawExit(ctx: CanvasRenderingContext2D, exit: ExitEntity): void {
+    const x = Math.round(exit.x / WORLD_PER_PX);
+    const y = Math.round(exit.y / WORLD_PER_PX);
+    ctx.fillStyle = EDGE_COLOR;
+    ctx.fillRect(x - 5, y - 3, 11, 7);
+    ctx.fillStyle = EXIT_COLOR;
+    ctx.fillRect(x - 4, y - 2, 9, 5);
+    drawOutlinedText(ctx, 'VAN', x, y - 4 - FONT_HEIGHT, EXIT_COLOR);
+  }
+
+  paint(ctx: CanvasRenderingContext2D, players: readonly PlayerEntity[], localId: EntityId | null, exit: ExitEntity | null = null): void {
     ctx.drawImage(this.base, 0, 0);
     for (const id of this.visited) {
       const building = this.building(id);
       if (building) this.drawTick(ctx, building);
     }
+    if (exit) this.drawExit(ctx, exit);
     for (const player of players) {
       const stillOnTheMap = player.status !== 'dead';
       if (stillOnTheMap) this.drawPlayer(ctx, player, player.id === localId);

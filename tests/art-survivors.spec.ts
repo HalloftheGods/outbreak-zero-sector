@@ -57,10 +57,21 @@ describe('survivors', () => {
   it('stays in the character scale', () => {
     for (const skin of art) {
       const { w, h } = bounds(skin.weapons.pistol.idle[6].frames[0]);
-      expect(h).toBeGreaterThanOrEqual(24);
+      expect(h).toBeGreaterThanOrEqual(18);
       expect(h).toBeLessThanOrEqual(32);
       expect(w).toBeLessThanOrEqual(26);
     }
+  });
+
+  it('makes Sol the smallest of the cast', () => {
+    const heights = art.map((skin) => bounds(skin.weapons.pistol.idle[2].frames[0]).h);
+    const sol = heights[heights.length - 1];
+    expect(heights.slice(0, -1).every((height) => height > sol)).toBe(true);
+  });
+
+  it('gives each survivor a portrait from the same frame', () => {
+    const sizes = new Set(art.map(({ portrait }) => `${portrait.w}x${portrait.h}`));
+    expect(sizes.size).toBe(1);
   });
 
   it('puts each muzzle offset on the last pixel of the barrel', () => {
@@ -69,7 +80,7 @@ describe('survivors', () => {
       MUZZLE_OFFSETS[id].forEach(({ x, y }, dir) => {
         const frame = art[0].weapons[id].idle[dir].frames[0];
         const px = x + frame.ax;
-        const py = y + frame.ay;
+        const py = y + frame.ay + art[0].gunDrop;
         const [ax, ay] = AXES[dir];
         expect(opaqueAt(frame, px, py), `${id} ${dir} tip`).toBe(true);
         // Facing the viewer the barrel lies over the legs, so only the tip itself can be checked.

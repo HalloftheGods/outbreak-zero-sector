@@ -1,7 +1,10 @@
-import { PLAYER_RADIUS, PLAYER_SPEED, ZOMBIES } from '../../shared/constants.ts';
+import { PLAYER_RADIUS, ZOMBIES } from '../../shared/constants.ts';
+import { townContainers } from '../../shared/containers.ts';
+import { playerSpeed } from '../../shared/players.ts';
 import { PROP_DEFS } from '../../shared/protocol.ts';
 import type {
   EntityId,
+  ExitEntity,
   PickupEntity,
   PlayerEntity,
   PropInstance,
@@ -9,6 +12,8 @@ import type {
   ZombieEntity,
   ZombieType,
 } from '../../shared/protocol.ts';
+import { containerLook } from '../art/containers.ts';
+import type { ContainerArt } from '../art/containers.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
 import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
@@ -40,6 +45,9 @@ const GLINT_RAY = '#e8c878';
 interface PlacedProp {
   readonly prop: PropInstance;
   readonly sprite: PixelSprite;
+  /** Set on a searchable prop, which swaps its sprite for one of these two once searched. */
+  readonly container: { readonly id: number; readonly art: ContainerArt } | null;
+  /** Both of a container's sprites fit in these bounds. */
   readonly x0: number;
   readonly y0: number;
   readonly x1: number;
@@ -63,7 +71,8 @@ type DrawItem =
   | { readonly y: number; readonly kind: 'building'; readonly building: PlacedBuilding }
   | { readonly y: number; readonly kind: 'player'; readonly player: PlayerEntity }
   | { readonly y: number; readonly kind: 'zombie'; readonly zombie: ZombieEntity }
-  | { readonly y: number; readonly kind: 'pickup'; readonly pickup: PickupEntity };
+  | { readonly y: number; readonly kind: 'pickup'; readonly pickup: PickupEntity }
+  | { readonly y: number; readonly kind: 'exit'; readonly exit: ExitEntity };
 
 const shadows = new Map<number, HTMLCanvasElement>();
 
@@ -104,6 +113,7 @@ export class EntityRenderer {
   private readonly art: ArtBook;
   private readonly visuals: VisualStore;
   private readonly buildings: BuildingLayer;
+  private readonly reducedMotion: boolean;
   private props: PlacedProp[] = [];
   private fires: PlacedProp[] = [];
   private corpses: Corpse[] = [];
@@ -111,25 +121,31 @@ export class EntityRenderer {
   private readonly killed = new Map<EntityId, number>();
   private stamp: (sprite: PixelSprite, x: number, y: number, alpha?: number) => void = () => {};
 
-  constructor(art: ArtBook, visuals: VisualStore, buildings: BuildingLayer) {
+  constructor(art: ArtBook, visuals: VisualStore, buildings: BuildingLayer, reducedMotion = false) {
     this.art = art;
     this.visuals = visuals;
     this.buildings = buildings;
+    this.reducedMotion = reducedMotion;
   }
 
   setMap(map: WorldMap, stamp: (sprite: PixelSprite, x: number, y: number, alpha?: number) => void): void {
     this.stamp = stamp;
-    this.props = map.props.map((prop) => {
-      const sprite = this.art.environment.props[prop.kind];
-      const x0 = Math.round(prop.x) - sprite.ax;
-      const y0 = Math.round(prop.y) - sprite.ay;
+    const containers = new Map(townContainers(map).map((container) => [container.propIndex, container]));
+    this.props = map.props.map((prop, index) => {
+      const found = containers.get(index);
+      const art = found ? this.art.containers[containerLook(found)] : null;
+      const sprite = art ? art.closed : this.art.environment.props[prop.kind];
+      const states = art ? [art.closed, art.opened] : [sprite];
+      const x = Math.round(prop.x);
+      const y = Math.round(prop.y);
       return {
         prop,
         sprite,
-        x0,
-        y0,
-        x1: x0 + sprite.w,
-        y1: y0 + sprite.h,
+        container: found && art ? { id: found.id, art } : null,
+        x0: Math.min(...states.map((state) => x - state.ax)),
+        y0: Math.min(...states.map((state) => y - state.ay)),
+        x1: Math.max(...states.map((state) => x - state.ax + state.w)),
+        y1: Math.max(...states.map((state) => y - state.ay + state.h)),
         tall: sprite.ay > PROP_DEFS[prop.kind].h + 8,
         room: this.buildings.placedAt(prop.x, prop.y - PROP_DEFS[prop.kind].h / 2),
         alpha: 1,
@@ -201,6 +217,8 @@ export class EntityRenderer {
     for (const pickup of scene.pickups) {
       if (visible(pickup.x, pickup.y)) items.push({ y: pickup.y, kind: 'pickup', pickup });
     }
+    const { exit } = scene;
+    if (exit && visible(exit.x, exit.y)) items.push({ y: exit.y, kind: 'exit', exit });
     return items.sort((a, b) => a.y - b.y);
   }
 
@@ -221,10 +239,11 @@ export class EntityRenderer {
     const viewer = scene.players.find((player) => player.id === scene.viewerId) ?? null;
     const blend = 1 - Math.exp(-FADE_RATE * dt);
     for (const item of this.collect(scene, left, top, viewW, viewH)) {
-      if (item.kind === 'prop') this.drawProp(ctx, item.prop, viewer, left, top, blend);
+      if (item.kind === 'prop') this.drawProp(ctx, item.prop, scene, viewer, left, top, blend);
       else if (item.kind === 'building') this.buildings.drawShell(ctx, item.building, left, top);
       else if (item.kind === 'player') this.drawPlayer(ctx, item.player, left, top, time);
       else if (item.kind === 'zombie') this.drawZombie(ctx, item.zombie, left, top, time);
+      else if (item.kind === 'exit') drawSprite(ctx, this.art.environment.escapeVan, Math.round(item.exit.x) - left, Math.round(item.exit.y) - top);
       else this.drawPickup(ctx, item.pickup, left, top, time);
     }
   }
@@ -232,6 +251,7 @@ export class EntityRenderer {
   private drawProp(
     ctx: CanvasRenderingContext2D,
     placed: PlacedProp,
+    scene: SceneView,
     viewer: PlayerEntity | null,
     left: number,
     top: number,
@@ -239,8 +259,11 @@ export class EntityRenderer {
   ): void {
     const hidesViewer = viewer !== null && placed.tall && this.covers(placed, placed.prop.y, viewer);
     placed.alpha += ((hidesViewer ? FADED_ALPHA : 1) - placed.alpha) * blend;
+    const { container } = placed;
+    const searched = container !== null && scene.openedContainers.includes(container.id);
+    const sprite = searched ? container.art.opened : placed.sprite;
     ctx.globalAlpha = placed.alpha;
-    ctx.drawImage(spriteCanvas(placed.sprite), placed.x0 - left, placed.y0 - top);
+    ctx.drawImage(spriteCanvas(sprite), Math.round(placed.prop.x) - sprite.ax - left, Math.round(placed.prop.y) - sprite.ay - top);
     ctx.globalAlpha = 1;
   }
 
@@ -268,7 +291,7 @@ export class EntityRenderer {
     const sinceShot = time - visual.fireAt;
     if (sinceShot < clipDuration(fire)) return clipFrame(fire, sinceShot);
     const walk = set.walk[dir];
-    if (player.moving) return strideFrame(walk, visual.walked, PLAYER_SPEED / walk.fps);
+    if (player.moving) return strideFrame(walk, visual.walked, playerSpeed(player.skin) / walk.fps);
     return clipFrame(set.idle[dir], time);
   }
 
@@ -281,6 +304,7 @@ export class EntityRenderer {
     }
     const sprite = this.survivorFrame(player, time);
     visual.sprite = sprite;
+    visual.gunDrop = this.art.survivors[player.skin % this.art.survivors.length].gunDrop;
     const lunge = this.lunge(time - visual.meleeAt);
     const x = Math.round(player.x + Math.cos(player.angle) * lunge) - left;
     const y = Math.round(player.y + Math.sin(player.angle) * lunge) - top;
@@ -325,7 +349,11 @@ export class EntityRenderer {
     const flames = this.art.environment.barrelFire;
     for (const fire of this.fires) {
       const onScreen = fire.x1 > left && fire.x0 < left + viewW && fire.y1 > top - 24 && fire.y0 < top + viewH;
-      if (onScreen) drawSprite(ctx, clipFrame(flames, time + fire.prop.x), fire.x0 + fire.sprite.ax - left, fire.y0 + fire.sprite.ay - top);
+      if (onScreen) drawSprite(ctx, clipFrame(flames, time + fire.prop.x), Math.round(fire.prop.x) - left, Math.round(fire.prop.y) - top);
+    }
+    if (scene.exit) {
+      const lamps = clipFrame(this.art.environment.escapeVanLights, this.reducedMotion ? 0 : time);
+      drawSprite(ctx, lamps, Math.round(scene.exit.x) - left, Math.round(scene.exit.y) - top);
     }
     for (const bullet of scene.bullets) {
       const clip = this.art.fx.tracer[dirFromAngle(Math.atan2(bullet.vy, bullet.vx))];

@@ -1,8 +1,8 @@
 // Vehicles, drawn nose-left (or nose-up) as hand grids with the paint as letters, so one
 // body serves any colour. The near side and wheels show below the top planes.
 
-import type { PixelSprite } from '../types.ts';
-import { PixelCanvas } from '../kit.ts';
+import type { Clip, PixelSprite } from '../types.ts';
+import { makeClip, PixelCanvas } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
 import type { Color, Ramp } from '../palette.ts';
@@ -103,9 +103,6 @@ function sedanBody(paint: Ramp): PixelCanvas {
 
 export function buildSedanH(): PixelSprite {
   const c = sedanBody([metal[0], metal[1], metal[2]]);
-  // One side window out, one dent in the door.
-  c.rect(26, 12, 7, 3, ink[0]).px(26, 12, metal[2]).px(32, 14, metal[2]);
-  c.rect(19, 17, 3, 1, metal[0]).rect(18, 18, 4, 1, metal[0]);
   c.outline({ selective: true });
   return bake(c, 1, SEDAN_W, 26);
 }
@@ -244,4 +241,15 @@ export function buildVan(): PixelSprite {
   for (const [x, y, w] of [[2, 30, 5], [20, 30, 18], [23, 29, 4], [31, 29, 3], [50, 30, 3]] as const) c.rect(x, y, w, 1, ash[0]);
   c.outline({ selective: true });
   return bake(c, 1, VAN_W, ground);
+}
+
+/** Hazard lights over the escape van, blinking so it can be picked out of the dark. */
+export function buildEscapeVanLights(): Clip {
+  const frame = (lit: boolean): PixelSprite => {
+    const c = new PixelCanvas(VAN_W + 2, 42);
+    const lamp = lit ? fire[3] : fire[0];
+    c.rect(3, 22, 3, 3, lamp).rect(VAN_W - 4, 22, 3, 3, lamp);
+    return bake(c, 1, VAN_W, 38);
+  };
+  return makeClip([frame(true), frame(false)], 2);
 }

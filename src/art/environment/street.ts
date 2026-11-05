@@ -53,35 +53,6 @@ export function buildDumpster(): PixelSprite {
   return bake(c, left, footW, ground);
 }
 
-function crate(c: PixelCanvas, x: number, y: number, w: number, top: number, front: number): void {
-  c.rect(x, y, w, top, wood[2]);
-  c.rect(x, y, w, 1, wood[3]);
-  for (let i = x + 4; i < x + w - 1; i += 4) c.rect(i, y + 1, 1, top - 1, wood[1]);
-  const fy = y + top;
-  c.rect(x, fy, w, front, wood[1]);
-  // Framed face with one diagonal brace.
-  c.rect(x, fy, w, 1, wood[3]);
-  c.rect(x, fy + front - 2, w, 2, wood[2]).rect(x, fy + front - 1, w, 1, wood[1]);
-  c.rect(x, fy, 2, front, wood[2]).rect(x + w - 2, fy, 2, front, wood[1]);
-  c.rect(x + 2, fy + 1, w - 4, front - 3, wood[0]);
-  c.line(x + 2, fy + front - 3, x + w - 3, fy + 1, wood[2]);
-  c.px(x + 1, fy + 1, ink[1]).px(x + w - 2, fy + 1, ink[1]);
-}
-
-export function buildCrates(): PixelSprite {
-  const footW = 20;
-  const c = new PixelCanvas(footW + 4, 34);
-  const ground = 30;
-  const left = 2;
-  groundShadow(c, left + 1, ground - 1, footW, 3);
-  crate(c, left + 9, ground - 15, 12, 5, 10);
-  crate(c, left - 1, ground - 16, 12, 5, 11);
-  crate(c, left + 2, ground - 28, 13, 5, 8);
-  c.rect(left + 10, ground - 15, 1, 15, ink[1]);
-  c.outline({ selective: true });
-  return bake(c, left, footW, ground);
-}
-
 export function buildBarrier(): PixelSprite {
   const footW = 32;
   const c = new PixelCanvas(footW + 2, 24);

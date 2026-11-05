@@ -17,6 +17,8 @@ export interface EntityVisual {
   statusAt: number;
   /** The frame last drawn, for bars and silhouettes that need its size. */
   sprite: PixelSprite | null;
+  /** How far below the standard build this survivor holds a gun. */
+  gunDrop: number;
   seenFrame: number;
 }
 
@@ -34,6 +36,7 @@ function blankVisual(): EntityVisual {
     status: null,
     statusAt: 0,
     sprite: null,
+    gunDrop: 0,
     seenFrame: 0,
   };
 }

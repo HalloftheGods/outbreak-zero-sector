@@ -23,7 +23,11 @@ const ALERT: Record<ZombieType, SfxName> = {
 const PICKUP: Record<PickupType, SfxName> = {
   bandage: 'pickup_bandage', medkit: 'pickup_medkit', pistol_ammo: 'pickup_pistol_ammo',
   carbine_ammo: 'pickup_carbine_ammo', shells: 'pickup_shells', carbine: 'pickup_weapon', shotgun: 'pickup_weapon',
+  knife: 'pickup_weapon',
+  barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
 };
+/** A can on the end of a gun: still a shot, but a dull one. */
+const SUPPRESSED_GAIN = 0.35;
 /** A pack waking at once shares this: at most one alert snarl per window. */
 const ALERT_WINDOW = 0.15;
 
@@ -53,6 +57,7 @@ export class AudioEngine {
   private soundtrack: Soundtrack | null = null;
   private prefs: Prefs = loadPrefs();
   private scene: Scene = 'menu';
+  private town = 1;
   private intensity = 0;
   private health = 1;
   private groanIn = 2;
@@ -69,6 +74,7 @@ export class AudioEngine {
         this.music.setScene(this.scene);
         this.music.setIntensity(this.intensity);
         this.soundtrack = this.makeSoundtrack(this.mixer);
+        this.soundtrack?.setLevel(this.town);
         this.soundtrack?.setScene(this.scene);
       } catch {
         this.mixer = null;
@@ -99,6 +105,12 @@ export class AudioEngine {
 
   playUi(name: 'click' | 'hover' | 'start' | 'pause' | 'resume'): void {
     this.mixer?.play(`ui_${name}`);
+  }
+
+  /** The town being played, which picks the music between hordes. */
+  setLevel(level: number): void {
+    this.town = level;
+    this.soundtrack?.setLevel(level);
   }
 
   setScene(scene: Scene): void {
@@ -142,7 +154,7 @@ export class AudioEngine {
     switch (e.type) {
       case 'shot': {
         const p = at(e.x, e.y, e.playerId);
-        mixer.play(SHOT[e.weapon], p);
+        mixer.play(SHOT[e.weapon], e.suppressed ? { ...p, gain: SUPPRESSED_GAIN } : p);
         if (e.weapon === 'shotgun') mixer.play('pump', { ...p, delay: 0.45, gain: 0.8 });
         break;
       }
@@ -160,6 +172,7 @@ export class AudioEngine {
       case 'weapon_switch': mixer.play('weapon_switch', at(e.x, e.y, e.playerId)); break;
       case 'bullet_impact': mixer.play('impact', { x: e.x, y: e.y }); break;
       case 'zombie_hit': mixer.play('flesh_hit', { x: e.x, y: e.y }); break;
+      case 'headshot': mixer.play('headshot', at(e.x, e.y, e.playerId)); break;
       case 'zombie_die': mixer.play(DEATH[e.zombieType], { x: e.x, y: e.y }); break;
       case 'zombie_attack': mixer.play('claw', { x: e.x, y: e.y }); break;
       case 'bloater_burst': mixer.play('bloater_burst', { x: e.x, y: e.y }); break;
@@ -168,6 +181,7 @@ export class AudioEngine {
       case 'player_dead': mixer.play('player_downed', { ...at(e.x, e.y, e.playerId), pitch: 0.75 }); break;
       case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
       case 'pickup': mixer.play(PICKUP[e.pickup], at(e.x, e.y, e.playerId)); break;
+      case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
       case 'wave_start': mixer.play('wave_start'); break;
       case 'wave_clear': mixer.play('wave_clear'); break;
       case 'game_over': mixer.play('game_over', { local: true }); break;

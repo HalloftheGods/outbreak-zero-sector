@@ -1,6 +1,7 @@
 // Assembles the art book. Each lane owns one build function; see the top of its file.
 
 import type { ArtBook } from './types.ts';
+import { buildContainers } from './containers.ts';
 import { buildEnvironment } from './environment.ts';
 import { buildFx, buildPickups } from './fx.ts';
 import { buildSurvivors } from './survivors.ts';
@@ -9,14 +10,20 @@ import { buildZombies } from './zombies.ts';
 
 let book: ArtBook | null = null;
 
-export function buildArtBook(): ArtBook {
-  book ??= {
+function assemble(): ArtBook {
+  const environment = buildEnvironment();
+  return {
     survivors: buildSurvivors(),
     zombies: buildZombies(),
-    environment: buildEnvironment(),
+    environment,
     pickups: buildPickups(),
+    containers: buildContainers(environment.props),
     fx: buildFx(),
     ui: buildUi(),
   };
+}
+
+export function buildArtBook(): ArtBook {
+  book ??= assemble();
   return book;
 }

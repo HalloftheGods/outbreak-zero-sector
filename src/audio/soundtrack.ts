@@ -1,21 +1,10 @@
 import type { Scene } from './music.ts';
+import { playlistFor } from './playlists.ts';
+import type { Playlist } from './playlists.ts';
 
 /** Fade time constant in seconds; a track is inaudible after about three of these. */
 const FADE_TC = 0.4;
 const SILENT_AFTER_MS = 1600;
-
-interface Playlist {
-  readonly files: readonly string[];
-  /** A horde starts its track from the top; the quiet scenes pick up where they stopped. */
-  readonly fromTop: boolean;
-}
-
-const RUINS: Playlist = { files: ['silent-ruins-variation.mp3'], fromTop: false };
-const LULL: Playlist = { files: ['silent-ruins.mp3'], fromTop: false };
-const HORDE: Playlist = { files: ['escalation-hard.mp3', 'escalation.mp3'], fromTop: true };
-const QUIET: Playlist = { files: [], fromTop: false };
-
-export const PLAYLISTS: Record<Scene, Playlist> = { menu: RUINS, intermission: LULL, wave: HORDE, gameover: QUIET };
 
 /** The parts of an audio element this class touches, so a spec can stand in for one. */
 export type TrackElement = Pick<HTMLAudioElement, 'currentTime' | 'paused' | 'preload' | 'play' | 'pause' | 'addEventListener'>;
@@ -36,6 +25,8 @@ export class Soundtrack {
   private readonly tracks = new Map<string, Track>();
   private readonly turns = new Map<Playlist, number>();
   private playlist: Playlist | null = null;
+  private scene: Scene = 'menu';
+  private level = 1;
   private current: Track | null = null;
   private readonly listening = new AbortController();
 
@@ -47,7 +38,18 @@ export class Soundtrack {
   ) {}
 
   setScene(scene: Scene): void {
-    const playlist = PLAYLISTS[scene];
+    this.scene = scene;
+    this.retune();
+  }
+
+  /** The town being played picks the music between hordes. */
+  setLevel(level: number): void {
+    this.level = level;
+    this.retune();
+  }
+
+  private retune(): void {
+    const playlist = playlistFor(this.scene, this.level);
     const unchanged = playlist === this.playlist;
     if (unchanged) return;
     this.playlist = playlist;

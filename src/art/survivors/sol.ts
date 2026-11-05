@@ -1,0 +1,132 @@
+// Skin 4, Sol: seven years old and the smallest of the cast. A sandy mop of hair, big round
+// glasses, a teal tee with a yellow stripe, denim shorts and red sneakers.
+
+import { RAMPS } from '../palette.ts';
+import type { Person } from './rig.ts';
+
+const { blood, bone, denim, fire, ink, skin, teal, wood } = RAMPS;
+
+const legend = {
+  k: ink[0], K: ink[1],
+  a: skin[0], b: skin[1], c: skin[2], d: skin[3],
+  h: wood[1], i: wood[2], j: wood[3],
+  l: bone[3], L: denim[2],
+  t: teal[0], u: teal[1], v: teal[2], y: fire[2], Y: fire[1],
+  m: denim[0], n: denim[1], o: denim[2],
+  r: skin[3], q: skin[2], p: skin[1], R: skin[3], Q: skin[2], P: skin[1],
+  e: bone[3], f: blood[1], g: blood[2],
+};
+
+export const SOL: Person = {
+  legend,
+  spread: -1,
+  shorter: { legs: 3, torso: 2 },
+  farLegend: { ...legend, r: skin[2], q: skin[1], p: skin[0], R: skin[2], Q: skin[1], P: skin[0], g: blood[1], f: blood[0], e: bone[2] },
+  sleeve: [teal[0], teal[1], teal[2]],
+  cuff: [skin[1], skin[2], skin[3]],
+  hand: [skin[1], skin[2], skin[3]],
+  heads: {
+    0: { dx: 1, rows: [
+      '..hijjih..',
+      '.hijjjjih.',
+      'hijjijjiih',
+      'hijihijhcc',
+      'hhbcccKKcc',
+      'hhKKKKlkKd',
+      '.hbcccKKcc',
+      '..bbccccc.',
+      '...abbbb..',
+    ] },
+    1: { rows: [
+      '..hijjijh.',
+      '.hijjjjjih',
+      'hijjijijih',
+      'hijhijhijc',
+      'hhbKKcKKcc',
+      'hhKlkKKlkK',
+      '.hbKKcKKcc',
+      '..bbccccc.',
+      '...abbbb..',
+    ] },
+    2: { rows: [
+      '..hijjih..',
+      '.hijjjiih.',
+      'hijjijiiih',
+      'hijhijhiih',
+      'bcKKddKKca',
+      'bKlkKKlkKa',
+      'bcKKccKKca',
+      '.ccccbcbb.',
+      '..cbbbbb..',
+    ] },
+    6: { rows: [
+      '..hijjih..',
+      '.hijjjiih.',
+      'hijjijiiih',
+      'hijjjiiihh',
+      'hiijiiiihh',
+      'hhiiiiihhh',
+      'KhhiiihhhK',
+      '.bhhhhhha.',
+      '..abbbba..',
+    ] },
+    7: { rows: [
+      '..hijjijh.',
+      '.hijjjjjih',
+      'hijjijijih',
+      'hijjjiiihh',
+      'hiijiiihcc',
+      'hhiiiihKKc',
+      'KhhiiihKcc',
+      '.bhhhhabb.',
+      '..abbbba..',
+    ] },
+  },
+  torsos: {
+    0: { rows: [
+      '..vvuuu..',
+      '.vvuuuuut',
+      '.yyyyyyyY',
+      '.vuuuuuut',
+      '.uuuuuutt',
+      '.nnnnnnmm',
+      '.onnnnnmm',
+    ] },
+    1: { rows: [
+      '...vvuuu..',
+      '.vvuuuuuut',
+      'yyyyyyyyYY',
+      'vuuuuuuutt',
+      'uuuuuuuutt',
+      'onnnnnnnmm',
+      'onnnnnnnmm',
+    ] },
+    2: { rows: [
+      '...vuuuu..',
+      '.vvuuuuut.',
+      'yyyyyyyyYY',
+      'vuuuuuuutt',
+      'uuuuuuuutt',
+      'onnnnnnnmm',
+      'onnnmmnnmm',
+    ] },
+    6: { rows: [
+      '...vuuuu..',
+      '.vvuuuuut.',
+      'yyyyyyyyYY',
+      'vuuuuuuutt',
+      'uuuuuuuutt',
+      'onnnnnnnmm',
+      'onnnmmnnmm',
+    ] },
+    7: { rows: [
+      '...vuuuu..',
+      '.vvuuuuut.',
+      'yyyyyyyyYY',
+      'vuuuuuuutt',
+      'uuuuuuuutt',
+      'onnnnnnnmm',
+      'onnnmmnnmm',
+    ] },
+  },
+};

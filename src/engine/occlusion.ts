@@ -19,6 +19,7 @@ const BLOCKS_LIGHT: ReadonlySet<PropKind> = new Set<PropKind>([
   'crate_stack',
   'shelf',
   'locker',
+  'fridge',
 ]);
 
 /** Coarse solid grid, so casting light rays costs array reads rather than prop tests. */

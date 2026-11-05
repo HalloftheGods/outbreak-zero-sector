@@ -1,4 +1,5 @@
 import { PLAYER_MAX_HEALTH } from './constants.ts';
+import { noParts } from './gun-upgrades.ts';
 import { giveStartingLoadout } from './player-health.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 
@@ -16,6 +17,7 @@ const FRESH_CONNECTION = {
   left: false,
   right: false,
   shoot: false,
+  aim: null,
   queuedSeq: 0,
   reloadQueued: false,
   weaponQueued: null,
@@ -26,6 +28,12 @@ const FRESH_CONNECTION = {
   dryFireCooldown: 0,
   meleeCooldown: 0,
   reloadLeft: 0,
+  search: 0,
+  searchHeld: false,
+  searchSpent: false,
+  searchingId: null,
+  searchLeft: 0,
+  searchHealth: 0,
 } as const;
 
 export interface Arrival {
@@ -52,11 +60,14 @@ export function createPlayer(arrival: Arrival, spot: { x: number; y: number }): 
     owned: [],
     ammoBag: { pistol: 0, carbine: 0, shotgun: 0 },
     medkits: 0,
+    knife: false,
     indoors: null,
     bleedout: 0,
     score: 0,
     kills: 0,
     guns: {},
+    parts: noParts(),
+    benchReady: false,
   };
   giveStartingLoadout(player);
   return player;

@@ -101,6 +101,21 @@ export const pickupShells: Recipe = (v) => {
   noise(v, { at: 0.2, filter: 'lowpass', freq: 500, decay: 0.08, gain: 0.35 });
 };
 
+/** A door or drawer coming open. */
+export const containerOpen: Recipe = (v) => {
+  noise(v, { filter: 'bandpass', freq: 700, freq1: 1100, q: 2, attack: 0.02, decay: 0.12, gain: 0.3 });
+  tone(v, { at: 0.1, type: 'triangle', f0: 240, f1: 170, decay: 0.05, gain: 0.25 });
+};
+
+/** Things coming off a shelf and hitting the floor, loud enough to be worth flinching at. */
+export const clatter: Recipe = (v) => {
+  [0, 0.07, 0.11, 0.2, 0.26, 0.38].forEach((at, i) => {
+    noise(v, { at, filter: 'bandpass', freq: 2600 - i * 240, q: 3, decay: 0.05, gain: 0.5 });
+    tone(v, { at, type: 'triangle', f0: 1500 - i * 150, f1: 900 - i * 90, decay: 0.05, gain: 0.2 });
+  });
+  noise(v, { at: 0.02, filter: 'lowpass', freq: 500, decay: 0.12, gain: 0.5 });
+};
+
 export const waveClear: Recipe = (v) => {
   [220, 277.2, 329.6, 440].forEach((f, i) => {
     tone(v, { at: i * 0.16, type: 'sawtooth', f0: f, lp: 1800, attack: 0.02, decay: 0.7, gain: 0.2 });

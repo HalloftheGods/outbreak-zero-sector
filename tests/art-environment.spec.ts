@@ -19,7 +19,7 @@ const environment = buildEnvironment();
 type Edge = 'top' | 'bottom' | 'left' | 'right';
 
 const FLOORS = ['floor_wood', 'floor_tile', 'floor_concrete', 'floor_carpet'] as const;
-const FURNITURE = ['shelf', 'counter', 'table', 'sofa', 'bed', 'locker', 'workbench', 'gas_pump'] as const;
+const FURNITURE = ['shelf', 'counter', 'table', 'sofa', 'bed', 'locker', 'fridge', 'workbench', 'gas_pump'] as const;
 const SIDES = ['top', 'bottom', 'left', 'right'] as const;
 const MIN_FACADES = { house: 3, apartment: 2, warehouse: 2 } as const;
 const MAX_RISE = 28;

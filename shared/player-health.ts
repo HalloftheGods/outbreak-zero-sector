@@ -9,6 +9,7 @@ import {
   TICK_DT,
   WEAPONS,
 } from './constants.ts';
+import { noParts } from './gun-upgrades.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { alivePlayers, emit, openGroundNear } from './sim-state.ts';
 
@@ -18,6 +19,8 @@ function resetKit(p: PlayerState, spareRounds: number): void {
   p.guns = { pistol: { ammo: pistol.magSize } };
   p.ammoBag = { pistol: spareRounds, carbine: 0, shotgun: 0 };
   p.medkits = 0;
+  p.knife = false;
+  p.parts = noParts();
   p.owned = ['pistol'];
   p.weapon = 'pistol';
   p.ammo = pistol.magSize;

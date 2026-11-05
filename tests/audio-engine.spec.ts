@@ -49,6 +49,7 @@ const EVENTS: GameEvent[] = [
   { type: 'weapon_switch', playerId: P, weapon: 'carbine', x: 0, y: 0 },
   { type: 'bullet_impact', x: 30, y: 10, angle: 0 },
   { type: 'zombie_hit', zombieId: 'z', zombieType: 'walker', x: 30, y: 0, angle: 0 },
+  { type: 'headshot', playerId: P, zombieId: 'z', zombieType: 'walker', x: 30, y: -20, angle: 0, points: 5 },
   { type: 'zombie_die', zombieId: 'z', zombieType: 'brute', x: 30, y: 0, angle: 0, killerId: P, points: 100 },
   { type: 'zombie_attack', zombieId: 'z', zombieType: 'runner', x: 20, y: 0 },
   { type: 'bloater_burst', x: 20, y: 20, radius: 30 },
@@ -70,7 +71,7 @@ const EVENTS: GameEvent[] = [
   { type: 'wave_intermission', wave: 2, seconds: 10 },
   { type: 'wave_start', wave: 2, hostiles: 12 },
   { type: 'wave_clear', wave: 2 },
-  { type: 'game_over', stats: { wave: 3, durationSec: 120, players: [] } },
+  { type: 'game_over', stats: { outcome: 'defeat', difficulty: 'lights_out', level: 1, wave: 3, durationSec: 120, players: [] } },
 ];
 
 describe('Mixer level', () => {

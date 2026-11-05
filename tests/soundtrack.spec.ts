@@ -1,6 +1,11 @@
 import { existsSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PLAYLISTS, Soundtrack } from '../src/audio/soundtrack.ts';
+import { FINAL_LEVEL, LEVELS } from '../shared/levels.ts';
+import type { Scene } from '../src/audio/music.ts';
+import { LULLS, playlistFor } from '../src/audio/playlists.ts';
+import { Soundtrack } from '../src/audio/soundtrack.ts';
+
+const SCENES: readonly Scene[] = ['menu', 'intermission', 'wave', 'gameover', 'victory', 'credits'];
 
 class FakeElement {
   currentTime = 0;
@@ -53,7 +58,7 @@ describe('the soundtrack', () => {
   });
 
   it('has a file behind every track it names', () => {
-    const files = Object.values(PLAYLISTS).flatMap((playlist) => playlist.files);
+    const files = LEVELS.flatMap((level) => SCENES.flatMap((scene) => playlistFor(scene, level.number).files));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) expect(existsSync(`public/music/${file}`), file).toBe(true);
   });
@@ -103,7 +108,7 @@ describe('the soundtrack', () => {
     music.setScene('wave');
     music.setScene('intermission');
     vi.runAllTimers();
-    expect(playing()).toEqual(['music/silent-ruins.mp3']);
+    expect(playing()).toEqual(['music/level-01-abandoned-streets.mp3']);
   });
 
   it('moves on when a track ends, and ignores the end of one it has left', () => {
@@ -135,6 +140,39 @@ describe('the soundtrack', () => {
     made[0].fire('playing');
     made[0].fire('error');
     expect(available).toEqual([true, false]);
+  });
+
+  it('gives every level its own lull, in turn where it has multiple takes', () => {
+    expect(LULLS).toHaveLength(FINAL_LEVEL);
+    expect(playlistFor('intermission', 2).files).toEqual(['escalation.mp3', 'escalation-hard.mp3', 'level-02-metro-tunnels.mp3']);
+    expect(playlistFor('intermission', 10).files).toEqual(['level-10-final-stand.mp3', 'level-10-final-evacuation.mp3']);
+    expect(playlistFor('intermission', 99)).toBe(playlistFor('intermission', FINAL_LEVEL));
+    music.setLevel(7);
+    music.setScene('intermission');
+    music.setScene('wave');
+    music.setScene('intermission');
+    vi.runAllTimers();
+    expect(playing()).toEqual(['music/level-07-quarantine-breach-alt.mp3']);
+  });
+
+  it('changes the lull when the town changes, but leaves a horde alone', () => {
+    music.setScene('intermission');
+    music.setLevel(3);
+    vi.runAllTimers();
+    expect(playing()).toEqual(['music/level-03-into-the-breach.mp3']);
+    music.setScene('wave');
+    music.setLevel(4);
+    vi.runAllTimers();
+    expect(playing()).toHaveLength(1);
+    expect(playing()[0]).toContain('horde-attack');
+  });
+
+  it('plays the victory theme and then the credits', () => {
+    music.setScene('victory');
+    expect(playing()).toEqual(['music/victory-dark-salvation.mp3']);
+    music.setScene('credits');
+    vi.runAllTimers();
+    expect(playing()).toEqual(['music/end-credits-surviving-the-night.mp3']);
   });
 
   it('stops everything on dispose', () => {

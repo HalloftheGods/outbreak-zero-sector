@@ -10,6 +10,12 @@ export const PLAYER_SPEED = 84;
 export const PLAYER_MAX_HEALTH = 100;
 /** Distance from the player's centre to the barrel tip, reported on shot events. */
 export const MUZZLE_OFFSET = 11;
+/**
+ * Bodies collide on the ground, but people aim at chests. Aim, muzzle flashes
+ * and tracers all sit this far above the ground point, so a shot passes through
+ * the crosshair rather than just under it.
+ */
+export const CHEST_HEIGHT = 13;
 
 export interface WeaponStats {
   readonly label: string;
@@ -69,8 +75,8 @@ export const ZOMBIES: Record<ZombieType, ZombieStats> = {
 
 /** The attack stays in its swing pose this long after the wind-up resolves. */
 export const ZOMBIE_RECOVERY_SEC = 0.22;
-/** Standing population plus any horde. */
-export const ZOMBIE_CAP = 200;
+/** Standing population plus any horde, with room for the last level's. */
+export const ZOMBIE_CAP = 260;
 export const KNOCKBACK_SPEED = 90;
 export const KNOCKBACK_DECAY_PER_SEC = 10;
 
@@ -97,6 +103,18 @@ export const POPULATION_TOPUP_SEC = 5;
 export const SPAWN_SAFE_RADIUS = 520;
 /** Top-ups appear at least this far from every player. */
 export const TOPUP_MIN_DISTANCE = 700;
+
+/** Players start this close to a town's entry. */
+export const SPAWN_SCATTER = 28;
+
+/** Standing this close to the van counts as being at it. */
+export const EXIT_RADIUS = 48;
+/** How long everyone must stay at the van before it leaves. */
+export const EXIT_HOLD_SEC = 2;
+/** Open ground the van needs around it, which clears its footprint. */
+export const EXIT_CLEARANCE = 32;
+/** Health each survivor gets back on reaching the next town. */
+export const LEVEL_CLEAR_HEAL = 25;
 
 /** First lull: enough to reach a building or two before the first horde. */
 export const LEAD_IN_SEC = 140;
@@ -141,8 +159,13 @@ export const BANDAGE_HEAL = 18;
 export const MEDKIT_HEAL = 50;
 export const MEDKIT_MAX = 3;
 
-/** How the world's ammo adds up: all of it should kill about this share of the standing population. */
-export const AMMO_POPULATION_SHARE = 0.6;
+/**
+ * How the world's ammo adds up: all of it should kill about this share of the standing population.
+ * About half of it is shut away in containers, and nobody gets through every drawer in a town.
+ */
+export const AMMO_POPULATION_SHARE = 1.15;
+/** Share of a town's ammo lying on its floors. Containers hold the rest. */
+export const AMMO_FLOOR_SHARE = 0.5;
 /** Items placed in far-off buildings after each horde. */
 export const RESTOCK_ITEMS = 5;
 /** Restock lands at least this far from every player. */

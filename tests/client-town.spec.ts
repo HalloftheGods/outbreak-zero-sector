@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MEDKIT_MAX, WEAPONS } from '../shared/constants.ts';
+import { townContainers } from '../shared/containers.ts';
 import { BUILDING_DEFS } from '../shared/protocol.ts';
 import type { PickupEntity, PlayerEntity } from '../shared/protocol.ts';
 import { generateWorldMap } from '../shared/world-map.ts';
+import { containerLook } from '../src/art/containers.ts';
 import { buildArtBook } from '../src/art/index.ts';
 import type { PixelSprite } from '../src/art/types.ts';
 import { BuildingLayer, roomRect } from '../src/engine/building-layer.ts';
 import { EntityRenderer } from '../src/engine/entity-renderer.ts';
 import { EMPTY_SCENE } from '../src/engine/scene.ts';
-import { FADE_STEPS, fadedCanvas } from '../src/engine/sprite-cache.ts';
+import { FADE_STEPS, fadedCanvas, spriteCanvas } from '../src/engine/sprite-cache.ts';
 import { VisualStore } from '../src/engine/visuals.ts';
 import { WorldRenderer } from '../src/engine/world-renderer.ts';
 import { ClientWorld } from '../src/game/client-world.ts';
@@ -26,7 +28,7 @@ function player(patch: Partial<PlayerEntity> = {}): PlayerEntity {
     id: 'me', name: 'ANA', skin: 0, x: 500, y: 500, angle: 0, moving: false, status: 'alive',
     health: 100, maxHealth: 100, weapon: 'pistol', ammo: 12, magSize: 12, reserve: 12, owned: ['pistol'],
     ammoBag: { pistol: 12, carbine: 0, shotgun: 0 }, mags: { pistol: 12, carbine: 0, shotgun: 0 }, medkits: 0, indoors: null,
-    reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0, ...patch,
+    reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0, knife: false, search: 0, ...patch,
   };
 }
 
@@ -237,7 +239,7 @@ describe('RunNotices', () => {
     const notices = new RunNotices();
     const banner = notices.banner({ title: 'A', subtitle: '', tone: 'danger' }, 0);
     const place = notices.place('Pharmacy', 0);
-    const ui = { banner, place } as UiState;
+    const ui = { banner, place, levelCard: null } as UiState;
     expect(notices.expired(ui, 100)).toEqual({});
     expect(notices.expired(ui, 2400)).toEqual({ place: null });
     expect(notices.expired(ui, 2700)).toEqual({ banner: null, place: null });
@@ -407,6 +409,23 @@ describe('the town on screen', () => {
     const closed = draws();
     buildings.update(furnished.id, 1);
     expect(draws()).toBeGreaterThan(closed);
+  });
+
+  it('swaps a prop for its searched sprite once it has been searched', () => {
+    const container = townContainers(map).find(({ buildingKind }) => buildingKind === 'outdoors')!;
+    const entities = new EntityRenderer(art, new VisualStore(), layer());
+    entities.setMap(map, () => {});
+    const images = (openedContainers: readonly number[]) => {
+      const ctx = fakeCanvas().getContext();
+      const drawImage = vi.fn();
+      ctx.drawImage = drawImage;
+      const scene = { ...EMPTY_SCENE, openedContainers };
+      entities.drawWorld(ctx as unknown as CanvasRenderingContext2D, scene, container.x - 160, container.y - 120, 320, 240, 0, 1 / 60);
+      return drawImage.mock.calls.map(([image]) => image);
+    };
+    const searched = spriteCanvas(art.containers[containerLook(container)].opened);
+    expect(images([])).not.toContain(searched);
+    expect(images([container.id])).toContain(searched);
   });
 
   it('glints a pickup where the light finds it, and stays dark where it does not', () => {

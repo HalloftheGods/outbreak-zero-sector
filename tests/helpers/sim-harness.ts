@@ -1,6 +1,10 @@
+import { EXIT_HOLD_SEC, TICK_RATE } from '../../shared/constants.ts';
+import { openExit } from '../../shared/level-exit.ts';
+import { levelDef } from '../../shared/levels.ts';
 import { BUILDING_DEFS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, ClientInputPacket, GameEvent, PropInstance, SnapshotPacket, ZombieType } from '../../shared/protocol.ts';
-import type { SimState, ZombieState } from '../../shared/sim-state.ts';
+import type { ExitState, SimState, ZombieState } from '../../shared/sim-state.ts';
+import { alivePlayers } from '../../shared/sim-state.ts';
 import { GameSimulation } from '../../shared/simulation.ts';
 import { spawnZombie } from '../../shared/waves.ts';
 
@@ -19,6 +23,7 @@ export function input(overrides: Partial<ClientInputPacket> = {}): ClientInputPa
     weapon: null,
     melee: false,
     heal: false,
+    search: false,
     ...overrides,
   };
 }
@@ -55,6 +60,33 @@ export function addZombie(state: SimState, type: ZombieType, x: number, y: numbe
 export function addRoamer(state: SimState, type: ZombieType, x: number, y: number): ZombieState {
   spawnZombie(state, type, x, y);
   return state.zombies[state.zombies.length - 1];
+}
+
+export const VAN_WAIT_TICKS = EXIT_HOLD_SEC * TICK_RATE;
+
+/** The level's hordes are behind everyone and the van has come. */
+export function openLevelExit(state: SimState): ExitState {
+  state.wave = levelDef(state.level).hordes;
+  openExit(state);
+  return state.exit as ExitState;
+}
+
+/** Starts a horde and sees it off by outlasting it. */
+export function surviveHorde(sim: GameSimulation, state: SimState): void {
+  state.intermissionLeft = 0;
+  sim.step();
+  state.hordeLeft = 0;
+  sim.step();
+}
+
+/** Everyone on their feet walks to the van and waits it out, which leaves the town. */
+export function boardVan(sim: GameSimulation, state: SimState): void {
+  const exit = state.exit as ExitState;
+  for (const p of alivePlayers(state)) {
+    p.x = exit.x;
+    p.y = exit.y;
+  }
+  steps(sim, VAN_WAIT_TICKS);
 }
 
 export function eventsOf<T extends GameEvent['type']>(snapshot: SnapshotPacket, type: T): Extract<GameEvent, { type: T }>[] {

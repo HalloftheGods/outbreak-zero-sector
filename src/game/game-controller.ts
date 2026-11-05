@@ -1,6 +1,5 @@
 import { shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
-import { TICK_DT } from '../../shared/constants.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/protocol.ts';
 import { generateWorldMap } from '../../shared/world-map.ts';
 import { buildArtBook } from '../art/index.ts';
@@ -8,28 +7,31 @@ import { AudioEngine } from '../audio/audio-engine.ts';
 import { aimAngle } from '../engine/camera.ts';
 import { CHEST_HEIGHT, EMPTY_SCENE } from '../engine/scene.ts';
 import type { SceneView } from '../engine/scene.ts';
-import { uiUnit } from '../engine/viewport.ts';
+import { titleUnit, uiUnit } from '../engine/viewport.ts';
 import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
 import type { GameTransport } from '../network/transport.ts';
+import { BenchLink } from './bench-link.ts';
 import { ClientWorld } from './client-world.ts';
-import { SERVER_FIELD_ID } from './hud-state.ts';
 import type { RunResult, UiState } from './hud-state.ts';
+import { loadCharacter } from './character-pref.ts';
+import { loadDifficulty } from './difficulty-pref.ts';
 import { InputManager } from './input-manager.ts';
+import { recordGameFinished, recordLevelReached } from './level-progress.ts';
+import { InputSender } from './input-sender.ts';
+import { tickRunAudio } from './run-audio.ts';
 import { deathFade, finishRun, healthFraction, NO_RUN_UI, RunHud } from './run-hud.ts';
+import { RunStage } from './run-stage.ts';
 import { pickupNote } from './run-notices.ts';
-import { DEFAULT_PREFS, loadBest, loadPrefs, savePrefs } from './storage.ts';
+import { DEFAULT_PREFS, loadBest, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
 
 const GAME_OVER_BEAT_MS = 1800;
 const MAX_FRAME_DT = 0.05;
-const MAX_INPUTS_PER_FRAME = 2;
 const CALLSIGN_MAX = 12;
 const FALLBACK_CALLSIGN = 'SURVIVOR';
 const TITLE_MAP_SEED = 20417;
 const ART_DELAY_MS = 40;
-/** Full intensity by this many hostiles; scales the music, not the danger. */
-const INTENSE_HOSTILES = 24;
 
 type UiSound = 'click' | 'hover' | 'start' | 'pause' | 'resume';
 
@@ -41,14 +43,17 @@ const EVENT_MUSIC: Partial<Record<GameEvent['type'], 'wave' | 'intermission'>> =
 /** Owns a run from menu to game over. Vue only sees the small state in `ui`. */
 export class GameController {
   readonly ui: ShallowRef<UiState>;
+  /** The workbench screen's way to the run. */
+  readonly bench: BenchLink;
 
   private readonly audio = new AudioEngine();
   private readonly input: InputManager;
+  private readonly inputs: InputSender;
   private readonly runHud: RunHud;
+  private readonly stage: RunStage;
   private renderer: WorldRenderer | null = null;
   private transport: GameTransport | null = null;
   private world: ClientWorld | null = null;
-  private map: WorldMap | null = null;
   private titleMap: WorldMap | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private lastScene: SceneView = EMPTY_SCENE;
@@ -56,14 +61,14 @@ export class GameController {
   private artTimer: ReturnType<typeof setTimeout> | null = null;
   private lastFrameMs = 0;
   private lastSnapshotMs = 0;
-  private inputClock = 0;
-  private inputSeq = 0;
   private aim = 0;
   private titleTime = 0;
   /** Set from the moment the run ends, a beat before the results show. */
   private runResult: RunResult | null = null;
   private gameOverAtMs = 0;
   private welcomed = false;
+  /** Highest level already written to storage this page load, so snapshots do not hit it every tick. */
+  private levelNoted = 0;
 
   constructor() {
     const prefs = loadPrefs();
@@ -77,19 +82,28 @@ export class GameController {
       lostReason: '',
       signalWeak: false,
       best: loadBest(),
+      leaderboard: loadLeaderboard(),
       callsign: prefs.callsign || DEFAULT_PREFS.callsign,
       serverAddress: prefs.serverAddress,
       volume: this.audio.volume,
       muted: this.audio.muted,
     });
     this.runHud = new RunHud(() => this.ui.value, (patch) => this.publish(patch));
+    this.stage = new RunStage(this.runHud, () => this.renderer);
     this.input = new InputManager({
       onGesture: () => this.audio.unlock(),
       onPause: () => this.togglePause(),
       onMute: () => this.toggleMute(),
-      onConfirm: (target) => this.confirm(target),
+      onConfirm: () => this.confirm(),
       onMap: () => this.toggleMap(),
       mapUsable: () => this.canUseMap(),
+    });
+    this.inputs = new InputSender(this.input);
+    this.bench = new BenchLink({
+      transport: () => this.transport,
+      menuUp: () => this.isMenuUp(),
+      setInputEnabled: (enabled) => this.input.setEnabled(enabled),
+      settle: () => this.sendNeutralInput(),
     });
   }
 
@@ -149,6 +163,7 @@ export class GameController {
 
   private applyUiUnit(): void {
     document.documentElement.style.setProperty('--u', `${uiUnit(window.innerWidth, window.innerHeight)}px`);
+    document.documentElement.style.setProperty('--title-u', `${titleUnit(window.innerWidth, window.innerHeight)}px`);
   }
 
   private readonly onResize = (): void => {
@@ -240,13 +255,13 @@ export class GameController {
     transport.onWelcome = (packet) => this.onWelcome(packet);
     transport.onSnapshot = (packet) => this.onSnapshot(packet);
     transport.onClosed = (reason) => this.onClosed(reason);
-    transport.connect(this.ui.value.callsign.trim() || FALLBACK_CALLSIGN);
+    transport.connect(this.ui.value.callsign.trim() || FALLBACK_CALLSIGN, loadDifficulty(), loadCharacter());
   }
 
   /** A menu is over the game: solo stops, and co-op stands still while the town carries on. */
   private holdRun(held: boolean): void {
     this.transport?.setPaused(held);
-    this.input.setEnabled(!held);
+    this.input.setEnabled(!held && !this.bench.open);
     this.audio.playUi(held ? 'pause' : 'resume');
     if (held) this.sendNeutralInput();
   }
@@ -276,11 +291,17 @@ export class GameController {
   }
 
   playAgain(): void {
-    const canRestart = this.ui.value.screen === 'gameover' && !this.ui.value.restarting;
+    const won = this.runResult?.stats.outcome === 'victory';
+    const canRestart = this.ui.value.screen === 'gameover' && !this.ui.value.restarting && !won;
     if (!canRestart) return;
     this.audio.playUi('start');
     this.publish({ restarting: true });
     this.transport?.requestRestart();
+  }
+
+  /** The ending screens pick their own track once the tally is read. */
+  endingMusic(scene: 'victory' | 'credits'): void {
+    this.audio.setScene(scene);
   }
 
   toMenu(): void {
@@ -291,15 +312,13 @@ export class GameController {
     this.input.setEnabled(false);
     this.audio.setScene('menu');
     if (this.titleMap) this.renderer?.setMap(this.titleMap);
-    this.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, best: loadBest() });
+    this.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, best: loadBest(), leaderboard: loadLeaderboard() });
   }
 
-  private confirm(target: EventTarget | null): void {
+  /** The title has no say here: its menu answers Enter, and only Start or Join begins a run. */
+  private confirm(): void {
     const { screen } = this.ui.value;
-    const inServerField = target instanceof HTMLInputElement && target.id === SERVER_FIELD_ID;
-    if (screen === 'title' && inServerField) this.startCoop();
-    else if (screen === 'title') this.startSolo();
-    else if (screen === 'gameover') this.playAgain();
+    if (screen === 'gameover') this.playAgain();
     else if (screen === 'lost') this.toMenu();
     else if (this.isMenuUp()) this.togglePause();
   }
@@ -308,16 +327,13 @@ export class GameController {
 
   private onWelcome(packet: WelcomePacket): void {
     this.welcomed = true;
-    this.map = generateWorldMap(packet.mapSeed);
-    this.world = new ClientWorld(this.map, packet.yourId);
-    this.runHud.setMap(this.map);
-    this.renderer?.setMap(this.map);
+    this.world = new ClientWorld(this.stage.open(packet.mapSeed), packet.yourId);
     this.beginRun();
   }
 
   private beginRun(): void {
     this.runResult = null;
-    this.inputClock = 0;
+    this.inputs.reset();
     this.runHud.reset();
     this.input.setEnabled(true);
     this.publish({ ...NO_RUN_UI, screen: 'game', connecting: false });
@@ -346,9 +362,18 @@ export class GameController {
     if (runRestarted) {
       world.restart();
       this.renderer?.reset();
+      this.stage.rewind();
       this.beginRun();
     }
+    this.stage.follow(world, snapshot, now);
+    this.bench.observe(snapshot);
     // Someone joining mid-horde gets no wave_start, so the first frame sets the mood.
+    this.audio.setLevel(snapshot.level);
+    const newLevel = snapshot.level > this.levelNoted;
+    if (newLevel) {
+      this.levelNoted = snapshot.level;
+      recordLevelReached(snapshot.level);
+    }
     const firstOfRun = world.latest === null;
     if (firstOfRun) this.audio.setScene(snapshot.phase === 'wave' ? 'wave' : 'intermission');
     this.lastSnapshotMs = now;
@@ -375,10 +400,12 @@ export class GameController {
 
   private enterGameOver(stats: GameOverStats, localId: string, now: number): void {
     this.runResult = finishRun(stats, localId);
+    const won = stats.outcome === 'victory';
+    if (won) recordGameFinished();
     this.gameOverAtMs = now;
     this.input.setEnabled(false);
-    this.audio.setScene('gameover');
-    this.publish({ paused: false, mapOpen: false, banner: null, place: null, best: loadBest() });
+    this.audio.setScene(stats.outcome === 'victory' ? 'victory' : 'gameover');
+    this.publish({ paused: false, mapOpen: false, banner: null, place: null, best: loadBest(), leaderboard: loadLeaderboard() });
   }
 
   // --- Frame loop ----------------------------------------------------------
@@ -425,6 +452,7 @@ export class GameController {
         camera.screenX(world.predictor.x),
         camera.screenY(world.predictor.y) - CHEST_HEIGHT,
       );
+      this.inputs.aimPoint = renderer.toWorld(pointerX, pointerY);
     }
     const aim = this.aim;
     const delay = transport?.interpolationDelayMs ?? 0;
@@ -437,12 +465,12 @@ export class GameController {
       ...entities,
       pointerX: over ? null : pointerX,
       pointerY: over ? null : pointerY,
-      showCrosshair: this.isPlaying() && !menuUp,
+      showCrosshair: this.isPlaying() && !menuUp && !this.bench.open,
     };
     this.lastScene = scene;
     const sending = transport !== null && !over;
-    if (sending) this.sendInputs(transport, world, aim, dirX, dirY, dt);
-    this.tickAudio(world, scene, dt);
+    if (sending) this.inputs.send(transport, world, aim, dirX, dirY, dt);
+    tickRunAudio(this.audio, world, scene, dt);
     renderer.effects.setHealth(healthFraction(world.localPlayer));
     renderer.effects.setDesaturation(deathFade(world.localPlayer?.status, over));
     renderer.render(scene, dt);
@@ -459,38 +487,9 @@ export class GameController {
     });
   }
 
-  /** Sent at the sim's rate, however fast this display runs. */
-  private sendInputs(transport: GameTransport, world: ClientWorld, aim: number, dirX: number, dirY: number, dt: number): void {
-    this.inputClock += dt;
-    let budget = MAX_INPUTS_PER_FRAME;
-    while (this.inputClock >= TICK_DT && budget > 0) {
-      this.inputClock -= TICK_DT;
-      budget -= 1;
-      this.inputSeq += 1;
-      transport.sendInput(this.input.sample(this.inputSeq, aim, world.localPlayer));
-      world.predictor.record(this.inputSeq, dirX, dirY);
-    }
-    const fellBehind = this.inputClock >= TICK_DT;
-    if (fellBehind) this.inputClock = 0;
-  }
-
-  /** Called when the keys have just been let go, so a teammate does not keep running. */
   private sendNeutralInput(): void {
-    const world = this.world;
-    const inRun = world !== null && this.transport !== null;
-    if (!inRun) return;
-    this.inputSeq += 1;
-    const angle = world.localPlayer?.angle ?? 0;
-    this.transport?.sendInput(this.input.sample(this.inputSeq, angle, null));
-    world.predictor.record(this.inputSeq, 0, 0);
-  }
-
-  private tickAudio(world: ClientWorld, scene: SceneView, dt: number): void {
-    const health = healthFraction(world.localPlayer);
-    this.audio.setListener(scene.focusX, scene.focusY);
-    this.audio.setHealth(health);
-    const threat = scene.phase === 'wave' ? Math.min(1, scene.hostiles / INTENSE_HOSTILES) : 0;
-    this.audio.setIntensity(Math.min(1, threat * 0.75 + (1 - health) * 0.25));
-    this.audio.tick(dt, scene.zombies);
+    const { transport, world } = this;
+    const inRun = world !== null && transport !== null;
+    if (inRun) this.inputs.sendNeutral(transport, world);
   }
 }

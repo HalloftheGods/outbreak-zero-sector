@@ -1,6 +1,8 @@
 import { TICK_DT, TICK_RATE } from '../../shared/constants.ts';
+import type { DifficultyId } from '../../shared/difficulty.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import { GameSimulation } from '../../shared/simulation.ts';
+import type { BenchAction } from '../../shared/workbench.ts';
 import { TickClock } from './tick-clock.ts';
 import type { GameTransport } from './transport.ts';
 
@@ -20,16 +22,24 @@ export class LocalSession implements GameTransport {
   sim: GameSimulation | null = null;
 
   private name = '';
+  private difficulty: DifficultyId | undefined;
+  private character: number | undefined;
   private paused = false;
   private readonly clock = new TickClock(1000 / TICK_RATE, () => this.tick());
 
-  connect(name: string): void {
+  connect(name: string, difficulty?: DifficultyId, character?: number): void {
     this.name = name;
+    this.difficulty = difficulty;
+    this.character = character;
     this.beginRun();
   }
 
   sendInput(input: ClientInputPacket): void {
     this.sim?.setInput(LOCAL_PLAYER_ID, input);
+  }
+
+  sendBench(action: BenchAction): void {
+    this.sim?.benchCommand(LOCAL_PLAYER_ID, action);
   }
 
   /** Every run in solo gets a fresh city. */
@@ -52,8 +62,8 @@ export class LocalSession implements GameTransport {
 
   private beginRun(): void {
     const seed = Math.floor(Math.random() * 0x7fffffff);
-    const sim = new GameSimulation({ seed });
-    sim.addPlayer(LOCAL_PLAYER_ID, this.name);
+    const sim = new GameSimulation({ seed, difficulty: this.difficulty, workbench: 'hold' });
+    sim.addPlayer(LOCAL_PLAYER_ID, this.name, null, this.character);
     this.sim = sim;
     this.paused = false;
     this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: seed });

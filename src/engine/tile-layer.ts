@@ -1,6 +1,7 @@
 import { TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { TileKind, WorldMap } from '../../shared/protocol.ts';
 import type { PixelSprite } from '../art/types.ts';
+import type { Tint } from './level-look.ts';
 import { drawSprite, spriteCanvas } from './sprite-cache.ts';
 
 const CHUNK_TILES = 16;
@@ -16,6 +17,7 @@ export function tileVariant(col: number, row: number, seed: number, count: numbe
 /**
  * The ground, pre-rendered to chunk canvases. Decals are stamped straight into
  * the chunks, so a thousand bloodstains cost no more per frame than clean road.
+ * A level's tint goes in the same way, painted once when a chunk is made.
  */
 export class GroundLayer {
   private readonly map: WorldMap;
@@ -23,10 +25,12 @@ export class GroundLayer {
   private readonly chunkCols: number;
   private readonly chunkRows: number;
   private chunks: (HTMLCanvasElement | undefined)[] = [];
+  private tint: Tint | null;
 
-  constructor(map: WorldMap, tiles: Record<TileKind, readonly PixelSprite[]>) {
+  constructor(map: WorldMap, tiles: Record<TileKind, readonly PixelSprite[]>, tint: Tint | null = null) {
     this.map = map;
     this.tiles = tiles;
+    this.tint = tint;
     this.chunkCols = Math.ceil(map.width / CHUNK_SIZE);
     this.chunkRows = Math.ceil(map.height / CHUNK_SIZE);
   }
@@ -34,6 +38,13 @@ export class GroundLayer {
   /** Back to clean road; chunks rebuild on demand. */
   clear(): void {
     this.chunks = [];
+  }
+
+  setTint(tint: Tint | null): void {
+    const unchanged = tint === this.tint;
+    if (unchanged) return;
+    this.tint = tint;
+    this.clear();
   }
 
   private chunk(chunkCol: number, chunkRow: number): HTMLCanvasElement {
@@ -60,6 +71,12 @@ export class GroundLayer {
         const sprite = variants[tileVariant(col, row, seed, variants.length)];
         ctx.drawImage(spriteCanvas(sprite), (col - firstCol) * TILE_SIZE, (row - firstRow) * TILE_SIZE);
       }
+    }
+    if (this.tint) {
+      ctx.globalAlpha = this.tint.alpha;
+      ctx.fillStyle = this.tint.color;
+      ctx.fillRect(0, 0, CHUNK_SIZE, CHUNK_SIZE);
+      ctx.globalAlpha = 1;
     }
     return canvas;
   }

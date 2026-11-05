@@ -44,6 +44,10 @@ defineProps<{ banner: Banner }>();
   color: var(--bone-dim);
 }
 
+.is-hope .banner-title {
+  color: var(--amber);
+}
+
 @keyframes banner-life {
   0% { opacity: 0; }
   8% { opacity: 1; }

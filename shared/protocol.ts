@@ -1,21 +1,27 @@
 // Single source of truth for everything that crosses the sim/client boundary.
 // Pure data and types only, so it loads in the browser, Node and vitest alike.
 
+import { CHARACTERS } from './characters.ts';
+import type { DifficultyId } from './difficulty.ts';
+import type { PartId } from './gun-upgrade-data.ts';
+import type { PlayerGear } from './gun-upgrades.ts';
+import type { BenchAction, BenchView } from './workbench.ts';
+
 export type EntityId = string;
 
 export type WeaponId = 'pistol' | 'carbine' | 'shotgun';
 export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute';
-export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun';
+export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun' | 'knife' | PartId;
 export type PlayerStatus = 'alive' | 'downed' | 'dead';
 export type GamePhase = 'intermission' | 'wave' | 'gameover';
 
 export const WEAPON_ORDER: readonly WeaponId[] = ['pistol', 'carbine', 'shotgun'];
-export const SURVIVOR_SKIN_COUNT = 4;
+export const SURVIVOR_SKIN_COUNT = CHARACTERS.length;
 
 export interface PlayerEntity {
   readonly id: EntityId;
   name: string;
-  /** Index into the survivor art, 0..SURVIVOR_SKIN_COUNT-1, unique per room while skins last. */
+  /** Index into CHARACTERS and the survivor art. No two players in a room share one. */
   skin: number;
   x: number;
   y: number;
@@ -38,6 +44,10 @@ export interface PlayerEntity {
   mags: Record<WeaponId, number>;
   /** Medkits carried, used with the heal input. */
   medkits: number;
+  /** Carrying a knife, which makes the shove a stab. */
+  knife: boolean;
+  /** 0 when not searching, otherwise 0..1 through the search. */
+  search: number;
   /** Id of the building this player stands in, or null outdoors. */
   indoors: string | null;
   /** 0 when not reloading, otherwise 0..1 through the reload. */
@@ -50,6 +60,8 @@ export interface PlayerEntity {
   kills: number;
   /** Highest input seq applied; the client reconciles prediction against it. */
   lastInputSeq: number;
+  /** Parts carried and work done on guns, left off for someone with neither. */
+  gear?: PlayerGear;
 }
 
 export interface ZombieEntity {
@@ -89,15 +101,32 @@ export interface PlayerRunStats {
   readonly score: number;
 }
 
+/** How a run ended: everyone fell, or the van left the last town. */
+export type RunOutcome = 'defeat' | 'victory';
+
 export interface GameOverStats {
+  readonly outcome: RunOutcome;
+  /** What the run was played on. */
+  readonly difficulty: DifficultyId;
+  /** Level reached, 1 up to the last. */
+  readonly level: number;
+  /** Hordes survived over the whole run, every town added up. */
   readonly wave: number;
   readonly durationSec: number;
   readonly players: readonly PlayerRunStats[];
 }
 
+/** The van out of town, there once the level's last horde is survived. Draw it as a `van_h` prop at x,y. */
+export interface ExitEntity {
+  readonly x: number;
+  readonly y: number;
+  /** 0..1 through the wait with everyone at the van, 0 until they all are. */
+  readonly progress: number;
+}
+
 /** One-shot facts for audio, particles and banners. Every field is in world space. */
 export type GameEvent =
-  | { readonly type: 'shot'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number; readonly angle: number }
+  | { readonly type: 'shot'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number; readonly angle: number; readonly suppressed?: boolean }
   | { readonly type: 'dry_fire'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'melee'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly angle: number; readonly hit: boolean }
   | { readonly type: 'heal'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly amount: number }
@@ -107,6 +136,7 @@ export type GameEvent =
   | { readonly type: 'weapon_switch'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
   | { readonly type: 'bullet_impact'; readonly x: number; readonly y: number; readonly angle: number }
   | { readonly type: 'zombie_hit'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number }
+  | { readonly type: 'headshot'; readonly playerId: EntityId; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly points: number }
   | { readonly type: 'zombie_die'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly killerId: EntityId | null; readonly points: number }
   | { readonly type: 'zombie_attack'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
   | { readonly type: 'bloater_burst'; readonly x: number; readonly y: number; readonly radius: number }
@@ -115,9 +145,13 @@ export type GameEvent =
   | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
+  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
   | { readonly type: 'wave_clear'; readonly wave: number }
+  | { readonly type: 'exit_open'; readonly level: number; readonly x: number; readonly y: number }
+  | { readonly type: 'level_complete'; readonly level: number }
+  | { readonly type: 'level_start'; readonly level: number }
   | { readonly type: 'game_over'; readonly stats: GameOverStats };
 
 export interface ClientInputPacket {
@@ -128,6 +162,9 @@ export interface ClientInputPacket {
   readonly right: boolean;
   /** Radians, world space, y down: 0 = east, PI/2 = south. */
   readonly angle: number;
+  /** The crosshair as a spot in the drawn world, where heads are judged. Left off when there is no crosshair. */
+  readonly aimX?: number;
+  readonly aimY?: number;
   readonly shoot: boolean;
   readonly reload: boolean;
   /** Requested weapon, or null. The sim ignores weapons the player does not own. */
@@ -136,13 +173,19 @@ export interface ClientInputPacket {
   readonly melee: boolean;
   /** Use a carried medkit. */
   readonly heal: boolean;
+  /** The search key is held down. */
+  readonly search: boolean;
 }
 
 export interface SnapshotPacket {
   readonly type: 'snapshot';
   readonly tick: number;
   readonly phase: GamePhase;
-  /** Horde number. Phase 'intermission' is the scavenging lull, phase 'wave' is a horde hunting the players. */
+  /** Level of the run, 1 up to the last. */
+  readonly level: number;
+  /** The town being played: generateWorldMap(mapSeed). A change means the map changed, whatever the events said. */
+  readonly mapSeed: number;
+  /** Horde number in this town. Phase 'intermission' is the scavenging lull, phase 'wave' is a horde hunting the players. */
   readonly wave: number;
   /** Seconds to the next horde during intermission, otherwise 0. */
   readonly intermission: number;
@@ -152,16 +195,22 @@ export interface SnapshotPacket {
   readonly zombies: readonly ZombieEntity[];
   readonly bullets: readonly BulletEntity[];
   readonly pickups: readonly PickupEntity[];
+  /** The way out of this town, sent to everyone wherever they stand, or null until it opens. */
+  readonly exit: ExitEntity | null;
+  /** Ids of the town's containers that have been opened, so everyone sees them open. */
+  readonly openedContainers: readonly number[];
   /** Events since the previous snapshot, in order. */
   readonly events: readonly GameEvent[];
   readonly gameOver: GameOverStats | null;
+  /** Present while the run is held at the workbench between towns. */
+  readonly bench?: BenchView;
 }
 
 export interface WelcomePacket {
   readonly type: 'welcome';
   readonly yourId: EntityId;
   readonly tickRate: number;
-  /** generateWorldMap(mapSeed) rebuilds the same map on the client. */
+  /** generateWorldMap(mapSeed) rebuilds the town being played when this client joined. */
   readonly mapSeed: number;
 }
 
@@ -171,8 +220,10 @@ export type ServerPacket =
   | { readonly type: 'player_disconnected'; readonly playerId: EntityId };
 
 export type ClientPacket =
-  | { readonly type: 'join'; readonly name: string; readonly token: string }
+  /** The difficulty is read from the first player into an empty room and ignored from everyone after. */
+  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number }
   | { readonly type: 'input'; readonly input: ClientInputPacket }
+  | { readonly type: 'bench'; readonly action: BenchAction }
   | { readonly type: 'restart' };
 
 // --- World map -------------------------------------------------------------
@@ -231,6 +282,7 @@ export const PROP_DEFS = {
   sofa: { w: 36, h: 14 },
   bed: { w: 24, h: 32 },
   locker: { w: 16, h: 8 },
+  fridge: { w: 16, h: 8 },
   workbench: { w: 40, h: 12 },
 } as const;
 export type PropKind = keyof typeof PROP_DEFS;

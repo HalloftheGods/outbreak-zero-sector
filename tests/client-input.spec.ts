@@ -304,12 +304,14 @@ describe('InputManager', () => {
     muting.dispose();
   });
 
-  it('tells Enter what had focus', () => {
+  it('confirms on Enter in a field, and counts it as a gesture', () => {
     const onConfirm = vi.fn();
-    const confirming = new InputManager({ ...noop, onConfirm });
+    const onGesture = vi.fn();
+    const confirming = new InputManager({ ...noop, onConfirm, onGesture });
     const field = new (globalThis as unknown as { HTMLInputElement: new () => object }).HTMLInputElement();
     browser.dispatch('keydown', key('Enter', { target: field }));
-    expect(onConfirm).toHaveBeenCalledWith(field);
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onGesture).toHaveBeenCalled();
     confirming.dispose();
   });
 

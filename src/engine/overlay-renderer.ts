@@ -1,5 +1,8 @@
-import { ZOMBIES } from '../../shared/constants.ts';
-import type { EntityId, PlayerEntity, ZombieEntity } from '../../shared/protocol.ts';
+import { characterOf } from '../../shared/characters.ts';
+import { EXIT_RADIUS, ZOMBIES } from '../../shared/constants.ts';
+import { CONTAINER_LABEL } from '../../shared/containers.ts';
+import { HEAD_MARGIN, isOnHead } from '../../shared/headshots.ts';
+import type { EntityId, ExitEntity, PlayerEntity, ZombieEntity } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT } from './bitmap-font.ts';
@@ -8,6 +11,9 @@ import { bodyHeight, drawSprite } from './sprite-cache.ts';
 import type { VisualStore } from './visuals.ts';
 
 const POINTER_INSET = 8;
+/** Clear of the HUD in every corner, and of the screen's edge, where the van must not be missed. */
+const VAN_POINTER_INSET = 26;
+const VAN_POINTER_LABEL_GAP = 5;
 /** A hurt zombie's bar only shows where a light finds it; in the dark it would mark the spot. */
 const BAR_MIN_LIGHT = 60;
 const INK = '#0b0c10';
@@ -16,6 +22,13 @@ const BLOOD = '#c8332a';
 const SICK = '#8fbf3a';
 const AMBER = '#e8a33d';
 const DEFAULT_BODY_HEIGHT = 18;
+/** Words and the wait bar sit this far over the van's ground line. */
+const VAN_TAG_HEIGHT = 46;
+const VAN_BAR_WIDTH = 32;
+const EXIT_RING_DOTS = 28;
+/** A search's bar and prompt sit this far over a head, clear of a teammate's own tag. */
+const SEARCH_TAG_HEIGHT = FONT_HEIGHT * 2 + 12;
+const SEARCH_BAR_WIDTH = 24;
 
 type Pixel = readonly [number, number];
 
@@ -84,6 +97,31 @@ function drawBar(ctx: CanvasRenderingContext2D, x: number, y: number, width: num
   ctx.fillRect(x, y, filled, 2);
 }
 
+/**
+ * Whether a screen point is on a head the player can make out. A head in the dark
+ * stays unmarked, for the same reason a hurt zombie's bar does: it would mark the spot.
+ */
+export function onSeenHead(
+  zombies: readonly ZombieEntity[],
+  screenX: number,
+  screenY: number,
+  left: number,
+  top: number,
+  lightAt: (x: number, y: number) => number,
+  isKilled: (id: EntityId) => boolean,
+): boolean {
+  return zombies.some((zombie) => {
+    const aimedAt = !isKilled(zombie.id) && isOnHead(zombie, screenX + left, screenY + top, HEAD_MARGIN);
+    return aimedAt && lightAt(zombie.x - left, zombie.y - top) >= BAR_MIN_LIGHT;
+  });
+}
+
+/** Dots around the spot that counts as being at the van. */
+const EXIT_RING: readonly Pixel[] = Array.from({ length: EXIT_RING_DOTS }, (_, dot) => {
+  const angle = (dot / EXIT_RING_DOTS) * Math.PI * 2;
+  return [Math.round(Math.cos(angle) * EXIT_RADIUS), Math.round(Math.sin(angle) * EXIT_RADIUS)];
+});
+
 /** Everything drawn on top of the world: bars, names, edge arrows and the crosshair. */
 export class OverlayRenderer {
   private readonly art: ArtBook;
@@ -123,7 +161,7 @@ export class OverlayRenderer {
       drawBar(ctx, x - 8, y, 16, player.health / player.maxHealth, SICK);
       y -= FONT_HEIGHT + 3;
     }
-    drawOutlinedText(ctx, player.name, x, y, BONE);
+    drawOutlinedText(ctx, `${player.name} / ${characterOf(player.skin).name}`, x, y, BONE);
   }
 
   private drawPointers(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number): void {
@@ -132,6 +170,36 @@ export class OverlayRenderer {
       const pointer = edgePointer(player.x - left, player.y - top, viewW, viewH);
       if (pointer) drawArrow(ctx, pointer, SICK);
     }
+  }
+
+  /** A bar over anyone searching, and for the local player the key to hold. */
+  private drawSearch(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number): void {
+    for (const player of scene.players) {
+      const x = Math.round(player.x) - left;
+      const y = Math.round(player.y) - top - this.heightOf(player.id) - SEARCH_TAG_HEIGHT;
+      const prompted = player.id === scene.localId && scene.searchable !== null;
+      if (player.search > 0) drawBar(ctx, x - SEARCH_BAR_WIDTH / 2, y, SEARCH_BAR_WIDTH, player.search, BONE);
+      else if (prompted) drawOutlinedText(ctx, `HOLD E: ${CONTAINER_LABEL[scene.searchable.kind]}`, x, y, AMBER);
+    }
+  }
+
+  /** An arrow to the van while it is out of sight. In sight, the ring to stand in and the wait. */
+  private drawExit(ctx: CanvasRenderingContext2D, exit: ExitEntity, left: number, top: number, viewW: number, viewH: number): void {
+    const x = Math.round(exit.x) - left;
+    const y = Math.round(exit.y) - top;
+    const pointer = edgePointer(x, y, viewW, viewH, VAN_POINTER_INSET);
+    if (pointer) {
+      drawArrow(ctx, pointer, AMBER);
+      const labelBelow = pointer.y < viewH / 2;
+      const labelY = labelBelow ? pointer.y + VAN_POINTER_LABEL_GAP : pointer.y - VAN_POINTER_LABEL_GAP - FONT_HEIGHT;
+      drawOutlinedText(ctx, 'VAN', pointer.x, labelY, AMBER);
+      return;
+    }
+    ctx.fillStyle = AMBER;
+    for (const [dx, dy] of EXIT_RING) ctx.fillRect(x + dx, y + dy, 1, 1);
+    const tagY = y - VAN_TAG_HEIGHT;
+    if (exit.progress > 0) drawBar(ctx, x - VAN_BAR_WIDTH / 2, tagY, VAN_BAR_WIDTH, exit.progress, SICK);
+    else drawOutlinedText(ctx, 'VAN', x, tagY, AMBER);
   }
 
   draw(
@@ -155,10 +223,25 @@ export class OverlayRenderer {
     for (const player of scene.players) {
       this.drawPlayerTag(ctx, player, player.id === scene.localId, left, top, time);
     }
+    this.drawSearch(ctx, scene, left, top);
     this.drawPointers(ctx, scene, left, top, viewW, viewH);
+    const exitShown = scene.exit !== null && scene.phase !== 'gameover';
+    if (exitShown) this.drawExit(ctx, scene.exit, left, top, viewW, viewH);
   }
 
-  drawCrosshair(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    drawSprite(ctx, this.art.ui.crosshair, Math.round(x), Math.round(y));
+  drawCrosshair(
+    ctx: CanvasRenderingContext2D,
+    scene: SceneView,
+    left: number,
+    top: number,
+    lightAt: (x: number, y: number) => number,
+    isKilled: (id: EntityId) => boolean,
+  ): void {
+    const { pointerX: x, pointerY: y } = scene;
+    const noPointer = x === null || y === null;
+    if (noPointer) return;
+    const { crosshair, crosshairHead } = this.art.ui;
+    const sprite = onSeenHead(scene.zombies, x, y, left, top, lightAt, isKilled) ? crosshairHead : crosshair;
+    drawSprite(ctx, sprite, Math.round(x), Math.round(y));
   }
 }

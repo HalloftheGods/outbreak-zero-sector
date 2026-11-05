@@ -1,4 +1,4 @@
-// Skins in SURVIVOR_SKIN_COUNT order. See survivors/rig.ts for how a figure is built.
+// Skins in the order of shared/characters.ts. See survivors/rig.ts for how a figure is built.
 
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
@@ -7,11 +7,14 @@ import type { DrawnDir } from './kit.ts';
 import { ANCHOR_X, ANCHOR_Y } from './survivors/cell.ts';
 import { weaponClips } from './survivors/clips.ts';
 import { deadClip, downedClip } from './survivors/fallen.ts';
-import { COURIER } from './survivors/courier.ts';
-import { MECHANIC } from './survivors/mechanic.ts';
-import { MEDIC } from './survivors/medic.ts';
-import { RANGER } from './survivors/ranger.ts';
+import { KHRONUS8 } from './survivors/khronus8.ts';
+import { NIGHT } from './survivors/night.ts';
+import { portraitOf } from './survivors/portrait.ts';
+import { REX } from './survivors/rex.ts';
+import { bodyDrop } from './survivors/rig.ts';
 import type { Person } from './survivors/rig.ts';
+import { SATORI } from './survivors/satori.ts';
+import { SOL } from './survivors/sol.ts';
 import { GUNS } from './survivors/weapons.ts';
 
 /** Facings drawn by hand, and which of them each mirrored facing copies. */
@@ -34,7 +37,7 @@ export const MUZZLE_OFFSETS: Record<WeaponId, readonly { x: number; y: number }[
   shotgun: muzzleOffsets('shotgun'),
 };
 
-const CAST: readonly Person[] = [RANGER, MEDIC, MECHANIC, COURIER];
+const CAST: readonly Person[] = [NIGHT, KHRONUS8, SATORI, REX, SOL];
 
 /**
  * Each weapon's clips draw on first use. A solo run only ever touches one person, and
@@ -57,7 +60,13 @@ function lazyWeapons(person: Person): Record<WeaponId, SurvivorWeaponArt> {
 }
 
 function art(person: Person): SurvivorArt {
-  return { weapons: lazyWeapons(person), downed: downedClip(person), dead: deadClip(person) };
+  return {
+    weapons: lazyWeapons(person),
+    downed: downedClip(person),
+    dead: deadClip(person),
+    portrait: portraitOf(person),
+    gunDrop: bodyDrop(person),
+  };
 }
 
 export function buildSurvivors(): readonly SurvivorArt[] {

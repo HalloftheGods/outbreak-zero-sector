@@ -60,6 +60,144 @@ body {
   color: var(--blood-bright);
 }
 
+/* The title and its pages run on their own unit, so they fill a big window. */
+.px-title-scale {
+  --u: var(--title-u, 2px);
+  font-size: calc(var(--u) * 8);
+}
+
+/* The title's sub pages: one tinted sheet, so the town keeps moving behind it. */
+.px-page {
+  background: rgba(7, 8, 12, 0.35);
+  animation: px-fade-in 120ms steps(3);
+}
+
+.px-sheet {
+  --edge: var(--ink-line);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 5);
+  width: calc(var(--u) * 280);
+  max-width: 100%;
+  max-height: 100%;
+  padding: calc(var(--u) * 6);
+  background: rgba(11, 12, 16, 0.74);
+}
+
+.px-sheet-heading {
+  font-size: calc(var(--u) * 12);
+}
+
+.px-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 5);
+  min-height: 0;
+  padding: var(--u);
+  overflow-y: auto;
+}
+
+/* Back sits on the left as a link; the page's own actions sit on the right. */
+.px-sheet-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: calc(var(--u) * 4);
+}
+
+.px-sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 4);
+  margin-left: auto;
+}
+
+.px-sheet-actions > .px-button {
+  width: auto;
+  padding-inline: calc(var(--u) * 10);
+}
+
+.px-rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.px-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 4);
+  padding: calc(var(--u) * 2) calc(var(--u) * 3);
+  background: rgba(23, 24, 31, 0.72);
+  color: var(--bone);
+}
+
+.px-error {
+  margin: 0;
+  color: var(--blood-bright);
+}
+
+/* A plain list of words; the marker alone says which one is live. */
+.px-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+}
+
+.px-menu-item {
+  position: relative;
+  border: 0;
+  padding: var(--u) calc(var(--u) * 12);
+  background: none;
+  color: var(--bone-dim);
+  font: inherit;
+  font-size: calc(var(--u) * 11);
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: var(--u) var(--u) 0 var(--ink);
+  outline: none;
+  cursor: pointer;
+}
+
+.px-menu-item.is-selected {
+  color: var(--bone);
+}
+
+.px-menu-item.is-selected::before {
+  content: '>';
+  position: absolute;
+  left: calc(var(--u) * 3);
+  color: var(--amber);
+}
+
+/* A menu link outside the title list (Back, Next, Prev): the same word and marker, lit by hover or focus. */
+.px-link {
+  padding: var(--u) calc(var(--u) * 12) var(--u) calc(var(--u) * 12);
+  font-size: calc(var(--u) * 9);
+}
+
+.px-link:hover:not(:disabled),
+.px-link:focus-visible {
+  color: var(--bone);
+}
+
+.px-link:hover:not(:disabled)::before,
+.px-link:focus-visible::before {
+  content: '>';
+  position: absolute;
+  left: calc(var(--u) * 3);
+  color: var(--amber);
+}
+
+.px-link:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .px-note {
   color: var(--bone-dim);
   text-align: center;
@@ -113,6 +251,13 @@ body {
 .px-button.is-primary:focus-visible {
   --edge: var(--bone);
   background: var(--blood-bright);
+  color: var(--ink);
+}
+
+/* The live choice in a row of boxed choices; red stays for the one button that starts a run. */
+.px-button.is-chosen {
+  --edge: var(--amber);
+  background: var(--amber);
   color: var(--ink);
 }
 
@@ -185,7 +330,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .px-screen, .px-blink {
+  .px-screen, .px-page, .px-blink {
     animation: none !important;
   }
 }

@@ -6,6 +6,7 @@ import type { PixelSprite } from '../types.ts';
 import { PixelCanvas } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
+import { PART_ART } from './parts.ts';
 import { gridSprite } from './shared.ts';
 import type { Grid } from './shared.ts';
 import { BANDAGE, CARBINE_AMMO, PISTOL_AMMO, SHELLS } from './pickups.ts';
@@ -123,6 +124,22 @@ const SHOTGUN_SMALL: Grid = [
   'yxw..........',
 ];
 
+const KNIFE_SMALL: Grid = [
+  '...........pe',
+  '..........ppo',
+  '.........ppo.',
+  '........ppo..',
+  '.......ppo...',
+  '......ppo....',
+  '.....ppo.....',
+  '...nnpo......',
+  '...znnn......',
+  '..zyxn.......',
+  '.zyx.........',
+  'zyx..........',
+  'xw...........',
+];
+
 const HEART: Grid = [
   '..ttt...ttt..',
   '.tuuut.tttts.',
@@ -164,6 +181,10 @@ export function buildCrosshair(): PixelSprite {
   return gridSprite(CROSSHAIR, ICON, 6, 6);
 }
 
+export function buildCrosshairHead(): PixelSprite {
+  return gridSprite(CROSSHAIR, { ...ICON, e: blood[3] }, 6, 6);
+}
+
 export function buildWeaponIcons(): Record<WeaponId, PixelSprite> {
   return { pistol: outlined(PISTOL, 32, 14), carbine: outlined(CARBINE, 32, 14), shotgun: outlined(SHOTGUN, 32, 14) };
 }
@@ -177,6 +198,12 @@ export function buildPickupIcons(): Record<PickupType, PixelSprite> {
     shells: outlined(SHELLS, 15, 15),
     carbine: outlined(CARBINE_SMALL, 15, 15),
     shotgun: outlined(SHOTGUN_SMALL, 15, 15),
+    knife: outlined(KNIFE_SMALL, 15, 15),
+    barrel: outlined(PART_ART.barrel.rows, 15, 15),
+    grip: outlined(PART_ART.grip.rows, 15, 15),
+    magazine: outlined(PART_ART.magazine.rows, 15, 15),
+    suppressor: outlined(PART_ART.suppressor.rows, 15, 15),
+    toolkit: outlined(PART_ART.toolkit.rows, 15, 15),
   };
 }
 

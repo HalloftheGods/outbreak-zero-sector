@@ -6,6 +6,7 @@ import type { Clip } from '../types.ts';
 import { makeClip, PixelCanvas } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
+import { PART_ART } from './parts.ts';
 import type { Grid } from './shared.ts';
 
 const { blood, bone, fire, ink, metal, olive, wood } = RAMPS;
@@ -124,6 +125,14 @@ const SHOTGUN: Grid = [
   'xxxw....mm.................',
 ];
 
+/** A kitchen knife lying flat: wood grip, steel guard, and the blade running to a point. */
+const KNIFE: Grid = [
+  '.......nnooopp..',
+  'zyyyyxmnpppppppp',
+  'xxxxxwmnoooooo..',
+  '.......n........',
+];
+
 interface ItemSpec {
   readonly rows: Grid;
   /** Where the glint sits, relative to the item. */
@@ -138,6 +147,8 @@ const ITEMS: Record<PickupType, ItemSpec> = {
   shells: { rows: SHELLS, glint: [3, 1] },
   carbine: { rows: CARBINE, glint: [8, 1] },
   shotgun: { rows: SHOTGUN, glint: [10, 1] },
+  knife: { rows: KNIFE, glint: [11, 1] },
+  ...PART_ART,
 };
 
 function frame({ rows, glint }: ItemSpec, index: number): PixelCanvas {

@@ -1,43 +1,21 @@
 // The downed crawl and the death collapse. These face no direction, so they reuse a
-// person's own parts: the back view turned on its side, face down, for both.
+// person's own parts: the back view turned on its side, face down, for both. The cast
+// are kids and teens, so a fall stays bloodless: they lie down and the gun drops.
 
 import type { Clip, PixelSprite } from '../types.ts';
 import { makeClip } from '../kit.ts';
-import type { Legend, Point } from '../kit.ts';
-import { RAMPS } from '../palette.ts';
+import type { Point } from '../kit.ts';
 import { Cell, turnClockwise } from './cell.ts';
 import { LEG_SETS } from './legs.ts';
 import type { Strip } from './legs.ts';
-import { drawHand, HEAD_BOTTOM, limbSegment, placePart, TORSO_BOTTOM } from './rig.ts';
+import { bodyDrop, drawHand, HEAD_BOTTOM, legTrim, limbSegment, placePart, torsoBottom, trimStrip } from './rig.ts';
 import type { Person, Tone } from './rig.ts';
 import { GUN_LEGEND } from './weapons.ts';
-
-const { blood } = RAMPS;
 
 const GROUND_Y = 33;
 const TORSO_X = 13;
 /** A body lying down is foreshortened, so it is no wider than this. */
 const LYING_WIDTH = 10;
-
-const POOL_LEGEND: Legend = { a: blood[0], b: blood[1], c: blood[2] };
-
-const POOL_SMALL = [
-  '......aabbbbba.....',
-  '...aabbbbbbbbbbaa..',
-  '.aabbbbbcbbbbbbbba.',
-  '..aabbbbbbbbbbaa...',
-  '.....aaaaaa........',
-];
-
-const POOL_LARGE = [
-  '........aabbbbbaa.......',
-  '....aaabbbbbbbbbbbaa....',
-  '.aabbbbbbcbbbbbbbbbbbaa.',
-  'aabbbbbbbbbbcbbbbbbbbbba',
-  '.aaabbbbbbbbbbbbbbbbaa..',
-  '....aabbbbbbbaaabaa.....',
-  '.......aaaa.............',
-];
 
 const DROPPED_PISTOL = [
   'dddddk',
@@ -99,7 +77,12 @@ function crawlFrame(person: Person, frame: CrawlFrame): PixelSprite {
   const c = new Cell();
   const back = LEG_SETS[6].strips;
   const torso = sideways(person.torsos[6].rows);
-  const parts = { torso, nearLeg: turnClockwise(back[frame.nearLeg]), farLeg: turnClockwise(back[frame.farLeg]) };
+  const trim = legTrim(person);
+  const parts = {
+    torso,
+    nearLeg: turnClockwise(trimStrip(back[frame.nearLeg], trim)),
+    farLeg: turnClockwise(trimStrip(back[frame.farLeg], trim)),
+  };
   const shoulderX = TORSO_X + torso[0].length - 1 + frame.shift;
   const top = GROUND_Y - torso.length + 1;
   drawArmBetween(c, [shoulderX, top + 2], [frame.farHand + frame.shift, top + 3], person.sleeve, person.cuff, person.hand);
@@ -115,29 +98,36 @@ export function downedClip(person: Person): Clip {
   return makeClip(CRAWL.map((frame) => crawlFrame(person, frame)), 4, true);
 }
 
-function standingFrame(person: Person, bodyY: number, leg: string, headX: number, headY: number, armLift: number): PixelSprite {
+/** Facing the viewer, hands at the sides. Exported for the portrait, which is this at rest. */
+export function standingFrame(person: Person, bodyY: number, leg: string, headX: number, headY: number, armLift: number): PixelSprite {
   const c = new Cell();
   const set = LEG_SETS[2];
-  c.grid(set.farX, 26 + bodyY, set.strips[leg].slice(0, 8 - bodyY), person.farLegend);
-  c.grid(set.nearX, 26 + bodyY, set.strips[leg].slice(0, 8 - bodyY), person.legend);
-  placePart(c, person.torsos[2], TORSO_BOTTOM, person.legend, 0, bodyY);
-  const shoulder = 20 + bodyY;
-  const left: Point = [14, shoulder];
-  const right: Point = [25, shoulder];
-  drawArmBetween(c, left, [12, shoulder + 7 - armLift], person.sleeve, person.cuff, person.hand);
-  drawArmBetween(c, right, [27, shoulder + 7 - armLift], person.sleeve, person.cuff, person.hand);
-  placePart(c, person.heads[2], HEAD_BOTTOM, person.legend, headX, bodyY + headY);
+  const drop = bodyDrop(person);
+  const trim = legTrim(person);
+  const pack = person.packs?.[2];
+  if (pack) placePart(c, pack, torsoBottom(person), person.legend, 0, drop + bodyY);
+  const legRows = set.strips[leg].slice(trim, 8 - bodyY);
+  c.grid(set.farX, 26 + trim + bodyY, legRows, person.farLegend);
+  c.grid(set.nearX, 26 + trim + bodyY, legRows, person.legend);
+  placePart(c, person.torsos[2], torsoBottom(person), person.legend, 0, drop + bodyY);
+  const shoulder = 20 + drop + bodyY;
+  // Arms are shorter on a smaller build, or the hands would reach the floor.
+  const reach = 7 - armLift - Math.ceil(drop / 2);
+  const left: Point = [14 - person.spread, shoulder];
+  const right: Point = [25 + person.spread, shoulder];
+  drawArmBetween(c, left, [left[0] - 2, shoulder + reach], person.sleeve, person.cuff, person.hand);
+  drawArmBetween(c, right, [right[0] + 2, shoulder + reach], person.sleeve, person.cuff, person.hand);
+  placePart(c, person.heads[2], HEAD_BOTTOM, person.legend, headX, drop + bodyY + headY);
   return c.toSprite();
 }
 
-function corpseFrame(person: Person, lift: number, pool: readonly string[] | null, gun: boolean): PixelSprite {
+function corpseFrame(person: Person, lift: number, gun: boolean): PixelSprite {
   const c = new Cell();
   const back = LEG_SETS[6].strips;
   const torso = sideways(person.torsos[6].rows);
   const head = sideways(person.heads[6].rows);
-  const leg = turnClockwise(back.stand);
+  const leg = turnClockwise(trimStrip(back.stand, legTrim(person)));
   const top = GROUND_Y - torso.length + 1 - lift;
-  if (pool) c.grid(29 - (pool[0].length >> 1), GROUND_Y - 3, pool, POOL_LEGEND);
   const shoulderX = TORSO_X + torso[0].length - 1;
   drawArmBetween(c, [shoulderX - 1, top + 1], [shoulderX + 5, top - 3], person.sleeve, person.cuff, person.hand);
   drawLying(c, person, { torso, nearLeg: leg, farLeg: leg }, lift, 0);
@@ -152,8 +142,7 @@ export function deadClip(person: Person): Clip {
     standingFrame(person, 0, 'stand', -1, 0, 3),
     standingFrame(person, 2, 'stand', 1, 0, 1),
     standingFrame(person, 4, 'stand', 1, 1, 0),
-    corpseFrame(person, 3, null, false),
-    corpseFrame(person, 0, POOL_SMALL, true),
-    corpseFrame(person, 0, POOL_LARGE, true),
+    corpseFrame(person, 3, false),
+    corpseFrame(person, 0, true),
   ], 7, false);
 }

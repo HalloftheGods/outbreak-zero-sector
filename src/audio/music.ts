@@ -1,6 +1,6 @@
 import { makeVoice, noise, noiseBuffer, tone, type Voice } from './voice-kit.ts';
 
-export type Scene = 'menu' | 'intermission' | 'wave' | 'gameover';
+export type Scene = 'menu' | 'intermission' | 'wave' | 'gameover' | 'victory' | 'credits';
 
 const BPM = 84;
 const STEP = 60 / BPM / 4;
@@ -24,6 +24,8 @@ const LEVELS: Record<Scene, Levels> = {
   intermission: { drone: 0, pad: 0, wind: 0.035 },
   wave: { drone: 0.1, pad: 0, wind: 0.06 },
   gameover: { drone: 0, pad: 0, wind: 0.025 },
+  victory: { drone: 0, pad: 0, wind: 0 },
+  credits: { drone: 0, pad: 0, wind: 0 },
 };
 
 /**
@@ -66,7 +68,7 @@ export class Music {
     this.scene = scene;
     const lv = LEVELS[scene];
     const t = this.ctx.currentTime;
-    const tc = scene === 'gameover' ? 0.9 : 0.7;
+    const tc = scene === 'wave' || scene === 'menu' || scene === 'intermission' ? 0.7 : 0.9;
     this.droneGain.gain.setTargetAtTime(this.bedOn ? lv.drone : 0, t, tc);
     this.padGain.gain.setTargetAtTime(this.bedOn ? lv.pad : 0, t, tc);
     this.windGain.gain.setTargetAtTime(lv.wind, t, tc);
@@ -179,7 +181,8 @@ export class Music {
       const lull = this.scene === 'intermission';
       this.ambientIn = lull ? 14 + Math.random() * 14 : 16 + Math.random() * 20;
       const groan = lull || Math.random() < 0.6;
-      if (this.scene !== 'gameover') this.onAmbient(groan ? 'distant_groan' : 'distant_crash');
+      const hushed = this.scene === 'gameover' || this.scene === 'victory' || this.scene === 'credits';
+      if (!hushed) this.onAmbient(groan ? 'distant_groan' : 'distant_crash');
     }
   }
 

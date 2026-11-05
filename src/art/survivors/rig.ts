@@ -9,10 +9,13 @@ import { INK_SOFT } from '../palette.ts';
 import type { Color } from '../palette.ts';
 import { ANCHOR_X, Cell } from './cell.ts';
 import { LEG_SETS } from './legs.ts';
+import type { Strip } from './legs.ts';
 import { AXIS, GUN_LEGEND, GUN_LEGEND_EMPTY, GUNS, MAG_GRID, MAG_LEGEND, SHELL_GRID, SHELL_LEGEND } from './weapons.ts';
 import type { GunView } from './weapons.ts';
 
 const HIP_Y = 26;
+/** The lowest row a dropped magazine lands on. */
+const FLOOR_Y = 33;
 export const TORSO_BOTTOM = 27;
 export const HEAD_BOTTOM = 19;
 
@@ -46,6 +49,34 @@ export interface Person {
   readonly thick?: boolean;
   /** A stripe around the forearm. */
   readonly band?: Color;
+  /** A smaller build: rows gone from the top of each leg and from the torso, which lowers everything above. */
+  readonly shorter?: { readonly legs: number; readonly torso: number };
+}
+
+export function legTrim(person: Person): number {
+  return person.shorter?.legs ?? 0;
+}
+
+/** How far this person's shoulders, head and gun sit below the standard build's. */
+export function bodyDrop(person: Person): number {
+  return legTrim(person) + (person.shorter?.torso ?? 0);
+}
+
+/** Where a torso of this person's height ends, before the body offset moves it down. */
+export function torsoBottom(person: Person): number {
+  return TORSO_BOTTOM - (person.shorter?.torso ?? 0);
+}
+
+/** The grid compiler caches by array, so a trimmed strip has to stay the same array. */
+const trimmedStrips = new WeakMap<Strip, Map<number, Strip>>();
+
+export function trimStrip(strip: Strip, rows: number): Strip {
+  if (rows === 0) return strip;
+  const trims = trimmedStrips.get(strip) ?? new Map<number, Strip>();
+  trimmedStrips.set(strip, trims);
+  const trimmed = trims.get(rows) ?? strip.slice(rows);
+  trims.set(rows, trimmed);
+  return trimmed;
 }
 
 /** What a frame changes. Everything is a pixel offset from the rest pose. */
@@ -155,8 +186,9 @@ function drawLegs(c: Cell, person: Person, dir: DrawnDir, pose: Pose): void {
   const set = LEG_SETS[dir];
   const near = pose.near ?? set.stand[0];
   const far = pose.far ?? set.stand[1];
-  c.grid(set.farX, HIP_Y, set.strips[far], person.farLegend);
-  c.grid(set.nearX, HIP_Y, set.strips[near], person.legend);
+  const trim = legTrim(person);
+  c.grid(set.farX, HIP_Y + trim, trimStrip(set.strips[far], trim), person.farLegend);
+  c.grid(set.nearX, HIP_Y + trim, trimStrip(set.strips[near], trim), person.legend);
 }
 
 export function placePart(c: Cell, part: Part, bottom: number, legend: Legend, dx: number, dy: number): void {
@@ -188,17 +220,19 @@ export function drawPose(person: Person, weapon: WeaponId, dir: DrawnDir, pose: 
   const view = GUNS[weapon].views[dir];
   const body = BODY[dir];
   const bx = pose.bodyX ?? 0;
-  const by = pose.bodyY ?? 0;
+  const drop = bodyDrop(person);
+  const by = (pose.bodyY ?? 0) + drop;
   const gx = bx + (pose.gunX ?? 0);
   const gy = by + (pose.gunY ?? 0);
   const grip = gunPoint(view, view.grip, gx, gy);
   const rack = pose.rack ?? 0;
   const [axisX, axisY] = AXIS[dir];
-  const fore = pose.hand ?? gunPoint(view, view.fore, gx - axisX * rack, gy - axisY * rack);
+  const reached: Point | null = pose.hand ? [pose.hand[0], pose.hand[1] + drop] : null;
+  const fore = reached ?? gunPoint(view, view.fore, gx - axisX * rack, gy - axisY * rack);
 
   for (const layer of ORDER[dir]) {
     if (layer === 'legs') drawLegs(c, person, dir, pose);
-    else if (layer === 'torso') placePart(c, person.torsos[dir], TORSO_BOTTOM, person.legend, bx, by);
+    else if (layer === 'torso') placePart(c, person.torsos[dir], torsoBottom(person), person.legend, bx, by);
     else if (layer === 'head') placePart(c, person.heads[dir], HEAD_BOTTOM, person.legend, bx + (pose.headX ?? 0), by + (pose.headY ?? 0));
     else if (layer === 'gun') drawGun(c, view, gx, gy, dir, pose);
     else if (layer === 'nearArm') drawArm(c, person, shoulderOf(body.shoulderNear, body.wideNear, person, bx, by), body.elbowNear, grip);
@@ -207,10 +241,10 @@ export function drawPose(person: Person, weapon: WeaponId, dir: DrawnDir, pose: 
       drawArm(c, person, shoulderOf(body.shoulderFar, body.wideFar, person, bx, by), body.elbowFar, fore);
       drawHandOver(c, person, fore);
     }
-    else if (person.packs?.[dir]) placePart(c, person.packs[dir], TORSO_BOTTOM, person.legend, bx, by);
+    else if (person.packs?.[dir]) placePart(c, person.packs[dir], torsoBottom(person), person.legend, bx, by);
   }
   if (pose.carrying === 'mag') c.grid(fore[0] - 1, fore[1] + 1, MAG_GRID, MAG_LEGEND);
   if (pose.carrying === 'shell') c.grid(fore[0], fore[1] - 2, SHELL_GRID, SHELL_LEGEND);
-  if (pose.dropped) c.grid(pose.dropped[0], pose.dropped[1], MAG_GRID, MAG_LEGEND);
+  if (pose.dropped) c.grid(pose.dropped[0], Math.min(pose.dropped[1] + drop, FLOOR_Y), MAG_GRID, MAG_LEGEND);
   return c.toSprite();
 }

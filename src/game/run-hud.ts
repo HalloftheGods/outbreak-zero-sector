@@ -19,6 +19,7 @@ export const NO_RUN_UI = {
   hud: null,
   banner: null,
   place: null,
+  levelCard: null,
   result: null,
   restarting: false,
 } as const satisfies Partial<UiState>;
@@ -45,7 +46,7 @@ export function finishRun(stats: GameOverStats, localId: string): RunResult {
   const local = stats.players.find((player) => player.id === localId);
   const score = local?.score ?? 0;
   const kills = local?.kills ?? 0;
-  const isNewBest = local ? recordRun({ score, kills, wave: stats.wave, durationSec: stats.durationSec }) : false;
+  const isNewBest = local ? recordRun({ score, kills, wave: stats.wave, durationSec: stats.durationSec }, undefined, local.name) : false;
   return { stats, localId, score, kills, isNewBest };
 }
 
@@ -100,12 +101,17 @@ export class RunHud {
     const ctx = this.townCanvas?.getContext('2d') ?? null;
     const scene = this.lastScene;
     const canPaint = ctx !== null && scene !== null;
-    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId);
+    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit);
   }
 
   onEvent(event: GameEvent, now: number): void {
     const banner = hordeBanner(event);
     if (banner) this.publish({ banner: this.notices.banner(banner, now) });
+  }
+
+  /** The level's title card. Nothing said in the last town is worth keeping up beside it. */
+  showLevel(level: number, now: number): void {
+    this.publish({ levelCard: this.notices.levelCard(level, now), banner: null, place: null });
   }
 
   /** Who walked in where, and what the floor would not give up. */

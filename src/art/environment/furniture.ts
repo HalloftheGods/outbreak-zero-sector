@@ -12,7 +12,7 @@ import { bake, groundShadow } from './common.ts';
 
 const { ink, metal, wood, bone, denim, teal, blood, olive, fire, asphalt, ash, brick, concrete } = RAMPS;
 
-interface Piece {
+export interface Piece {
   readonly c: PixelCanvas;
   readonly left: number;
   readonly right: number;
@@ -25,7 +25,7 @@ interface Piece {
   readonly top: number;
 }
 
-function startPiece(kind: PropKind, rise: number): Piece {
+export function startPiece(kind: PropKind, rise: number): Piece {
   const { w, h } = PROP_DEFS[kind];
   const left = 2;
   const ground = h + rise + 1;
@@ -34,7 +34,7 @@ function startPiece(kind: PropKind, rise: number): Piece {
   return { c, left, right: left + w - 1, w, ground, front: ground - rise, top: ground - rise - h };
 }
 
-function finish(p: Piece): PixelSprite {
+export function finish(p: Piece): PixelSprite {
   p.c.outline({ selective: true });
   return bake(p.c, p.left, p.w, p.ground);
 }
@@ -149,22 +149,6 @@ export function buildBed(): PixelSprite {
   c.line(left, top + 15, right, top + 12, denim[2]).line(left + 4, front - 1, left + 10, top + 15, denim[0]).line(left + 15, front - 1, left + 18, top + 14, denim[0]);
   c.rect(left, front, w, 6, wood[1]).rect(left, front, w, 1, wood[3]).rect(left, ground - 1, w, 1, wood[0]);
   c.rect(left + 3, front + 2, w - 6, 2, wood[0]);
-  return finish(p);
-}
-
-export function buildLocker(): PixelSprite {
-  const p = startPiece('locker', 22);
-  const { c, left, right, ground, front, top, w } = p;
-  c.rect(left, top, w, 8, metal[1]).rect(left, top, w, 1, metal[3]).rect(left, top, 1, 8, metal[2]);
-  c.rect(left, front, w, 22, ash[0]);
-  c.rect(left, front, w, 1, metal[2]).rect(left, front, 1, 22, metal[1]).rect(left + 7, front, 2, 22, metal[0]);
-  for (const y of [front + 3, front + 5, front + 7]) c.rect(left + 2, y, 4, 1, ink[1]);
-  c.rect(left + 5, front + 11, 1, 3, metal[3]);
-  // The right door has been forced and stands open on an empty shelf.
-  c.rect(left + 9, front + 1, 7, 21, ink[0]);
-  c.rect(left + 9, front + 6, 7, 1, metal[0]).rect(left + 10, front + 2, 3, 3, ink[1]);
-  c.rect(right - 2, front, 3, 22, metal[1]).rect(right - 2, front, 1, 22, metal[3]).rect(right, front, 1, 22, metal[0]);
-  c.rect(left, ground - 1, w, 1, ink[1]);
   return finish(p);
 }
 

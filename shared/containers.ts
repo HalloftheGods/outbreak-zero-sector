@@ -1,0 +1,157 @@
+import { PLAYER_RADIUS } from './constants.ts';
+import type { BuildingKind, PickupType, PropKind, WorldMap } from './protocol.ts';
+import { buildingAt, isSolidProp, propBox } from './world-query.ts';
+import type { Box } from './world-query.ts';
+
+export type ContainerKind = 'drawer' | 'locker' | 'fridge' | 'cabinet' | 'shelf' | 'box' | 'car';
+
+/** Somewhere to search, fixed by the town itself, so a client works these out from the map alone. */
+export interface Container {
+  /** Its place in the town's list, which is all a snapshot needs to say. */
+  readonly id: number;
+  readonly kind: ContainerKind;
+  /** The piece it is part of, which a client draws in its shut or searched look. */
+  readonly prop: PropKind;
+  /** That piece's place in the map's list of props. */
+  readonly propIndex: number;
+  readonly building?: string;
+  readonly buildingKind: BuildingKind | 'outdoors';
+  /** The bottom centre of the furniture it is part of. */
+  readonly x: number;
+  readonly y: number;
+  readonly box: Box;
+}
+
+export interface ContainerLoot {
+  readonly type: PickupType;
+  readonly rounds: number;
+}
+
+/** One run's state of a container, at the same index as the town's list. */
+export interface ContainerState {
+  opened: boolean;
+  /** Null when there is nothing in it, or nothing left. */
+  loot: ContainerLoot | null;
+}
+
+/** Seconds of holding the key: a drawer is quick, a locker or car has more to go through. */
+export const SEARCH_SEC: Record<ContainerKind, number> = {
+  drawer: 1,
+  cabinet: 1.25,
+  shelf: 1.25,
+  box: 1.25,
+  fridge: 1.5,
+  locker: 2,
+  car: 2,
+};
+
+export const CONTAINER_LABEL: Record<ContainerKind, string> = {
+  drawer: 'DRAWER',
+  locker: 'LOCKER',
+  fridge: 'FRIDGE',
+  cabinet: 'CABINET',
+  shelf: 'SHELF',
+  box: 'BOX',
+  car: 'CAR',
+};
+
+/** Gap from the player's edge to the furniture that still counts as within reach. */
+const SEARCH_GAP = 10;
+const SEARCH_REACH = PLAYER_RADIUS + SEARCH_GAP;
+
+/** What each piece of furniture opens up as, room by room. Anything left out is not searched. */
+const ROOM_CONTAINERS: Record<BuildingKind, Partial<Record<PropKind, ContainerKind>>> = {
+  house: { bed: 'drawer', fridge: 'fridge', locker: 'locker' },
+  apartment: { bed: 'drawer', fridge: 'fridge', locker: 'locker', shelf: 'shelf' },
+  diner: { fridge: 'fridge' },
+  garage: { locker: 'locker', workbench: 'cabinet', shelf: 'shelf', car_sedan_h: 'car', crate_stack: 'box' },
+  warehouse: { workbench: 'cabinet', shelf: 'shelf', crate_stack: 'box' },
+  grocery: { counter: 'cabinet', shelf: 'shelf' },
+  pharmacy: { counter: 'cabinet' },
+  clinic: { locker: 'locker', counter: 'cabinet', shelf: 'shelf' },
+  police: { locker: 'locker', counter: 'cabinet', shelf: 'shelf' },
+  gun_shop: { locker: 'locker', counter: 'cabinet', shelf: 'shelf' },
+};
+
+/** What vehicles and clutter open up as outdoors. */
+const OUTDOOR_CONTAINERS: Partial<Record<PropKind, ContainerKind>> = {
+  car_sedan_h: 'car',
+  car_sedan_v: 'car',
+  car_wreck_h: 'car',
+  van_h: 'car',
+  crate_stack: 'box',
+};
+
+interface TownContainers {
+  readonly all: readonly Container[];
+  readonly byBuilding: ReadonlyMap<string, readonly Container[]>;
+  readonly outdoors: readonly Container[];
+}
+
+const towns = new WeakMap<WorldMap, TownContainers>();
+
+function survey(map: WorldMap): TownContainers {
+  const all: Container[] = [];
+  const byBuilding = new Map<string, Container[]>();
+  const outdoors: Container[] = [];
+  for (const [propIndex, prop] of map.props.entries()) {
+    if (!isSolidProp(prop)) continue;
+    const room = buildingAt(map, prop.x, prop.y - 1);
+    const kind = room ? ROOM_CONTAINERS[room.kind][prop.kind] : OUTDOOR_CONTAINERS[prop.kind];
+    if (!kind) continue;
+    const container: Container = {
+      id: all.length,
+      kind,
+      prop: prop.kind,
+      propIndex,
+      building: room ? room.id : undefined,
+      buildingKind: room ? room.kind : 'outdoors',
+      x: prop.x,
+      y: prop.y,
+      box: propBox(prop),
+    };
+    all.push(container);
+    if (room) {
+      byBuilding.set(room.id, [...(byBuilding.get(room.id) ?? []), container]);
+    } else {
+      outdoors.push(container);
+    }
+  }
+  return { all, byBuilding, outdoors };
+}
+
+function surveyed(map: WorldMap): TownContainers {
+  let town = towns.get(map);
+  if (!town) {
+    town = survey(map);
+    towns.set(map, town);
+  }
+  return town;
+}
+
+/** Every container in a town, in id order. */
+export const townContainers = (map: WorldMap): readonly Container[] => surveyed(map).all;
+
+function gapTo({ x0, y0, x1, y1 }: Box, x: number, y: number): number {
+  return Math.hypot(x - Math.max(x0, Math.min(x, x1)), y - Math.max(y0, Math.min(y, y1)));
+}
+
+/**
+ * The nearest container still shut within reach of a spot, or null. Only the room the spot is in
+ * counts, so nobody searches through a wall. When outdoors, only outdoor containers count.
+ */
+export function containerInReach(map: WorldMap, x: number, y: number, isOpen: (id: number) => boolean): Container | null {
+  const room = buildingAt(map, x, y);
+  const candidates = room ? surveyed(map).byBuilding.get(room.id) ?? [] : surveyed(map).outdoors;
+  let nearest: Container | null = null;
+  let nearestGap = SEARCH_REACH;
+  for (const container of candidates) {
+    const gap = gapTo(container.box, x, y);
+    const nearer = gap <= nearestGap && !isOpen(container.id);
+    if (nearer) {
+      nearest = container;
+      nearestGap = gap;
+    }
+  }
+  return nearest;
+}

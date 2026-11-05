@@ -1,11 +1,14 @@
+import type { LevelTheme } from '../../shared/levels.ts';
 import type { EntityId, GameEvent, WorldMap, ZombieType } from '../../shared/protocol.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
+import { Atmosphere } from './atmosphere.ts';
 import { BuildingLayer, roomRect } from './building-layer.ts';
 import { Camera } from './camera.ts';
 import { EntityRenderer } from './entity-renderer.ts';
 import { FxDirector } from './fx-director.ts';
 import type { FxContext } from './fx-director.ts';
 import type { ScreenRect } from './light-field.ts';
+import { lampWorks } from './level-look.ts';
 import { flicker, Lighting } from './lighting.ts';
 import { OcclusionGrid } from './occlusion.ts';
 import { OverlayRenderer } from './overlay-renderer.ts';
@@ -28,6 +31,11 @@ const TEAM_AURA_STRENGTH = 0.45;
 /** Street lamps are weak and failing: they mark corners, they do not light the road. */
 const LAMP_REACH = 0.62;
 const LAMP_STRENGTH = 0.8;
+/** The van leaves its lights on, so the dark around it gives it away. */
+const VAN_GLOW_COLOR = '#ffc878';
+const VAN_GLOW_RADIUS = 84;
+const VAN_GLOW_STRENGTH = 0.7;
+const VAN_GLOW_HEIGHT = 12;
 
 /** Draws the whole game into a low-res buffer that CSS scales up by a whole number. */
 export class WorldRenderer {
@@ -43,6 +51,7 @@ export class WorldRenderer {
   private readonly overlay: OverlayRenderer;
   private readonly buildings: BuildingLayer;
   private readonly lighting = new Lighting();
+  private readonly atmosphere: Atmosphere;
   private readonly fx: FxDirector;
   private readonly art: ArtBook;
   private viewport: Viewport = computeViewport(480, 270, 1);
@@ -58,8 +67,9 @@ export class WorldRenderer {
     this.art = art;
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.effects = new ScreenEffects(reducedMotion);
+    this.atmosphere = new Atmosphere(reducedMotion);
     this.buildings = new BuildingLayer(art.environment);
-    this.entities = new EntityRenderer(art, this.visuals, this.buildings);
+    this.entities = new EntityRenderer(art, this.visuals, this.buildings, reducedMotion);
     this.overlay = new OverlayRenderer(art, this.visuals);
     this.fx = new FxDirector(art, this.visuals, this.effects, {
       stamp: (sprite, x, y, alpha) => this.stamp(sprite, x, y, alpha),
@@ -103,14 +113,28 @@ export class WorldRenderer {
     return ((clientY - this.canvasTop) * this.viewport.dpr) / this.viewport.scale;
   }
 
-  setMap(map: WorldMap): void {
+  /** Buffer pixels to the spot in the drawn world under them, shake included. */
+  toWorld(bufferX: number, bufferY: number): { x: number; y: number } {
+    return { x: bufferX + this.camera.left + this.effects.shakeX, y: bufferY + this.camera.top + this.effects.shakeY };
+  }
+
+  /** The title and a town before its first frame are the plain night. */
+  setMap(map: WorldMap, theme: LevelTheme = 'night'): void {
     this.map = map;
     this.ground = new GroundLayer(map, this.art.environment.tiles);
+    this.setTheme(theme);
     this.occlusion = new OcclusionGrid(map);
     this.buildings.setMap(map);
     this.camera.setWorld(map.width, map.height);
     this.entities.setMap(map, (sprite, x, y, alpha) => this.stamp(sprite, x, y, alpha));
     this.reset();
+  }
+
+  setTheme(theme: LevelTheme): void {
+    this.atmosphere.setTheme(theme);
+    const { ambient, ground } = this.atmosphere.look;
+    this.lighting.setAmbient(ambient);
+    this.ground?.setTint(ground);
   }
 
   /** A new run on the same map: scrub the streets. */
@@ -130,11 +154,16 @@ export class WorldRenderer {
   private composeLight(scene: SceneView, left: number, top: number): void {
     const lighting = this.lighting;
     lighting.begin(left, top);
+    const look = this.atmosphere.look;
     const lights = this.map?.lights ?? [];
     for (let i = 0; i < lights.length; i += 1) {
+      if (!lampWorks(look, i)) continue;
       const light = lights[i];
-      const strength = (light.flicker ? flicker(this.time, i) : 1) * LAMP_STRENGTH;
-      lighting.addPool(light.x - left, light.y - top, light.radius * LAMP_REACH, light.color, strength);
+      const strength = (light.flicker ? flicker(this.time, i) : 1) * LAMP_STRENGTH * look.lampStrength;
+      lighting.addPool(light.x - left, light.y - top, light.radius * LAMP_REACH, look.lampColor ?? light.color, strength);
+    }
+    if (scene.exit) {
+      lighting.addPool(scene.exit.x - left, scene.exit.y - VAN_GLOW_HEIGHT - top, VAN_GLOW_RADIUS, VAN_GLOW_COLOR, VAN_GLOW_STRENGTH);
     }
     const open = this.buildings.openRoom();
     const room = open ? roomRect(open, left, top) : null;
@@ -224,16 +253,19 @@ export class WorldRenderer {
     this.composeLight(scene, left, top);
     this.lighting.apply(ctx);
     const lightAt = (x: number, y: number) => this.lighting.brightness(x, y);
+    const isKilled = (id: EntityId) => this.entities.isKilled(id);
+    const outdoors = 1 - (this.buildings.openRoom()?.reveal ?? 0);
+    this.atmosphere.drawWash(ctx, viewW, viewH, time, outdoors);
 
     this.entities.drawEmissive(ctx, scene, left, top, viewW, viewH, time);
     this.entities.drawGlints(ctx, scene, left, top, viewW, viewH, time, lightAt);
     this.fx.particles.drawEmissive(ctx, left, top);
     this.entities.drawOccluded(ctx, scene, left, top, viewW, viewH);
+    this.atmosphere.drawWeather(ctx, left, top, viewW, viewH, time, outdoors);
     this.effects.draw(ctx, viewW, viewH);
-    this.overlay.draw(ctx, scene, left, top, viewW, viewH, time, lightAt, (id) => this.entities.isKilled(id));
+    this.overlay.draw(ctx, scene, left, top, viewW, viewH, time, lightAt, isKilled);
     this.fx.particles.drawTexts(ctx, left, top);
-    const aiming = scene.showCrosshair && scene.pointerX !== null && scene.pointerY !== null;
-    if (aiming) this.overlay.drawCrosshair(ctx, scene.pointerX, scene.pointerY);
+    if (scene.showCrosshair) this.overlay.drawCrosshair(ctx, scene, left, top, lightAt, isKilled);
 
     this.visuals.endFrame();
     this.frameMs += (performance.now() - started - this.frameMs) * 0.05;

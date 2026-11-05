@@ -8,6 +8,7 @@ import {
   ZOMBIE_CAP,
 } from './constants.ts';
 import type { Point } from './flow-field.ts';
+import { levelDef } from './levels.ts';
 import { lootSpots } from './loot.ts';
 import type { BuildingInstance, BuildingKind, ZombieType } from './protocol.ts';
 import { pick, randRange } from './rng.ts';
@@ -27,12 +28,14 @@ const BRUTE_SHARE = 0.03;
 const GUARDS: Partial<Record<BuildingKind, number>> = { police: 4, gun_shop: 3, clinic: 2, pharmacy: 2 };
 
 function rollType(sim: SimState): ZombieType {
+  const { mix } = levelDef(sim.level);
   const roll = sim.rng();
-  const runnersEnd = ROAMER_MIX.bloater + ROAMER_MIX.runner;
-  if (roll < ROAMER_MIX.bloater) return 'bloater';
+  const bloatersEnd = ROAMER_MIX.bloater + mix.bloater;
+  const runnersEnd = bloatersEnd + ROAMER_MIX.runner + mix.runner;
+  if (roll < bloatersEnd) return 'bloater';
   if (roll < runnersEnd) return 'runner';
-  const bruteDue = sim.wave >= BRUTE_FROM_WAVE && roll < runnersEnd + BRUTE_SHARE;
-  return bruteDue ? 'brute' : 'walker';
+  const bruteShare = mix.brute + (sim.wave >= BRUTE_FROM_WAVE ? BRUTE_SHARE : 0);
+  return roll < runnersEnd + bruteShare ? 'brute' : 'walker';
 }
 
 const clearFor = (sim: SimState, type: ZombieType, spot: Point): boolean =>

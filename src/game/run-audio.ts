@@ -1,0 +1,17 @@
+import type { AudioEngine } from '../audio/audio-engine.ts';
+import type { SceneView } from '../engine/scene.ts';
+import type { ClientWorld } from './client-world.ts';
+import { healthFraction } from './run-hud.ts';
+
+/** Full intensity by this many hostiles; scales the music, not the danger. */
+const INTENSE_HOSTILES = 24;
+
+/** One frame of the sound of a run: where the ears are, and how bad it is. */
+export function tickRunAudio(audio: AudioEngine, world: ClientWorld, scene: SceneView, dt: number): void {
+  const health = healthFraction(world.localPlayer);
+  audio.setListener(scene.focusX, scene.focusY);
+  audio.setHealth(health);
+  const threat = scene.phase === 'wave' ? Math.min(1, scene.hostiles / INTENSE_HOSTILES) : 0;
+  audio.setIntensity(Math.min(1, threat * 0.75 + (1 - health) * 0.25));
+  audio.tick(dt, scene.zombies);
+}

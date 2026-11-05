@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { DEFAULT_SERVER_PORT, MAX_PLAYERS, TICK_RATE } from '../shared/constants.ts';
+import type { DifficultyId } from '../shared/difficulty.ts';
 import type { ClientPacket, ServerPacket, SnapshotPacket } from '../shared/protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import { viewFor } from '../shared/snapshot-view.ts';
@@ -72,7 +73,7 @@ function takePacketAllowance(client: Client, now: number): boolean {
 }
 
 export function startGameServer(options: GameServerOptions): Promise<RunningGameServer> {
-  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff) });
+  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff), workbench: 'timed' });
   const joinDeadlineMs = options.joinDeadlineMs ?? JOIN_DEADLINE_MS;
   const restartVoteMs = options.restartVoteMs ?? RESTART_VOTE_MS;
   const clients = new Set<Client>();
@@ -118,7 +119,7 @@ export function startGameServer(options: GameServerOptions): Promise<RunningGame
     tickTimer = null;
   }
 
-  function join(client: Client, name: string, token: string): void {
+  function join(client: Client, name: string, token: string, character?: number, difficulty?: DifficultyId): void {
     if (client.playerId) return;
     // A dropped link can outlive its refresh: the old socket goes and the new one takes that body over.
     const heldBy = sim.playerWithToken(token);
@@ -128,7 +129,9 @@ export function startGameServer(options: GameServerOptions): Promise<RunningGame
       return;
     }
     const id = randomUUID();
-    sim.addPlayer(id, name, token);
+    // The first player into an empty room sets how hard the run is.
+    if (difficulty && sim.playerCount === 0) sim.setDifficulty(difficulty);
+    sim.addPlayer(id, name, token, character);
     client.playerId = id;
     clearTimeout(client.joinDeadline);
     send(client, { type: 'welcome', yourId: id, tickRate: TICK_RATE, mapSeed: sim.map.seed });
@@ -169,9 +172,10 @@ export function startGameServer(options: GameServerOptions): Promise<RunningGame
   }
 
   function receive(client: Client, packet: ClientPacket): void {
-    if (packet.type === 'join') join(client, packet.name, packet.token);
+    if (packet.type === 'join') join(client, packet.name, packet.token, packet.character, packet.difficulty);
     else if (client.playerId === null) return;
     else if (packet.type === 'input') sim.setInput(client.playerId, packet.input);
+    else if (packet.type === 'bench') sim.benchCommand(client.playerId, packet.action);
     else askToRestart(client);
   }
 

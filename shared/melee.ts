@@ -1,3 +1,4 @@
+import { characterOf } from './characters.ts';
 import { damageZombie } from './combat.ts';
 import {
   MELEE_ARC_RAD,
@@ -15,6 +16,9 @@ import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 import { segmentHitsSolid } from './world-query.ts';
 
+/** With a knife in the other hand the shove goes in point first. Just as silent, and still only every so often per body. */
+export const KNIFE_DAMAGE = MELEE_DAMAGE * 4.5;
+
 const nearby: ZombieState[] = [];
 
 function inArc(p: PlayerState, z: ZombieState): boolean {
@@ -24,9 +28,9 @@ function inArc(p: PlayerState, z: ZombieState): boolean {
 
 function shove(sim: SimState, p: PlayerState, z: ZombieState): void {
   const angle = Math.atan2(z.y - p.y, z.x - p.x);
-  damageZombie(sim, z, MELEE_DAMAGE, angle, p.id);
+  damageZombie(sim, z, p.knife ? KNIFE_DAMAGE : MELEE_DAMAGE, angle, p.id);
   // Big bodies shove less, as they do from bullets.
-  const force = MELEE_KNOCKBACK_SPEED * Math.min(1, (6 / z.radius) ** 2);
+  const force = MELEE_KNOCKBACK_SPEED * characterOf(p.skin).shoveForce * Math.min(1, (6 / z.radius) ** 2);
   z.knockX += Math.cos(angle) * force;
   z.knockY += Math.sin(angle) * force;
   z.windupLeft = 0;

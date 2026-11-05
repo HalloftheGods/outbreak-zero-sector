@@ -100,7 +100,7 @@ describe('LocalSession', () => {
 
   it('reaches the sim with input', () => {
     const { session, snapshots } = connect();
-    session.sendInput({ seq: 4, up: false, down: false, left: false, right: true, angle: 0, shoot: false, reload: false, weapon: null, melee: false, heal: false });
+    session.sendInput({ seq: 4, up: false, down: false, left: false, right: true, angle: 0, shoot: false, reload: false, weapon: null, melee: false, heal: false, search: false });
     vi.advanceTimersByTime(TICK_MS * 4);
     const local = snapshots[snapshots.length - 1].players[0];
     expect(local.x).toBeGreaterThan(snapshots[0].players[0].x);
@@ -239,7 +239,7 @@ describe('SocketSession', () => {
   it('holds back input until welcomed', () => {
     const { session, socket } = connect();
     socket.open();
-    const input = { seq: 1, up: false, down: false, left: false, right: false, angle: 0, shoot: false, reload: false, weapon: null, melee: false, heal: false };
+    const input = { seq: 1, up: false, down: false, left: false, right: false, angle: 0, shoot: false, reload: false, weapon: null, melee: false, heal: false, search: false };
     session.sendInput(input);
     expect(socket.sent).toHaveLength(1);
     socket.onmessage?.({ data: welcome });

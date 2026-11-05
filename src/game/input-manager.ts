@@ -17,6 +17,7 @@ const WEAPON_KEYS: Readonly<Record<string, WeaponId>> = {
 
 const SHOVE_CODE = 'KeyF';
 const HEAL_CODE = 'KeyH';
+const SEARCH_CODE = 'KeyE';
 const MAP_CODES: ReadonlySet<string> = new Set(['Tab', 'KeyN']);
 const LEFT_BUTTON = 0;
 const RIGHT_BUTTON = 2;
@@ -30,6 +31,7 @@ const GAME_CODES: ReadonlySet<string> = new Set([
   'Space',
   SHOVE_CODE,
   HEAL_CODE,
+  SEARCH_CODE,
   ...Object.keys(WEAPON_KEYS),
 ]);
 
@@ -38,8 +40,8 @@ export interface InputCallbacks {
   onGesture(): void;
   onPause(): void;
   onMute(): void;
-  /** Enter, and what had focus, since the title answers it differently in the server field. */
-  onConfirm(target: EventTarget | null): void;
+  /** Enter, when no button has focus to answer it. */
+  onConfirm(): void;
   /** Tab or N. True if the game took the key, so Tab does not also move focus. */
   onMap(): boolean;
   /** The map is open or could open, so a Tab held down must stay away from the browser. */
@@ -168,6 +170,7 @@ export class InputManager {
       weapon: this.weaponLatch ?? cycled,
       melee: this.shoveLatch || (this.enabled && this.shoving) || this.isHeld([SHOVE_CODE]),
       heal: this.healLatch,
+      search: this.isHeld([SEARCH_CODE]),
     };
     this.clearLatches();
     return packet;
@@ -181,8 +184,9 @@ export class InputManager {
       return;
     }
     if (event.code === 'Enter' || event.code === 'NumpadEnter') {
+      this.callbacks.onGesture();
       // A focused button already answers Enter with a click.
-      if (!event.repeat && !(event.target instanceof HTMLButtonElement)) this.callbacks.onConfirm(event.target);
+      if (!event.repeat && !(event.target instanceof HTMLButtonElement)) this.callbacks.onConfirm();
       return;
     }
     if (isTyping(event.target)) return;

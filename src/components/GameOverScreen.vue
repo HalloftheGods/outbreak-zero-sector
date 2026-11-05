@@ -2,9 +2,11 @@
   <section class="px-screen gameover">
     <SpriteImg v-if="art" :sprite="art.ui.skull" :scale="3" />
     <h2 class="px-heading is-danger">Game over</h2>
+    <p class="gameover-difficulty">{{ difficultyDef(result.stats.difficulty).label }}</p>
     <p v-if="result.isNewBest" class="gameover-best px-blink">New best</p>
 
     <dl class="gameover-stats">
+      <div><dt>Level reached</dt><dd>{{ result.stats.level }}</dd></div>
       <div><dt>Hordes survived</dt><dd>{{ result.stats.wave }}</dd></div>
       <div><dt>Time survived</dt><dd>{{ formatDuration(result.stats.durationSec) }}</dd></div>
       <div><dt>Kills</dt><dd>{{ result.kills }}</dd></div>
@@ -36,6 +38,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ArtBook } from '../art/types.ts';
+import { difficultyDef } from '../../shared/difficulty.ts';
 import { formatDuration } from '../game/hud-state.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import PixelButton from './PixelButton.vue';
@@ -55,6 +58,11 @@ const ranked = computed(() => [...result.stats.players].sort((a, b) => b.score -
   animation: px-fade-in 0.7s steps(7) both;
 }
 
+.gameover-difficulty {
+  margin: 0;
+  color: var(--bone-dim);
+}
+
 .gameover-best {
   padding: var(--u) calc(var(--u) * 4);
   background: var(--amber);
@@ -65,7 +73,7 @@ const ranked = computed(() => [...result.stats.players].sort((a, b) => b.score -
 
 .gameover-stats {
   display: grid;
-  grid-template-columns: repeat(4, auto);
+  grid-template-columns: repeat(5, auto);
   gap: calc(var(--u) * 8);
   text-align: center;
 }

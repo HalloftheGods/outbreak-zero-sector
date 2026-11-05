@@ -1,3 +1,4 @@
+import type { DifficultyId } from './difficulty.ts';
 import type {
   BulletEntity,
   EntityId,
@@ -11,19 +12,28 @@ import type {
   ZombieEntity,
   ZombieType,
 } from './protocol.ts';
+import type { ContainerState } from './containers.ts';
 import type { FlowField, Point } from './flow-field.ts';
 import { randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import type { SpatialHashGrid } from './spatial-grid.ts';
 import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
+import type { GunQuirk, PartCounts } from './gun-upgrade-data.ts';
+import type { GunFit } from './gun-upgrades.ts';
+import type { BenchState, WorkbenchMode } from './workbench.ts';
 
 /** Rounds in the gun itself. Spare rounds live in PlayerEntity.ammoBag, gun or no gun. */
 export interface GunState {
   ammo: number;
+  /** Quirk and upgrades, absent on a stock gun. Goes when the gun does. */
+  fit?: GunFit;
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear'> {
+  parts: PartCounts;
+  /** Said so at the current workbench. */
+  benchReady: boolean;
   /** Reconnect token, or null when nobody can come back as this player. Never sent to clients. */
   readonly token: string | null;
   up: boolean;
@@ -31,6 +41,8 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags'> {
   left: boolean;
   right: boolean;
   shoot: boolean;
+  /** Where the crosshair last was in the drawn world, or null from a client that never said. */
+  aim: Point | null;
   /** Latest seq seen by setInput, applied on the next tick. */
   queuedSeq: number;
   /** Latched by setInput until a tick consumes them, so a later packet cannot erase them. */
@@ -46,6 +58,15 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags'> {
   meleeCooldown: number;
   /** Seconds left on the current reload, 0 when not reloading. */
   reloadLeft: number;
+  /** The search key is down. */
+  searchHeld: boolean;
+  /** This press of the key has done its work, or been cut off: nothing more until it is let go. */
+  searchSpent: boolean;
+  /** Container being searched, or null. */
+  searchingId: number | null;
+  searchLeft: number;
+  /** Health at the last tick, so a hit shows up as a drop. */
+  searchHealth: number;
 }
 
 /** Unaware, walking to a noise, or after a player. */
@@ -87,6 +108,8 @@ export interface ZombieState extends ZombieEntity {
 export interface BulletState extends BulletEntity {
   damage: number;
   rangeLeft: number;
+  /** The zombie whose head was under the crosshair when this was fired. */
+  headTarget?: ZombieState | null;
 }
 
 export interface PickupState extends PickupEntity {
@@ -94,20 +117,41 @@ export interface PickupState extends PickupEntity {
   ttl: number | null;
   /** Rounds left in an ammo pickup, 0 for anything else. */
   rounds: number;
+  /** What a found gun's last owner did to it. */
+  quirk?: GunQuirk;
+}
+
+/** The van, once it has come. */
+export interface ExitState {
+  readonly x: number;
+  readonly y: number;
+  /** Seconds everyone on their feet has been at the van without a break. */
+  hold: number;
 }
 
 export interface SimState {
-  readonly map: WorldMap;
+  /** Every level's town follows from this. */
+  readonly runSeed: number;
+  /** Ammo, zombie speed and bite, horde size and lull length follow from this. */
+  difficulty: DifficultyId;
+  /** The current level's town. */
+  map: WorldMap;
   readonly rng: Rng;
   /** Leads hunters to the players. */
-  readonly flow: FlowField;
+  flow: FlowField;
   /** Leads alerted zombies to the latest gunfire. */
-  readonly noiseFlow: FlowField;
+  noiseFlow: FlowField;
   readonly grid: SpatialHashGrid<ZombieState>;
   tick: number;
   runStartTick: number;
   phase: GamePhase;
-  /** Most recently started wave, 0 before the first. */
+  /** Level of the run, from 1. */
+  level: number;
+  /** Null until the level's last horde is survived. */
+  exit: ExitState | null;
+  /** Hordes survived in towns already left. */
+  hordesBehind: number;
+  /** Most recently started wave in this town, 0 before the first. */
   wave: number;
   intermissionLeft: number;
   /** Seconds until the current horde gives up. */
@@ -125,9 +169,14 @@ export interface SimState {
   zombies: ZombieState[];
   bullets: BulletState[];
   pickups: PickupState[];
+  /** At the same index as the town's container list. */
+  containers: ContainerState[];
   events: GameEvent[];
   gameOver: GameOverStats | null;
   nextEntity: number;
+  readonly workbench: WorkbenchMode;
+  /** Set while the run is held at the workbench. */
+  bench: BenchState | null;
 }
 
 export function entityId(sim: SimState, prefix: string): EntityId {

@@ -37,10 +37,13 @@ const me: PlayerEntity = {
   id: 'me', name: 'ANA', skin: 0, x: 500, y: 500, angle: 0, moving: false, status: 'alive',
   health: 100, maxHealth: 100, weapon: 'pistol', ammo: 12, magSize: 12, reserve: 12, owned: ['pistol'],
   ammoBag: { ...noRounds, pistol: 12 }, mags: { ...noRounds, pistol: 12 }, medkits: 0, indoors: null,
-  reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0,
+  reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0, knife: false, search: 0,
 };
 
 const stats: GameOverStats = {
+  outcome: 'defeat',
+  difficulty: 'lights_out',
+  level: 1,
   wave: 2,
   durationSec: 90,
   players: [{ id: 'me', name: 'ANA', skin: 0, kills: 5, score: 300 }],
@@ -48,8 +51,8 @@ const stats: GameOverStats = {
 
 function frame(tick: number, patch: Partial<SnapshotPacket> = {}): SnapshotPacket {
   return {
-    type: 'snapshot', tick, phase: 'intermission', wave: 0, intermission: 60, hostiles: 0, players: [me],
-    zombies: [], bullets: [], pickups: [], events: [], gameOver: null, ...patch,
+    type: 'snapshot', tick, phase: 'intermission', level: 1, mapSeed: 4242, wave: 0, intermission: 60, hostiles: 0, players: [me],
+    zombies: [], bullets: [], pickups: [], exit: null, openedContainers: [], events: [], gameOver: null, ...patch,
   };
 }
 
@@ -117,8 +120,8 @@ describe('game flow', () => {
     expect(game.ui.value.art).not.toBeNull();
   });
 
-  it('starts solo on Enter and fills in the HUD', () => {
-    pressEnter();
+  it('starts solo from the setup page and fills in the HUD', () => {
+    game.startSolo();
     pump(500);
     const { screen, hud, mode } = game.ui.value;
     expect(screen).toBe('game');
@@ -127,17 +130,19 @@ describe('game flow', () => {
     expect(hud?.health).toBe(hud?.maxHealth);
   });
 
-  it('connects on Enter in the co-op server box', () => {
+  it('connects from the co-op setup page', () => {
     vi.stubGlobal('WebSocket', FakeSocket);
-    browser.dispatch('keydown', { code: 'Enter', repeat: false, target: textField('server'), preventDefault() {} });
+    game.startCoop();
     expect(game.ui.value).toMatchObject({ mode: 'coop', connecting: true });
     expect(game.sim).toBeNull();
   });
 
-  it('still starts solo on Enter in the callsign box', () => {
-    browser.dispatch('keydown', { code: 'Enter', repeat: false, target: textField('callsign'), preventDefault() {} });
-    expect(game.ui.value.mode).toBe('solo');
-    expect(game.sim).not.toBeNull();
+  it.each([null, 'callsign', 'server'])('never starts a run on a bare Enter at the title (focus: %s)', (field) => {
+    vi.stubGlobal('WebSocket', FakeSocket);
+    const target = field ? textField(field) : null;
+    browser.dispatch('keydown', { code: 'Enter', repeat: false, target, preventDefault() {} });
+    expect(game.ui.value).toMatchObject({ screen: 'title', connecting: false });
+    expect(game.sim).toBeNull();
   });
 
   it('pauses solo when the window loses focus', () => {

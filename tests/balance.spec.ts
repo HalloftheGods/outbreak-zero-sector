@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AMMO_POPULATION_SHARE, LEAD_IN_SEC, STANDING_POPULATION, TICK_RATE } from '../shared/constants.ts';
+import { containerLoot } from '../shared/container-loot.ts';
 import { ammoKillShare } from '../shared/loot.ts';
 import type { ClientInputPacket, PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
+import type { SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import { ScavengerBot, TriggerBot } from './helpers/bots.ts';
 import { stateOf, stepUntil } from './helpers/sim-harness.ts';
@@ -127,7 +129,8 @@ describe('balance', () => {
   }, 240000);
 
   it('the map holds enough ammo for about the planned share of the population and no more', () => {
-    const shares = SEEDS.map((seed) => ammoKillShare(stateOf(new GameSimulation({ seed })).pickups));
+    const stockOf = (state: SimState) => [...state.pickups, ...containerLoot(state)];
+    const shares = SEEDS.map((seed) => ammoKillShare(stockOf(stateOf(new GameSimulation({ seed })))));
     console.info(`ammo on the map, as a share of the ${STANDING_POPULATION} standing zombies: ${shares.map((share) => share.toFixed(2)).join(' ')}`);
     for (const share of shares) {
       expect(share).toBeLessThanOrEqual(AMMO_POPULATION_SHARE * 1.02);

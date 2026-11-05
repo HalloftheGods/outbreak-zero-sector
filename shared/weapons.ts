@@ -1,4 +1,7 @@
-import { DRY_FIRE_INTERVAL_SEC, MUZZLE_OFFSET, TICK_DT, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from './constants.ts';
+import { characterOf } from './characters.ts';
+import { DRY_FIRE_INTERVAL_SEC, MUZZLE_OFFSET, TICK_DT, WEAPON_SWITCH_DELAY_SEC } from './constants.ts';
+import { heldStats, rankOf } from './gun-upgrades.ts';
+import { headUnderAim } from './headshots.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit, entityId } from './sim-state.ts';
 import { makeNoise } from './zombie-senses.ts';
@@ -9,7 +12,7 @@ export function syncGun(p: PlayerState): void {
   if (!gun) return;
   p.ammo = gun.ammo;
   p.reserve = p.ammoBag[p.weapon];
-  p.magSize = WEAPONS[p.weapon].magSize;
+  p.magSize = heldStats(p).magSize;
 }
 
 function cancelReload(p: PlayerState): void {
@@ -28,17 +31,21 @@ function switchWeapon(sim: SimState, p: PlayerState): void {
   emit(sim, { type: 'weapon_switch', playerId: p.id, weapon: wanted, x: p.x, y: p.y });
 }
 
+function reloadSeconds(p: PlayerState): number {
+  return (heldStats(p).reloadMs / 1000) * characterOf(p.skin).reloadTime;
+}
+
 function startReload(sim: SimState, p: PlayerState): void {
   const gun = p.guns[p.weapon];
-  const magFull = !gun || gun.ammo >= WEAPONS[p.weapon].magSize;
+  const magFull = !gun || gun.ammo >= heldStats(p).magSize;
   if (magFull || p.ammoBag[p.weapon] === 0 || p.reloadLeft > 0) return;
-  p.reloadLeft = WEAPONS[p.weapon].reloadMs / 1000;
+  p.reloadLeft = reloadSeconds(p);
   emit(sim, { type: 'reload_start', playerId: p.id, weapon: p.weapon, x: p.x, y: p.y });
 }
 
 function advanceReload(sim: SimState, p: PlayerState): void {
   if (p.reloadLeft <= 0) return;
-  const total = WEAPONS[p.weapon].reloadMs / 1000;
+  const total = reloadSeconds(p);
   p.reloadLeft -= TICK_DT;
   // A floor above zero keeps "reloading" distinct from "not reloading" on the first tick.
   p.reload = Math.max(0.01, 1 - p.reloadLeft / total);
@@ -46,7 +53,7 @@ function advanceReload(sim: SimState, p: PlayerState): void {
 
   const gun = p.guns[p.weapon];
   if (gun) {
-    const missing = WEAPONS[p.weapon].magSize - gun.ammo;
+    const missing = heldStats(p).magSize - gun.ammo;
     const loaded = Math.min(missing, p.ammoBag[p.weapon]);
     gun.ammo += loaded;
     p.ammoBag[p.weapon] -= loaded;
@@ -57,7 +64,9 @@ function advanceReload(sim: SimState, p: PlayerState): void {
 }
 
 function fire(sim: SimState, p: PlayerState): void {
-  const stats = WEAPONS[p.weapon];
+  const stats = heldStats(p);
+  // Pellets scatter past the crosshair, so a spread gun never claims a head.
+  const headTarget = stats.pellets === 1 ? headUnderAim(sim, p, stats.range) : null;
   for (let i = 0; i < stats.pellets; i++) {
     const angle = p.angle + (sim.rng() * 2 - 1) * stats.spreadRad;
     // Bullets leave from the body centre so the first sweep covers what is touching the player.
@@ -70,6 +79,7 @@ function fire(sim: SimState, p: PlayerState): void {
       vy: Math.sin(angle) * stats.bulletSpeed,
       damage: stats.damage,
       rangeLeft: stats.range,
+      headTarget,
     });
   }
   emit(sim, {
@@ -79,6 +89,7 @@ function fire(sim: SimState, p: PlayerState): void {
     x: p.x + Math.cos(p.angle) * MUZZLE_OFFSET,
     y: p.y + Math.sin(p.angle) * MUZZLE_OFFSET,
     angle: p.angle,
+    suppressed: rankOf(p.guns[p.weapon]?.fit, 'suppressor') > 0,
   });
   makeNoise(sim, p.x, p.y, stats.noiseRadius);
 }
@@ -91,7 +102,7 @@ function tryFire(sim: SimState, p: PlayerState): void {
   if (gun.ammo > 0) {
     gun.ammo -= 1;
     // Carrying the remainder keeps fire rates honest when they do not divide the tick.
-    p.fireCooldown += WEAPONS[p.weapon].fireIntervalMs / 1000;
+    p.fireCooldown += heldStats(p).fireIntervalMs / 1000;
     fire(sim, p);
     syncGun(p);
   } else if (p.ammoBag[p.weapon] > 0) {

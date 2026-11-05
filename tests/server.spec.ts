@@ -12,12 +12,14 @@ import { addZombie, input, stateOf } from './helpers/sim-harness.ts';
 const FLOOD_PACKETS = 1500;
 
 describe('packet validation', () => {
-  const good = { seq: 1, up: false, down: false, left: false, right: true, angle: 1, shoot: false, reload: false, weapon: null, melee: true, heal: false };
+  const good = { seq: 1, up: false, down: false, left: false, right: true, angle: 1, shoot: false, reload: false, weapon: null, melee: true, heal: false, search: false };
 
   it('accepts well-formed packets', () => {
     expect(parseClientPacket(JSON.stringify({ type: 'input', input: good }))).toEqual({ type: 'input', input: good });
     expect(parseClientPacket('{"type":"restart"}')).toEqual({ type: 'restart' });
     expect(parseClientPacket('{"type":"join","name":"Ann","token":"t1"}')).toEqual({ type: 'join', name: 'Ann', token: 't1' });
+    expect(parseClientPacket('{"type":"join","name":"Ann","token":"t1","character":4}')).toMatchObject({ character: 4 });
+    expect(parseClientPacket('{"type":"join","name":"Ann","token":"t1","character":5}')).toBeNull();
   });
 
   it.each([

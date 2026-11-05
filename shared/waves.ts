@@ -8,6 +8,11 @@ import {
   ZOMBIES,
   ZOMBIE_CAP,
 } from './constants.ts';
+import { BASELINE_DIFFICULTY, difficultyDef, lullSeconds, scaleHordeSize } from './difficulty.ts';
+import type { DifficultyId } from './difficulty.ts';
+import { openExit } from './level-exit.ts';
+import { LEVELS, levelDef } from './levels.ts';
+import type { LevelDef } from './levels.ts';
 import { restockLoot } from './loot.ts';
 import { returnDeadPlayers } from './player-health.ts';
 import type { ZombieType } from './protocol.ts';
@@ -20,11 +25,18 @@ import { SIGHT_CHECK_TICKS, backToRoaming } from './zombie-senses.ts';
 const SPAWN_TRIES_PER_TICK = 12;
 
 /** The whole horde in spawn order. Exported so balance is testable without running one. */
-export function waveRoster(wave: number, rng: () => number): ZombieType[] {
-  const total = 5 + wave * 3;
-  const brutes = wave % 5 === 0 ? wave / 5 : 0;
-  const bloaters = wave >= 3 ? Math.min(8, 1 + Math.floor((wave - 3) / 2)) : 0;
-  const runners = wave >= 2 ? Math.floor(total * Math.min(0.4, 0.14 + (wave - 2) * 0.04)) : 0;
+export function waveRoster(
+  wave: number,
+  rng: () => number,
+  level: LevelDef = LEVELS[0],
+  difficultyId: DifficultyId = BASELINE_DIFFICULTY,
+): ZombieType[] {
+  const { difficulty, mix } = level;
+  const total = scaleHordeSize(Math.round((5 + wave * 3) * difficulty), difficultyId);
+  const brutes = (wave % 5 === 0 ? wave / 5 : 0) + Math.round(total * mix.brute);
+  const bloaters = (wave >= 3 ? Math.min(8, 1 + Math.floor((wave - 3) / 2)) : 0) + Math.round(total * mix.bloater);
+  const runnerShare = (wave >= 2 ? Math.min(0.4, 0.14 + (wave - 2) * 0.04) : 0) + mix.runner;
+  const runners = Math.floor(total * runnerShare);
   const walkers = Math.max(0, total - runners - bloaters - brutes);
   const roster: ZombieType[] = [
     ...Array<ZombieType>(walkers).fill('walker'),
@@ -56,8 +68,8 @@ export function spawnZombie(sim: SimState, type: ZombieType, x: number, y: numbe
     attacking: false,
     radius: stats.radius,
     // Slight per-body variation stops a crowd marching in lockstep.
-    speed: stats.speed * speedScale(sim.wave) * randRange(sim.rng, 0.92, 1.08),
-    damage: stats.damage,
+    speed: stats.speed * speedScale(sim.wave) * randRange(sim.rng, 0.92, 1.08) * difficultyDef(sim.difficulty).zombieSpeed,
+    damage: stats.damage * difficultyDef(sim.difficulty).zombieDamage,
     points: stats.points,
     reach: stats.reach,
     windupSec: stats.windupSec,
@@ -123,7 +135,7 @@ function startHorde(sim: SimState): void {
   sim.hordeLeft = HORDE_MAX_SEC;
   // Only what the cap has room for is called: anything more would be counted and never come.
   const room = Math.max(0, ZOMBIE_CAP - sim.zombies.length);
-  sim.spawnQueue = waveRoster(sim.wave, sim.rng).slice(0, room).reverse();
+  sim.spawnQueue = waveRoster(sim.wave, sim.rng, levelDef(sim.level), sim.difficulty).slice(0, room).reverse();
   sim.spawnTimer = 0;
   returnDeadPlayers(sim);
   emit(sim, { type: 'wave_start', wave: sim.wave, hostiles: sim.spawnQueue.length });
@@ -158,11 +170,17 @@ function endHorde(sim: SimState): void {
   }
   thinRoamers(sim);
   emit(sim, { type: 'wave_clear', wave: sim.wave });
+  const levelSurvived = sim.wave >= levelDef(sim.level).hordes;
+  if (levelSurvived) openExit(sim);
   restockLoot(sim);
   sim.phase = 'intermission';
-  sim.intermissionLeft = INTERMISSION_SEC;
-  emit(sim, { type: 'wave_intermission', wave: sim.wave + 1, seconds: INTERMISSION_SEC });
+  const lull = lullSeconds(INTERMISSION_SEC, sim.difficulty);
+  sim.intermissionLeft = lull;
+  emit(sim, { type: 'wave_intermission', wave: sim.wave + 1, seconds: lull });
 }
+
+/** Hordes seen off in this town. One still hunting does not count. */
+export const hordesSurvivedHere = (sim: SimState): number => (sim.phase === 'wave' ? sim.wave - 1 : sim.wave);
 
 /** Horde zombies alive or still to come. */
 export function hordeHostiles(sim: SimState): number {

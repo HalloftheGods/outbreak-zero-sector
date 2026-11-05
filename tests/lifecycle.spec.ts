@@ -279,7 +279,7 @@ describe('restart', () => {
     const [a, b] = state.players;
     const zombie = addZombie(state, 'walker', a.x + 200, a.y);
     damageZombie(state, zombie, 1e6, 0, 'a');
-    addZombie(state, 'walker', a.x + 200, a.y);
+    const leftOver = addZombie(state, 'walker', a.x + 200, a.y);
     a.owned = ['pistol', 'carbine'];
     a.guns.carbine = { ammo: 1 };
     a.ammoBag.carbine = 1;
@@ -302,7 +302,8 @@ describe('restart', () => {
     expect(fresh.wave).toBe(0);
     expect(fresh.intermission).toBeCloseTo(LEAD_IN_SEC, 1);
     expect(fresh.gameOver).toBeNull();
-    expect(fresh.zombies).toEqual([]);
+    expect(fresh.zombies.some((z) => z.id === leftOver.id)).toBe(false);
+    expect(state.populationTarget).toBe(STANDING_POPULATION);
     expect(fresh.pickups.some((item) => item.id === 'x')).toBe(false);
     expect(state.pickups.length).toBeGreaterThan(30);
     expect(fresh.bullets).toEqual([]);

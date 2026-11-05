@@ -12,6 +12,11 @@ const HIT_FLASH_SEC = 0.09;
 const BLOOD = ['#8c1a14', '#a8231a', '#5e100c'];
 const ACID = ['#a9d94a', '#6d9c22', '#d4f07a'];
 const SPARK = ['#fff0b8', '#ffc04a', '#ff8e2e'];
+const SKULL_CHIPS = ['#e4dcc3', '#c9bd9c', '#a8231a'];
+const HEADSHOT_COLOR = '#ff5a3c';
+/** The word goes over the head it names. */
+const HEADSHOT_NOTE_GAP = 10;
+const HEADSHOT_KICK = 0.22;
 const SCORE_COLOR = '#e8a33d';
 const PICKUP_COLOR = '#b6d65a';
 const REFUSED_COLOR = '#d9b98a';
@@ -35,6 +40,12 @@ const PICKUP_LABEL: Record<PickupType, string> = {
   shells: 'SHELLS',
   carbine: 'CARBINE',
   shotgun: 'SHOTGUN',
+  knife: 'KNIFE',
+  barrel: 'BARREL',
+  grip: 'GRIP',
+  magazine: 'MAGAZINE',
+  suppressor: 'SUPPRESSOR',
+  toolkit: 'TOOLKIT',
 };
 
 export interface PulseLight {
@@ -106,12 +117,14 @@ export class FxDirector {
       case 'heal': this.onHeal(event, ctx); break;
       case 'bullet_impact': this.onImpact(event.x, event.y, event.angle); break;
       case 'zombie_hit': this.onZombieHit(event.zombieId, event.x, event.y, event.angle, ctx.time); break;
+      case 'headshot': this.onHeadshot(event, ctx); break;
       case 'zombie_die': this.onZombieDie(event, ctx); break;
       case 'bloater_burst': this.onBurst(event.x, event.y, event.radius); break;
       case 'player_hurt': this.onPlayerHurt(event.playerId, event.x, event.y, event.damage, ctx); break;
       case 'player_downed': this.stampBlood(event.x, event.y); break;
       case 'player_revived': this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR); break;
       case 'pickup': this.onPickup(event, ctx); break;
+      case 'container_opened': this.onContainerOpened(event, ctx); break;
       default: break;
     }
   }
@@ -126,8 +139,9 @@ export class FxDirector {
     const dir = dirFromAngle(event.angle);
     const barrel = barrelOffset(event.weapon, dir);
     const tipX = bodyX + barrel.x;
-    const tipY = bodyY + barrel.y;
-    this.visuals.get(event.playerId).fireAt = ctx.time;
+    const shooter = this.visuals.get(event.playerId);
+    const tipY = bodyY + barrel.y + shooter.gunDrop;
+    shooter.fireAt = ctx.time;
 
     this.particles.addClip(this.art.fx.muzzle[event.weapon][dir], tipX, tipY, true);
     const light = MUZZLE_LIGHT[event.weapon];
@@ -177,6 +191,19 @@ export class FxDirector {
     if (Math.random() < 0.35) this.stampBlood(x + spread(6), y + spread(6));
   }
 
+  /** The event is at the head as drawn, and dots start CHEST_HEIGHT over the spot they are given. */
+  private onHeadshot(event: Extract<GameEvent, { type: 'headshot' }>, ctx: FxContext): void {
+    const { x, y, angle } = event;
+    const groundY = y + CHEST_HEIGHT;
+    this.particles.addClip(this.art.fx.bloodBurst, x, y, false);
+    this.burstDots(x, groundY, angle, BLOOD, 12, 110, false, 1.1);
+    this.burstDots(x, groundY, angle, SKULL_CHIPS, 6, 140, false, 1.1);
+    const shotHere = event.playerId === ctx.localId;
+    if (!shotHere) return;
+    this.particles.addText(`HEADSHOT +${event.points}`, x, y - HEADSHOT_NOTE_GAP, HEADSHOT_COLOR);
+    this.effects.addShake(HEADSHOT_KICK);
+  }
+
   private onZombieDie(event: Extract<GameEvent, { type: 'zombie_die' }>, ctx: FxContext): void {
     const { x, y, angle } = event;
     this.hooks.addCorpse(event.zombieId, event.zombieType, x, y);
@@ -219,6 +246,13 @@ export class FxDirector {
     const label = isLocal && ctx.pickupNote ? ctx.pickupNote : PICKUP_LABEL[event.pickup];
     this.particles.addText(label, x, y - NOTE_HEIGHT, PICKUP_COLOR);
     this.pulses.push({ x: event.x, y: event.y, radius: 30, color: '#d8c89a', life: 0.18, maxLife: 0.18 });
+  }
+
+  /** Whoever hears a clatter sees where it came from; only the searcher is told they found nothing. */
+  private onContainerOpened(event: Extract<GameEvent, { type: 'container_opened' }>, ctx: FxContext): void {
+    const emptyHanded = !event.found && event.playerId === ctx.localId;
+    if (event.noisy) this.particles.addText('CLATTER', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR);
+    else if (emptyHanded) this.note('NOTHING', event.x, event.y);
   }
 
   /** Over the local player's head, for what the sim says nothing about: an item left where it lay. */

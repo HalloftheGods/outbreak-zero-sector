@@ -1,3 +1,4 @@
+import { characterOf } from './characters.ts';
 import {
   AMMO_PICKUPS,
   BANDAGE_HEAL,
@@ -10,6 +11,7 @@ import {
   WEAPONS,
 } from './constants.ts';
 import type { AmmoPickup } from './constants.ts';
+import { foundGunFit, isPartPickup, takePart } from './gun-upgrades.ts';
 import { WEAPON_ORDER } from './protocol.ts';
 import type { PickupType, WeaponId } from './protocol.ts';
 import type { PickupState, PlayerState, SimState } from './sim-state.ts';
@@ -26,8 +28,9 @@ export function spawnPickup(sim: SimState, type: PickupType, x: number, y: numbe
 }
 
 /** Rarely, something small falls off a body. It does not last. */
-export function maybeDropOnKill(sim: SimState, x: number, y: number): void {
-  if (sim.rng() >= KILL_DROP_CHANCE) return;
+export function maybeDropOnKill(sim: SimState, x: number, y: number, killer?: PlayerState): void {
+  const odds = killer ? characterOf(killer.skin).dropOdds : 1;
+  if (sim.rng() >= KILL_DROP_CHANCE * odds) return;
   if (sim.rng() < KILL_DROP_BANDAGE_ODDS) spawnPickup(sim, 'bandage', x, y, 0, KILL_DROP_TTL_SEC);
   else spawnPickup(sim, 'pistol_ammo', x, y, KILL_DROP_ROUNDS, KILL_DROP_TTL_SEC);
 }
@@ -55,7 +58,7 @@ function takeGun(p: PlayerState, item: PickupState, weapon: WeaponId): boolean {
     item.rounds = loaded - taken;
     return true;
   }
-  p.guns[weapon] = { ammo: loaded };
+  p.guns[weapon] = { ammo: loaded, fit: foundGunFit(item) };
   item.rounds = 0;
   p.owned = WEAPON_ORDER.filter((id) => id === weapon || p.owned.includes(id));
   p.weapon = weapon;
@@ -77,6 +80,12 @@ function applyPickup(p: PlayerState, item: PickupState): boolean {
     p.medkits += 1;
     return true;
   }
+  if (type === 'knife') {
+    if (p.knife) return false;
+    p.knife = true;
+    return true;
+  }
+  if (isPartPickup(type)) return takePart(p, type);
   const used = isAmmoPickup(type) ? takeAmmo(p, item, type) : takeGun(p, item, type);
   if (used) syncGun(p);
   return used;

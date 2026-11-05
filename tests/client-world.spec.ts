@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { CHARACTERS } from '../shared/characters.ts';
 import { PLAYER_SPEED, TICK_DT } from '../shared/constants.ts';
+import { playerSpeed } from '../shared/players.ts';
 import { BUILDING_DEFS } from '../shared/protocol.ts';
 import type { PlayerEntity, SnapshotPacket, WorldMap } from '../shared/protocol.ts';
 import { generateWorldMap } from '../shared/world-map.ts';
@@ -27,20 +29,28 @@ function player(id: string, patch: Partial<PlayerEntity> = {}): PlayerEntity {
     id, name: id.toUpperCase(), skin: 0, x: 500, y: 500, angle: 0, moving: false, status: 'alive',
     health: 100, maxHealth: 100, weapon: 'pistol', ammo: 12, magSize: 12, reserve: 12, owned: ['pistol'],
     ammoBag: { pistol: 12, carbine: 0, shotgun: 0 }, mags: { pistol: 12, carbine: 0, shotgun: 0 }, medkits: 0, indoors: null,
-    reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0, ...patch,
+    reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 0, knife: false, search: 0, ...patch,
   };
 }
 
 function snapshot(tick: number, players: PlayerEntity[], phase: SnapshotPacket['phase'] = 'wave'): SnapshotPacket {
   return {
-    type: 'snapshot', tick, phase, wave: 1, intermission: 0, hostiles: 0, players,
-    zombies: [], bullets: [], pickups: [], events: [], gameOver: null,
+    type: 'snapshot', tick, phase, level: 1, mapSeed: 1, wave: 1, intermission: 0, hostiles: 0, players,
+    zombies: [], bullets: [], pickups: [], exit: null, openedContainers: [], events: [], gameOver: null,
   };
 }
 
 describe('ClientWorld', () => {
   it('has nothing to show before the first snapshot', () => {
     expect(new ClientWorld(openMap, 'me').advance(0, 66, 0, 0, 0, 1 / 60)).toBeNull();
+  });
+
+  it('predicts at the speed of the local survivor', () => {
+    const satori = CHARACTERS.findIndex(({ id }) => id === 'satori');
+    const world = new ClientWorld(openMap, 'me');
+    world.push(snapshot(1, [{ ...player('me'), skin: satori }]), 1000);
+    const me = world.advance(1000, 66, 1, 0, 0, 1 / 60)!.players.find((p) => p.id === 'me')!;
+    expect(me.x).toBeCloseTo(500 + playerSpeed(satori) / 60, 3);
   });
 
   it('moves the local player at once and points them at the live aim', () => {
@@ -151,7 +161,7 @@ describe('buildHud', () => {
     const hud = buildHud(snapshot(1, [me, player('mate', { health: 10 })]), me, null);
     expect(hud.ammo).toBe(3);
     expect(hud.score).toBe(40);
-    expect(hud.teammates).toEqual([{ id: 'mate', name: 'MATE', health: 10, maxHealth: 100, status: 'alive' }]);
+    expect(hud.teammates).toEqual([{ id: 'mate', name: 'MATE', character: 'Night', health: 10, maxHealth: 100, status: 'alive' }]);
   });
 
   it('carries what is loaded in each gun', () => {

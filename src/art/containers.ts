@@ -1,0 +1,38 @@
+// Searchable props. Each has two whole sprites that stand in for the prop itself, one shut and one
+// searched, so a room reads as gone through at a glance. Anchored like props, on the footprint.
+
+import type { Container, ContainerKind } from '../../shared/containers.ts';
+import type { PropKind } from '../../shared/protocol.ts';
+import { buildCrateArt } from './containers/cartons.ts';
+import { buildBedArt, buildBenchArt, buildCounterArt } from './containers/fittings.ts';
+import { buildFridgeArt, buildLockerArt, buildShelfArt } from './containers/shelving.ts';
+import type { ContainerArt } from './containers/stage.ts';
+import { buildCarArt } from './containers/vehicles.ts';
+import type { PixelSprite } from './types.ts';
+
+export type { ContainerArt } from './containers/stage.ts';
+
+export type ContainerLook = ContainerKind | 'bench' | 'car_v' | 'wreck' | 'van';
+
+/** The props that look different from the rest of their kind. */
+const PROP_LOOKS: Partial<Record<PropKind, ContainerLook>> = {
+  workbench: 'bench',
+  car_sedan_v: 'car_v',
+  car_wreck_h: 'wreck',
+  van_h: 'van',
+};
+
+export const containerLook = ({ kind, prop }: Pick<Container, 'kind' | 'prop'>): ContainerLook => PROP_LOOKS[prop] ?? kind;
+
+export function buildContainers(props: Record<PropKind, PixelSprite>): Record<ContainerLook, ContainerArt> {
+  return {
+    drawer: buildBedArt(props.bed),
+    locker: buildLockerArt(props.locker),
+    fridge: buildFridgeArt(props.fridge),
+    cabinet: buildCounterArt(props.counter),
+    bench: buildBenchArt(props.workbench),
+    shelf: buildShelfArt(),
+    box: buildCrateArt(props.crate_stack),
+    ...buildCarArt(props),
+  };
+}

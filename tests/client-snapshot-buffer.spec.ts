@@ -19,6 +19,8 @@ function snapshot(tick: number, zombies: ZombieEntity[] = [], players: PlayerEnt
     type: 'snapshot',
     tick,
     phase: 'wave',
+    level: 1,
+    mapSeed: 1,
     wave: 1,
     intermission: 0,
     hostiles: zombies.length,
@@ -26,6 +28,8 @@ function snapshot(tick: number, zombies: ZombieEntity[] = [], players: PlayerEnt
     zombies,
     bullets: [],
     pickups: [],
+    exit: null,
+    openedContainers: [],
     events: [],
     gameOver: null,
   };

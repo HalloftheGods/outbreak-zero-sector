@@ -1,5 +1,8 @@
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_DT } from '../../shared/constants.ts';
+import { containerInReach } from '../../shared/containers.ts';
+import type { Container } from '../../shared/containers.ts';
 import { stepMovement } from '../../shared/movement.ts';
+import { playerSpeed } from '../../shared/players.ts';
 import type { EntityId, PlayerEntity, SnapshotPacket, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt, circleHitsSolid } from '../../shared/world-query.ts';
 import type { SceneView } from '../engine/scene.ts';
@@ -10,25 +13,27 @@ const MAX_BULLET_LEAD_SEC = 0.1;
 
 export type WorldEntities = Pick<
   SceneView,
-  'players' | 'zombies' | 'bullets' | 'pickups' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
+  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'searchable' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
 >;
 
 /** What this client currently believes: buffered snapshots plus the predicted local player. */
 export class ClientWorld {
   readonly localId: EntityId;
   readonly predictor: LocalPredictor;
-  private readonly map: WorldMap;
+  private map: WorldMap;
   private readonly buffer = new SnapshotBuffer(TICK_DT * 1000);
   private latestArrival = 0;
   private predicting = false;
+  /** The local survivor's walking speed, which prediction has to match. */
+  private speed = PLAYER_SPEED;
 
   constructor(map: WorldMap, localId: EntityId) {
     this.localId = localId;
     this.map = map;
     this.predictor = new LocalPredictor(
-      (x, y, dirX, dirY, dt) => stepMovement(map, x, y, dirX, dirY, PLAYER_SPEED, dt, PLAYER_RADIUS),
+      (x, y, dirX, dirY, dt) => stepMovement(this.map, x, y, dirX, dirY, this.speed, dt, PLAYER_RADIUS),
       TICK_DT,
-      (x, y) => circleHitsSolid(map, x, y, PLAYER_RADIUS),
+      (x, y) => circleHitsSolid(this.map, x, y, PLAYER_RADIUS),
     );
   }
 
@@ -47,10 +52,17 @@ export class ClientWorld {
     this.predicting = false;
   }
 
+  /** The run moved on. Nothing from the last town can be blended with, or predicted against, this one. */
+  enterTown(map: WorldMap): void {
+    this.map = map;
+    this.restart();
+  }
+
   push(snapshot: SnapshotPacket, nowMs: number): void {
     this.buffer.push(snapshot, nowMs);
     this.latestArrival = nowMs;
     const local = this.localPlayer;
+    if (local) this.speed = playerSpeed(local.skin);
     if (local?.status === 'alive' && this.predicting) {
       this.predictor.reconcile(local.x, local.y, local.lastInputSeq);
     }
@@ -62,6 +74,12 @@ export class ClientWorld {
     return players.find((player) => player.status === 'alive')
       ?? players.find((player) => player.status === 'downed')
       ?? local;
+  }
+
+  /** What the local player could start searching: nothing while down, or already at it. */
+  private searchableBy(player: PlayerEntity | null, opened: readonly number[]): Container | null {
+    const free = player !== null && player.status === 'alive' && player.search === 0;
+    return free ? containerInReach(this.map, player.x, player.y, (id) => opened.includes(id)) : null;
   }
 
   /** Advances prediction by dt and returns this frame's entities, or null before any snapshot. */
@@ -82,6 +100,9 @@ export class ClientWorld {
       zombies: interpolateZombies(sample),
       bullets: extrapolateBullets(newest.snapshot.bullets, lead),
       pickups: newest.snapshot.pickups,
+      exit: newest.snapshot.exit,
+      openedContainers: newest.snapshot.openedContainers,
+      searchable: this.searchableBy(shownLocal, newest.snapshot.openedContainers),
       localId: this.localId,
       viewerId: viewer?.id ?? null,
       focusX: viewer?.x ?? 0,

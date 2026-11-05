@@ -3,10 +3,12 @@
 
 import type { EnvironmentArt } from './types.ts';
 import { buildBrickApartment, buildSlabApartment } from './environment/apartment.ts';
+import { buildCrates } from './containers/cartons.ts';
+import { buildFridge, buildLocker } from './containers/shelving.ts';
 import { buildClinic } from './environment/clinic.ts';
 import { buildDiner } from './environment/diner.ts';
 import { buildInterior } from './environment/floors.ts';
-import { buildBed, buildCounter, buildLocker, buildShelf, buildSofa, buildTable, buildWorkbench } from './environment/furniture.ts';
+import { buildBed, buildCounter, buildShelf, buildSofa, buildTable, buildWorkbench } from './environment/furniture.ts';
 import { buildGarage } from './environment/garage.ts';
 import { buildGrocery } from './environment/grocery.ts';
 import { buildGunShop } from './environment/gun-shop.ts';
@@ -17,7 +19,6 @@ import { buildPolice } from './environment/police.ts';
 import {
   buildBarrelFire,
   buildBarrier,
-  buildCrates,
   buildDumpster,
   buildFireBarrel,
   buildHydrant,
@@ -25,7 +26,7 @@ import {
   buildStreetLamp,
 } from './environment/street.ts';
 import { buildTiles } from './environment/tiles.ts';
-import { buildSedanH, buildSedanV, buildVan, buildWreckH } from './environment/vehicles.ts';
+import { buildEscapeVanLights, buildSedanH, buildSedanV, buildVan, buildWreckH } from './environment/vehicles.ts';
 import { buildBrickWarehouse, buildSteelWarehouse } from './environment/warehouse.ts';
 import { buildFenceH, buildFenceV, buildGasPump } from './environment/yard.ts';
 
@@ -56,6 +57,7 @@ export function buildEnvironment(): EnvironmentArt {
       sofa: buildSofa(),
       bed: buildBed(),
       locker: buildLocker(),
+      fridge: buildFridge(),
       workbench: buildWorkbench(),
     },
     buildings: {
@@ -72,5 +74,7 @@ export function buildEnvironment(): EnvironmentArt {
     },
     interior: buildInterior(),
     barrelFire: buildBarrelFire(),
+    escapeVan: buildVan(),
+    escapeVanLights: buildEscapeVanLights(),
   };
 }

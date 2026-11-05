@@ -1,3 +1,4 @@
+import { characterOf } from './characters.ts';
 import { TICK_DT, ZOMBIE_INVESTIGATE_SEC, ZOMBIE_LOSE_INTEREST_SEC, ZOMBIE_SIGHT_RANGE } from './constants.ts';
 import type { PlayerState, SimState, ZombieMode, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
@@ -39,7 +40,7 @@ export function makeNoise(sim: SimState, x: number, y: number, radius: number): 
 
 function seesAnyone(sim: SimState, z: ZombieState, prey: readonly PlayerState[]): boolean {
   return prey.some((p) => {
-    const inRange = (p.x - z.x) ** 2 + (p.y - z.y) ** 2 <= ZOMBIE_SIGHT_RANGE ** 2;
+    const inRange = (p.x - z.x) ** 2 + (p.y - z.y) ** 2 <= (ZOMBIE_SIGHT_RANGE * characterOf(p.skin).sightRange) ** 2;
     return inRange && !segmentHitsSolid(sim.map, z.x, z.y, p.x, p.y);
   });
 }

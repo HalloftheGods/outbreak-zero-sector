@@ -18,7 +18,7 @@ function deep(): any {
 describe('sfx registry', () => {
   const required = [
     'pistol', 'carbine', 'shotgun', 'dry_click', 'mag_out', 'mag_in', 'pump', 'weapon_switch', 'impact',
-    'flesh_hit', 'die_walker', 'die_runner', 'die_bloater', 'die_brute', 'claw', 'groan_walker',
+    'flesh_hit', 'headshot', 'die_walker', 'die_runner', 'die_bloater', 'die_brute', 'claw', 'groan_walker',
     'shriek_runner', 'gurgle_bloater', 'roar_brute', 'bloater_burst', 'player_hurt', 'player_downed',
     'revive', 'heartbeat', 'pickup_medkit', 'pickup_ammo', 'pickup_weapon', 'wave_start', 'wave_clear',
     'pickup_bandage', 'pickup_pistol_ammo', 'pickup_carbine_ammo', 'pickup_shells', 'melee_swing', 'melee_thud', 'heal',

@@ -122,6 +122,7 @@ describe('render pipeline', () => {
         weapon: null,
         melee: tick % 40 === 0,
         heal: false,
+        search: false,
       });
       sim.step();
       const snapshot = sim.snapshot();

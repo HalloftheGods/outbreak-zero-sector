@@ -25,6 +25,17 @@ export function pick<T>(rng: Rng, items: readonly T[]): T {
   return items[Math.floor(rng() * items.length)];
 }
 
+/** One key of a table of relative odds. */
+export function pickWeighted<T extends string>(rng: Rng, table: Partial<Record<T, number>>): T {
+  const entries = Object.entries(table) as [T, number][];
+  let roll = rng() * entries.reduce((sum, [, weight]) => sum + weight, 0);
+  for (const [key, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return key;
+  }
+  return entries[0][0];
+}
+
 export function shuffle<T>(rng: Rng, items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));

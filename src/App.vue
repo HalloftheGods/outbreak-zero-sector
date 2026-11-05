@@ -9,10 +9,14 @@
         <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" />
         <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
       </template>
+      <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
+      <WorkbenchScreen v-if="ui.hud?.bench && ui.art" :hud="ui.hud" :bench="ui.hud.bench" :art="ui.art" />
       <TownMap v-if="ui.mapOpen" :mode="ui.mode" />
       <PauseMenu v-if="ui.paused" :ui :mode="ui.mode" />
     </template>
+
+    <EndingFlow v-else-if="ui.screen === 'gameover' && ui.result && ui.result.stats.outcome === 'victory'" :result="ui.result" :art="ui.art" />
 
     <GameOverScreen
       v-else-if="ui.screen === 'gameover' && ui.result"
@@ -31,14 +35,17 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, useTemplateRef } from 'vue';
 import ConnectionLost from './components/ConnectionLost.vue';
 import DownedOverlay from './components/DownedOverlay.vue';
+import EndingFlow from './components/EndingFlow.vue';
 import GameOverScreen from './components/GameOverScreen.vue';
 import HudOverlay from './components/HudOverlay.vue';
+import LevelCard from './components/LevelCard.vue';
 import PauseMenu from './components/PauseMenu.vue';
 import StudioSplash from './components/StudioSplash.vue';
 import TitleScreen from './components/TitleScreen.vue';
 import TownMap from './components/TownMap.vue';
 import { GAME_KEY } from './components/use-game.ts';
 import WaveBanner from './components/WaveBanner.vue';
+import WorkbenchScreen from './components/WorkbenchScreen.vue';
 import { GameController } from './game/game-controller.ts';
 import { shouldShowSplash } from './game/studio-splash.ts';
 
@@ -46,7 +53,7 @@ const game = new GameController();
 const ui = game.ui;
 const splashing = ref(shouldShowSplash(window.location.search));
 const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
-const aiming = computed(() => ui.value.screen === 'game' && !ui.value.paused && !ui.value.mapOpen);
+const aiming = computed(() => ui.value.screen === 'game' && !ui.value.paused && !ui.value.mapOpen && !ui.value.hud?.bench);
 
 provide(GAME_KEY, game);
 

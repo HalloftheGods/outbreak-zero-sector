@@ -1,3 +1,4 @@
+import { settleVan } from './exit-van.ts';
 import { BUILDING_DEFS, DOOR_WIDTH, PROP_DEFS, TILE_SIZE, WALL_THICKNESS } from './protocol.ts';
 import type { BuildingInstance, PropInstance, WorldMap } from './protocol.ts';
 
@@ -111,7 +112,10 @@ function solidIndex(map: WorldMap): SolidIndex {
   }
   for (const wall of wallBoxes(map)) addBox(wall);
   const index: SolidIndex = { buckets, blocked };
+  // Settling the van's spot reads these solids, so they are cached first and the van joins them after.
   indexes.set(map, index);
+  const van = settleVan(map);
+  if (van) addBox(van);
   return index;
 }
 
