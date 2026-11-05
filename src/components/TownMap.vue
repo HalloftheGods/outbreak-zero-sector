@@ -9,7 +9,8 @@
         </li>
         <li class="town-tick">Tick: been inside</li>
       </ul>
-      <p class="px-note">{{ mode === 'solo' ? 'Paused.' : 'The town does not wait.' }} Tab to close</p>
+      <p class="px-note">{{ mode === 'solo' ? 'Paused.' : 'The town does not wait.' }} <span class="keys-only">Tab to close</span></p>
+      <MenuLink class="touch-only town-close" @press="game.toggleMap()">Close</MenuLink>
     </aside>
   </section>
 </template>
@@ -18,6 +19,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import { TOWN_LEGEND } from '../game/town-map.ts';
 import type { TransportKind } from '../network/transport.ts';
+import MenuLink from './MenuLink.vue';
 import { useGame } from './use-game.ts';
 
 const SCREEN_MARGIN = 24;

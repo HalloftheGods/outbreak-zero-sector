@@ -1,10 +1,13 @@
-# Changelog - Outbreak: Zero Sector
+# Changelog - Undead of Night: Last Round
 
-All notable changes to the Outbreak: Zero Sector game are documented in this file.
+All notable changes to the Undead of Night: Last Round game are documented in this file.
 
 ## [2026-11-04] - Open Town
 
 ### Added
+- Redesigned Levels screen (`LevelsPage.vue`) with responsive multi-column card grid and procedural 64x36 pixel art preview thumbnails for all 10 level themes (Silent Ruins, Escalation, Into the Breach, Abyssal Depths, Contamination Zone, Underground Bunker, Quarantine Breach, Frozen Wasteland, The Hive, Final Stand) and a classified blueprint silhouette with padlock for locked sectors.
+- Redesigned How to Play screen (`HowToPlay.vue`) with an extra-wide layout featuring authentic in-game pixel art sprite recognition cards across all 12 sections (Escape van, survivors, weapons, ammunition, health pickups, searchable containers, zombie types, workbench parts, and difficulty tiers) so players visually recognize gameplay elements alongside tactical tips.
+- Touch play on phones and tablets, either way up: a floating left thumb stick, touch anywhere else to aim there and fire with a little extra headshot margin, edge buttons for Shove, Reload, Heal, Search, Weapon, Map and Pause, larger menu tap targets, and a tall view that sees no further than the same phone on its side, capped in co-op.
 - Gun upgrades at a workbench after each van ride, except the last. Barrels, grips, magazines, suppressors and rare toolkits are town loot, lost on death like everything carried. They buy damage, fire rate, magazine size or reload speed within each gun's slots, a suppressor cuts a gun's noise radius by 65%, and a toolkit moves one upgrade between guns. A found gun can carry a quirk with an upside and a downside. Upgrades stay on the gun across levels and go with it on death, no build passes 1.5 times the stock damage per second, and the HUD slots show pips. Solo holds until you are ready; a co-op server gives 45 seconds. Tables in `shared/gun-upgrade-data.ts`, rules in `shared/gun-upgrades.ts`, the hold in `shared/workbench.ts`.
 - Searchable cars, boxes (crates), shelves, drawers, lockers, fridges and cabinets across streets and interiors. Hold E near one to search it; moving or a hit cancels, opened ones show as opened to everyone, and a search sometimes clatters through the noise system. Most hold nothing, and every home holds something. The ammo budget rises to 1.15 of the population and counts containers: every town settles on budget with half on its floors and half shut away, at every level and difficulty.
 - Every searchable piece now has two whole sprites, shut and searched: shelves go from squared-away stock to shoved about with goods on the floor, taped cartons end up torn open and crushed, cars get smashed glass, a hanging door and a popped boot, and doors and drawers hang open with their contents turned out. Fridges are a prop of their own, the size of a locker, standing against the wall in homes and diners instead of drawn on tables and counters.
@@ -53,4 +56,3 @@ All notable changes to the Outbreak: Zero Sector game are documented in this fil
 - Full 360-degree twin-stick aiming and raycast projectile combat system.
 - Zombie swarm AI state machine featuring wandering, aggro detection, and separation steering.
 - Glassmorphic HUD overlay displaying player health, weapon ammo, survivor count, and connection status.
-- Steam-ready distribution architecture via lightweight web packaging.

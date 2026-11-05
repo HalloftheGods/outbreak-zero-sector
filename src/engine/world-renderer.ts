@@ -86,15 +86,18 @@ export class WorldRenderer {
     this.entities.addCorpse(id, type, x, y, this.time);
   }
 
-  resize(): void {
+  /** `reach` holds the view to that far from its middle, when the mode calls for it. */
+  resize(reach: number | null = null): void {
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
-    const viewport = computeViewport(cssW, cssH, window.devicePixelRatio || 1);
+    const viewport = computeViewport(cssW, cssH, window.devicePixelRatio || 1, reach);
     this.viewport = viewport;
     this.canvas.width = viewport.bufferW;
     this.canvas.height = viewport.bufferH;
     this.canvas.style.width = `${viewport.cssW}px`;
     this.canvas.style.height = `${viewport.cssH}px`;
+    this.canvas.style.left = `${viewport.left}px`;
+    this.canvas.style.top = `${viewport.top}px`;
     this.ctx.imageSmoothingEnabled = false;
     this.camera.setView(viewport.bufferW, viewport.bufferH);
     this.lighting.resize(viewport.bufferW, viewport.bufferH);

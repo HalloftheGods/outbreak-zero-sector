@@ -165,6 +165,8 @@ export interface ClientInputPacket {
   /** The crosshair as a spot in the drawn world, where heads are judged. Left off when there is no crosshair. */
   readonly aimX?: number;
   readonly aimY?: number;
+  /** Aimed with a finger. Left off for a mouse. */
+  readonly touch?: boolean;
   readonly shoot: boolean;
   readonly reload: boolean;
   /** Requested weapon, or null. The sim ignores weapons the player does not own. */

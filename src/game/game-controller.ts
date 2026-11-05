@@ -7,7 +7,6 @@ import { AudioEngine } from '../audio/audio-engine.ts';
 import { aimAngle } from '../engine/camera.ts';
 import { CHEST_HEIGHT, EMPTY_SCENE } from '../engine/scene.ts';
 import type { SceneView } from '../engine/scene.ts';
-import { titleUnit, uiUnit } from '../engine/viewport.ts';
 import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
@@ -18,13 +17,16 @@ import type { RunResult, UiState } from './hud-state.ts';
 import { loadCharacter } from './character-pref.ts';
 import { loadDifficulty } from './difficulty-pref.ts';
 import { InputManager } from './input-manager.ts';
-import { recordGameFinished, recordLevelReached } from './level-progress.ts';
+import { continueLevel, loadLevelProgress, recordGameFinished, recordLevelReached } from './level-progress.ts';
 import { InputSender } from './input-sender.ts';
 import { tickRunAudio } from './run-audio.ts';
 import { deathFade, finishRun, healthFraction, NO_RUN_UI, RunHud } from './run-hud.ts';
 import { RunStage } from './run-stage.ts';
 import { pickupNote } from './run-notices.ts';
 import { DEFAULT_PREFS, loadBest, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
+import { isTouchDevice } from './touch-input.ts';
+import { touchMarks } from './touch-marks.ts';
+import { fitWindow } from './view-fit.ts';
 
 const GAME_OVER_BEAT_MS = 1800;
 const MAX_FRAME_DT = 0.05;
@@ -46,8 +48,9 @@ export class GameController {
   /** The workbench screen's way to the run. */
   readonly bench: BenchLink;
 
+  /** The touch buttons press through this. */
+  readonly input: InputManager;
   private readonly audio = new AudioEngine();
-  private readonly input: InputManager;
   private readonly inputs: InputSender;
   private readonly runHud: RunHud;
   private readonly stage: RunStage;
@@ -73,6 +76,7 @@ export class GameController {
   constructor() {
     const prefs = loadPrefs();
     this.ui = shallowRef<UiState>({
+      touch: isTouchDevice(),
       screen: 'title',
       art: null,
       mode: 'solo',
@@ -97,6 +101,7 @@ export class GameController {
       onConfirm: () => this.confirm(),
       onMap: () => this.toggleMap(),
       mapUsable: () => this.canUseMap(),
+      onTouchSeen: () => { this.publish({ touch: true }); this.onResize(); },
     });
     this.inputs = new InputSender(this.input);
     this.bench = new BenchLink({
@@ -120,7 +125,7 @@ export class GameController {
 
   mount(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
-    this.applyUiUnit();
+    this.onResize();
     window.addEventListener('resize', this.onResize);
     window.addEventListener('blur', this.onAway);
     document.addEventListener('visibilitychange', this.onVisibility);
@@ -161,14 +166,8 @@ export class GameController {
     this.ui.value = { ...this.ui.value, ...patch };
   }
 
-  private applyUiUnit(): void {
-    document.documentElement.style.setProperty('--u', `${uiUnit(window.innerWidth, window.innerHeight)}px`);
-    document.documentElement.style.setProperty('--title-u', `${titleUnit(window.innerWidth, window.innerHeight)}px`);
-  }
-
   private readonly onResize = (): void => {
-    this.applyUiUnit();
-    this.renderer?.resize();
+    fitWindow(this.renderer, this.transport?.kind === 'coop', this.ui.value.touch);
   };
 
   /** A hidden tab gets no frames, so solo would otherwise be eaten alive unseen. */
@@ -223,12 +222,19 @@ export class GameController {
     this.audio.playUi(sound);
   }
 
-  startSolo(): void {
+  /** A fresh solo run from level 1, or from `fromLevel` with the return kit. */
+  startSolo(fromLevel?: number): void {
     if (!this.canStart()) return;
     this.audio.unlock();
     this.audio.playUi('start');
     this.publish({ mode: 'solo', error: null });
-    this.beginSession(new LocalSession());
+    this.beginSession(new LocalSession(), fromLevel);
+  }
+
+  /** Solo from the furthest level reached. Does nothing until a level past the first has been reached. */
+  continueSolo(): void {
+    const level = continueLevel(loadLevelProgress());
+    if (level !== null) this.startSolo(level);
   }
 
   startCoop(): void {
@@ -249,13 +255,13 @@ export class GameController {
     return art !== null && !connecting && screen === 'title';
   }
 
-  private beginSession(transport: GameTransport): void {
+  private beginSession(transport: GameTransport, startLevel?: number): void {
     this.transport = transport;
     this.welcomed = false;
     transport.onWelcome = (packet) => this.onWelcome(packet);
     transport.onSnapshot = (packet) => this.onSnapshot(packet);
     transport.onClosed = (reason) => this.onClosed(reason);
-    transport.connect(this.ui.value.callsign.trim() || FALLBACK_CALLSIGN, loadDifficulty(), loadCharacter());
+    transport.connect(this.ui.value.callsign.trim() || FALLBACK_CALLSIGN, loadDifficulty(), loadCharacter(), startLevel);
   }
 
   /** A menu is over the game: solo stops, and co-op stands still while the town carries on. */
@@ -290,13 +296,20 @@ export class GameController {
     return true;
   }
 
-  playAgain(): void {
+  playAgain(fromLevel?: number): void {
     const won = this.runResult?.stats.outcome === 'victory';
     const canRestart = this.ui.value.screen === 'gameover' && !this.ui.value.restarting && !won;
     if (!canRestart) return;
     this.audio.playUi('start');
     this.publish({ restarting: true });
-    this.transport?.requestRestart();
+    this.transport?.requestRestart(fromLevel);
+  }
+
+  /** After a solo death: back in at the furthest level reached. Co-op restarts stay at level 1. */
+  continueAgain(): void {
+    if (this.transport?.kind !== 'solo') return;
+    const level = continueLevel(loadLevelProgress());
+    if (level !== null) this.playAgain(level);
   }
 
   /** The ending screens pick their own track once the tally is read. */
@@ -311,6 +324,7 @@ export class GameController {
     this.runResult = null;
     this.input.setEnabled(false);
     this.audio.setScene('menu');
+    this.onResize();
     if (this.titleMap) this.renderer?.setMap(this.titleMap);
     this.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, best: loadBest(), leaderboard: loadLeaderboard() });
   }
@@ -335,6 +349,7 @@ export class GameController {
     this.runResult = null;
     this.inputs.reset();
     this.runHud.reset();
+    this.onResize();
     this.input.setEnabled(true);
     this.publish({ ...NO_RUN_UI, screen: 'game', connecting: false });
   }
@@ -349,6 +364,7 @@ export class GameController {
     this.runResult = null;
     this.input.setEnabled(false);
     this.audio.setScene('menu');
+    this.onResize();
     if (this.titleMap) this.renderer?.setMap(this.titleMap);
     this.publish({ ...NO_RUN_UI, screen: 'lost', lostReason: reason });
   }
@@ -446,7 +462,7 @@ export class GameController {
     const camera = renderer.camera;
     // Behind a co-op menu the mouse belongs to the menu, not the flashlight.
     if (!menuUp) {
-      this.aim = aimAngle(
+      this.aim = this.input.touch.look(this.aim) ?? aimAngle(
         pointerX,
         pointerY,
         camera.screenX(world.predictor.x),
@@ -461,11 +477,14 @@ export class GameController {
 
     const result = this.runResult;
     const over = result !== null;
+    const touch = touchMarks(this.input.touch, renderer, ms);
+    // A finger picks a spot on the picture, so the picture must not lean toward it and move the spot.
     const scene: SceneView = {
       ...entities,
-      pointerX: over ? null : pointerX,
-      pointerY: over ? null : pointerY,
+      pointerX: over || touch ? null : pointerX,
+      pointerY: over || touch ? null : pointerY,
       showCrosshair: this.isPlaying() && !menuUp && !this.bench.open,
+      touch,
     };
     this.lastScene = scene;
     const sending = transport !== null && !over;

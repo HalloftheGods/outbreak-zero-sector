@@ -3,7 +3,10 @@ import type { WeaponId, ZombieType } from './protocol.ts';
 export const TICK_RATE = 30;
 export const TICK_DT = 1 / TICK_RATE;
 export const MAX_PLAYERS = 4;
-export const DEFAULT_SERVER_PORT = 8097;
+/** Injected by vite.config.js from ZOMBIE_PORT for the browser build; undefined under plain node. */
+declare const __ZOMBIE_SERVER_PORT__: number | undefined;
+/** Server port. Browser: ZOMBIE_PORT at dev start (default 8097). Node server: reads ZOMBIE_PORT itself, same fallback. */
+export const DEFAULT_SERVER_PORT = typeof __ZOMBIE_SERVER_PORT__ === 'number' ? __ZOMBIE_SERVER_PORT__ : 8097;
 
 export const PLAYER_RADIUS = 6;
 export const PLAYER_SPEED = 84;

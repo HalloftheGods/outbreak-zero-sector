@@ -1,5 +1,6 @@
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { ClientInputPacket, WeaponId } from '../../shared/protocol.ts';
+import { TouchInput } from './touch-input.ts';
 
 const WHEEL_COOLDOWN_MS = 110;
 
@@ -46,6 +47,8 @@ export interface InputCallbacks {
   onMap(): boolean;
   /** The map is open or could open, so a Tab held down must stay away from the browser. */
   mapUsable(): boolean;
+  /** The first touch of the page. */
+  onTouchSeen?(): void;
 }
 
 interface OwnedWeapons {
@@ -81,6 +84,7 @@ function isShortcut(event: KeyboardEvent): boolean {
 export class InputManager {
   pointerClientX = 0;
   pointerClientY = 0;
+  readonly touch: TouchInput;
 
   private readonly callbacks: InputCallbacks;
   private readonly held = new Set<string>();
@@ -99,6 +103,15 @@ export class InputManager {
     this.callbacks = callbacks;
     this.pointerClientX = window.innerWidth / 2;
     this.pointerClientY = window.innerHeight / 2;
+    this.touch = new TouchInput({
+      live: () => this.enabled,
+      aimAt: (x, y) => {
+        this.pointerClientX = x;
+        this.pointerClientY = y;
+      },
+      onGesture: () => this.callbacks.onGesture(),
+      onSeen: () => this.callbacks.onTouchSeen?.(),
+    });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('mousemove', this.onMouseMove);
@@ -110,6 +123,7 @@ export class InputManager {
   }
 
   dispose(): void {
+    this.touch.dispose();
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('mousemove', this.onMouseMove);
@@ -123,6 +137,7 @@ export class InputManager {
   /** Off while any menu is up; nothing typed or clicked there reaches the game. */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    this.touch.letGo();
     this.clearLatches();
   }
 
@@ -131,6 +146,7 @@ export class InputManager {
     this.held.clear();
     this.firing = false;
     this.shoving = false;
+    this.touch.letGo();
     this.clearLatches();
   };
 
@@ -141,6 +157,7 @@ export class InputManager {
     this.reloadLatch = false;
     this.weaponLatch = null;
     this.cycleLatch = 0;
+    this.touch.clearLatch();
   }
 
   private isHeld(codes: readonly string[]): boolean {
@@ -148,11 +165,29 @@ export class InputManager {
   }
 
   get dirX(): number {
-    return Number(this.isHeld(RIGHT)) - Number(this.isHeld(LEFT));
+    return Math.sign(Number(this.isHeld(RIGHT)) - Number(this.isHeld(LEFT)) + this.touch.dirX);
   }
 
   get dirY(): number {
-    return Number(this.isHeld(DOWN)) - Number(this.isHeld(UP));
+    return Math.sign(Number(this.isHeld(DOWN)) - Number(this.isHeld(UP)) + this.touch.dirY);
+  }
+
+  /** A touch button goes down as the key it stands for. */
+  padDown(code: string): void {
+    if (code === 'Escape') {
+      this.callbacks.onPause();
+      return;
+    }
+    if (MAP_CODES.has(code)) {
+      this.callbacks.onMap();
+      return;
+    }
+    this.held.add(code);
+    if (this.enabled) this.latch(code);
+  }
+
+  padUp(code: string): void {
+    this.held.delete(code);
   }
 
   /** Builds the packet for this tick and spends the latches. */
@@ -160,12 +195,13 @@ export class InputManager {
     const cycled = weapons ? cycleWeapon(weapons, this.cycleLatch) : null;
     const packet: ClientInputPacket = {
       seq,
-      up: this.isHeld(UP),
-      down: this.isHeld(DOWN),
-      left: this.isHeld(LEFT),
-      right: this.isHeld(RIGHT),
+      up: this.isHeld(UP) || this.touch.dirY < 0,
+      down: this.isHeld(DOWN) || this.touch.dirY > 0,
+      left: this.isHeld(LEFT) || this.touch.dirX < 0,
+      right: this.isHeld(RIGHT) || this.touch.dirX > 0,
       angle,
-      shoot: this.fireLatch || (this.enabled && this.firing),
+      ...(this.touch.used ? { touch: true } : {}),
+      shoot: this.fireLatch || (this.enabled && this.firing) || this.touch.shooting,
       reload: this.reloadLatch,
       weapon: this.weaponLatch ?? cycled,
       melee: this.shoveLatch || (this.enabled && this.shoving) || this.isHeld([SHOVE_CODE]),
@@ -204,20 +240,24 @@ export class InputManager {
     this.held.add(event.code);
     if (!this.enabled) return;
     event.preventDefault();
-    if (event.repeat) return;
-    if (event.code === 'KeyR') this.reloadLatch = true;
-    if (event.code === 'KeyQ') this.cycleLatch += 1;
-    this.shoveLatch ||= event.code === SHOVE_CODE;
-    this.healLatch ||= event.code === HEAL_CODE;
-    const weapon = WEAPON_KEYS[event.code];
-    if (weapon) this.weaponLatch = weapon;
+    if (!event.repeat) this.latch(event.code);
   };
+
+  private latch(code: string): void {
+    if (code === 'KeyR') this.reloadLatch = true;
+    if (code === 'KeyQ') this.cycleLatch += 1;
+    this.shoveLatch ||= code === SHOVE_CODE;
+    this.healLatch ||= code === HEAL_CODE;
+    const weapon = WEAPON_KEYS[code];
+    if (weapon) this.weaponLatch = weapon;
+  }
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.held.delete(event.code);
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
+    this.touch.mouseMoved();
     this.pointerClientX = event.clientX;
     this.pointerClientY = event.clientY;
     // A native drag or menu can swallow the release; this is the first honest word on the buttons.

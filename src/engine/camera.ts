@@ -1,5 +1,5 @@
 const LEAD_FACTOR = 0.16;
-const LEAD_MAX = 40;
+export const LEAD_MAX = 40;
 const LEAD_RATE = 5;
 
 /** Top-left of the view along one axis. A world smaller than the view stays centred. */

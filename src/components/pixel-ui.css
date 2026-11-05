@@ -79,9 +79,17 @@ body {
   gap: calc(var(--u) * 5);
   width: calc(var(--u) * 280);
   max-width: 100%;
-  max-height: 100%;
+  max-height: calc(100vh - calc(var(--u) * 16));
   padding: calc(var(--u) * 6);
   background: rgba(11, 12, 16, 0.74);
+}
+
+.px-sheet.is-wide {
+  width: min(calc(var(--u) * 460), 94vw);
+}
+
+.px-sheet.is-extra-wide {
+  width: min(calc(var(--u) * 540), 96vw);
 }
 
 .px-sheet-heading {

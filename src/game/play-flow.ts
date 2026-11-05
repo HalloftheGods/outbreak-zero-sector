@@ -9,6 +9,9 @@ export interface PlayFlow {
 
 export const PLAY_START: PlayFlow = { step: 'who', mode: 'solo' };
 
+/** An invite link lands straight on the co-op step, skipping the callsign page. */
+export const PLAY_JOIN: PlayFlow = { step: 'how', mode: 'multi' };
+
 export function chooseMode(flow: PlayFlow, mode: PlayMode): PlayFlow {
   return { ...flow, mode };
 }

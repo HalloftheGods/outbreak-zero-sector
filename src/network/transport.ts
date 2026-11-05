@@ -14,10 +14,11 @@ export interface GameTransport {
   /** Fires at most once, and never after disconnect(). */
   onClosed: (reason: string) => void;
   /** Solo plays on this difficulty; in co-op the server uses it only if this player is first into the room. */
-  connect(name: string, difficulty?: DifficultyId, character?: number): void;
+  connect(name: string, difficulty?: DifficultyId, character?: number, startLevel?: number): void;
   sendInput(input: ClientInputPacket): void;
   sendBench(action: BenchAction): void;
-  requestRestart(): void;
+  /** Solo can begin again from a later level; co-op restarts at level 1 and ignores it. */
+  requestRestart(fromLevel?: number): void;
   setPaused(paused: boolean): void;
   disconnect(): void;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FINAL_LEVEL } from '../shared/levels.ts';
-import { isLevelUnlocked, loadLevelProgress, recordGameFinished, recordLevelReached } from '../src/game/level-progress.ts';
+import { continueLevel, isLevelUnlocked, loadLevelProgress, recordGameFinished, recordLevelReached } from '../src/game/level-progress.ts';
 
 function memoryStore() {
   const data = new Map<string, string>();
@@ -31,6 +31,27 @@ describe('level progress', () => {
     expect(loadLevelProgress(store).highest).toBe(FINAL_LEVEL);
     recordGameFinished(store);
     expect(loadLevelProgress(store)).toEqual({ highest: FINAL_LEVEL, finished: true });
+  });
+
+  it('offers to continue only once a level past the first has been reached', () => {
+    const store = memoryStore();
+    expect(continueLevel(loadLevelProgress(store))).toBeNull();
+    recordLevelReached(5, store);
+    expect(continueLevel(loadLevelProgress(store))).toBe(5);
+    recordLevelReached(3, store);
+    expect(continueLevel(loadLevelProgress(store))).toBe(5);
+  });
+
+  it('continues from the last level after the game is finished', () => {
+    const store = memoryStore();
+    recordGameFinished(store);
+    expect(continueLevel(loadLevelProgress(store))).toBe(FINAL_LEVEL);
+  });
+
+  it('offers nothing from a corrupt or blocked save', () => {
+    const bad = { getItem: () => '{"highest":"banana"}', setItem: () => undefined };
+    expect(continueLevel(loadLevelProgress(bad))).toBeNull();
+    expect(continueLevel(loadLevelProgress(null))).toBeNull();
   });
 
   it('ignores corrupt saves and survives blocked storage', () => {

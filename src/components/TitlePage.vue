@@ -1,6 +1,6 @@
 <template>
   <section class="px-screen px-title-scale px-page" :aria-label="heading">
-    <div class="px-sheet px-frame">
+    <div class="px-sheet px-frame" :class="{ 'is-wide': size === 'wide', 'is-extra-wide': size === 'extra-wide' }">
       <h2 class="px-heading px-sheet-heading">{{ heading }}</h2>
       <div class="px-sheet-body">
         <slot />
@@ -20,7 +20,13 @@ import { onBeforeUnmount, onMounted } from 'vue';
 import { isConfirmKey } from '../game/title-menu.ts';
 import MenuLink from './MenuLink.vue';
 
-defineProps<{ heading: string }>();
+withDefaults(
+  defineProps<{
+    heading: string;
+    size?: 'normal' | 'wide' | 'extra-wide';
+  }>(),
+  { size: 'normal' }
+);
 const emit = defineEmits<{ close: [] }>();
 
 function onKey(event: KeyboardEvent): void {

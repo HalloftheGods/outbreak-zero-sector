@@ -33,6 +33,7 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   const { aimX, aimY } = input;
   const aimed = Number.isFinite(aimX) && Number.isFinite(aimY);
   if (aimed) p.aim = { x: aimX as number, y: aimY as number };
+  p.touchAim = input.touch === true;
   if (input.reload === true) p.reloadQueued = true;
   if (input.melee === true) p.meleeQueued = true;
   if (input.heal === true) p.healQueued = true;

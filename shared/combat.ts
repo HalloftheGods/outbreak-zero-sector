@@ -107,7 +107,7 @@ function aimedHeadOnPath(sim: SimState, b: BulletState, dx: number, dy: number):
   const aimed = b.headTarget;
   const headStillThere = aimed && aimed.health > 0;
   if (!headStillThere) return Infinity;
-  const head = headOnBulletPlane(sim, aimed);
+  const head = headOnBulletPlane(sim, aimed, b.shooterId);
   return segmentEntersCircle(b.x, b.y, dx, dy, head.x, head.y, head.radius + BULLET_RADIUS);
 }
 

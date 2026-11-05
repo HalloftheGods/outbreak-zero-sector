@@ -43,6 +43,8 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear'> {
   shoot: boolean;
   /** Where the crosshair last was in the drawn world, or null from a client that never said. */
   aim: Point | null;
+  /** The crosshair is under a finger, which earns a little slack on heads. */
+  touchAim: boolean;
   /** Latest seq seen by setInput, applied on the next tick. */
   queuedSeq: number;
   /** Latched by setInput until a tick consumes them, so a later packet cannot erase them. */

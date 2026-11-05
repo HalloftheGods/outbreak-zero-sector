@@ -6,8 +6,15 @@ import { defineConfig } from 'vite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Ports: ZOMBIE_CLIENT_PORT (default 8096) for this dev server, ZOMBIE_PORT (default 8097) for the co-op server.
+const clientPort = Number(process.env.ZOMBIE_CLIENT_PORT) || 8096;
+const serverPort = Number(process.env.ZOMBIE_PORT) || 8097;
+
 export default defineConfig({
   base: './',
+  define: {
+    __ZOMBIE_SERVER_PORT__: JSON.stringify(serverPort),
+  },
   plugins: [
     vue(),
   ],
@@ -17,7 +24,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8096,
+    port: clientPort,
     host: '0.0.0.0',
     strictPort: true,
     cors: true,

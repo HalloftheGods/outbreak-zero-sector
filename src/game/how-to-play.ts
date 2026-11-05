@@ -31,6 +31,9 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
       'F or right click: Shove & Stab.',
       'H: use a medkit.',
       'Tab or N: town map. M: mute. Esc: pause.',
+      'Touch: put your left thumb down and drag to move.',
+      'Touch anywhere else to aim there and fire. Tap a head for a headshot. Hold and drag to keep firing.',
+      'The buttons along the edge do the rest. Hold Search.',
     ],
   },
   {
@@ -114,7 +117,7 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
     tab: 'Survivors',
     title: 'Five survivors',
     points: [
-      'Night: moves more quietly.',
+      'Night: harder for zombies to see.',
       'Khronus8: reloads faster.',
       'Satori: runs faster.',
       'Rex: shoves harder.',

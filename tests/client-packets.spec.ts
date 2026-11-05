@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SERVER_PORT } from '../shared/constants.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { isGameEvent, isSnapshotPacket, parseServerPacket } from '../src/network/packet-guards.ts';
 import { resolveServerUrl } from '../src/network/socket-session.ts';
@@ -126,12 +127,12 @@ describe('resolveServerUrl', () => {
   const https = { hostname: 'game.local', protocol: 'https:' };
 
   it('defaults to this host and the server port', () => {
-    expect(resolveServerUrl('', http)).toBe('ws://game.local:8097');
-    expect(resolveServerUrl('   ', https)).toBe('wss://game.local:8097');
+    expect(resolveServerUrl('', http)).toBe(`ws://game.local:${DEFAULT_SERVER_PORT}`);
+    expect(resolveServerUrl('   ', https)).toBe(`wss://game.local:${DEFAULT_SERVER_PORT}`);
   });
 
   it('fills in the default port for a bare host', () => {
-    expect(resolveServerUrl('10.0.0.5', http)).toBe('ws://10.0.0.5:8097');
+    expect(resolveServerUrl('10.0.0.5', http)).toBe(`ws://10.0.0.5:${DEFAULT_SERVER_PORT}`);
   });
 
   it('keeps an explicit port', () => {

@@ -52,6 +52,9 @@
           @input="game.setServerAddress(textOf($event))"
           @keydown.enter.prevent="next"
         />
+        <PixelButton class="setup-invite" :disabled="!inviteLink" @press="copyInvite">
+          {{ copied === 'done' ? 'Link copied' : copied === 'failed' ? 'Copy failed' : 'Copy invite link' }}
+        </PixelButton>
       </div>
 
       <DifficultyPicker />
@@ -60,7 +63,12 @@
 
     <template #actions>
       <MenuLink v-if="flow.step === 'who'" @press="next">Next</MenuLink>
-      <PixelButton v-else primary silent :disabled="!ready" @press="start">{{ actionLabel }}</PixelButton>
+      <template v-else>
+        <PixelButton primary silent :disabled="!ready" @press="start">{{ actionLabel }}</PixelButton>
+        <PixelButton v-if="resumeAt !== null && !multi" :disabled="!ready" @press="game.continueSolo()">
+          Continue from level {{ resumeAt }}
+        </PixelButton>
+      </template>
     </template>
   </TitlePage>
 </template>
@@ -70,7 +78,9 @@ import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
 import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
-import { advance, chooseMode, PLAY_START, playHeading, retreat, showsServer } from '../game/play-flow.ts';
+import { buildInviteLink } from '../game/invite-link.ts';
+import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
+import { advance, chooseMode, PLAY_JOIN, PLAY_START, playHeading, retreat, showsServer } from '../game/play-flow.ts';
 import type { PlayMode } from '../game/play-flow.ts';
 import { setupActionLabel } from '../game/title-menu.ts';
 import CharacterPicker from './CharacterPicker.vue';
@@ -80,21 +90,38 @@ import PixelButton from './PixelButton.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
 
-const { ui } = defineProps<{ ui: UiState }>();
+const { ui, join = false } = defineProps<{ ui: UiState; join?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 const callsign = useTemplateRef<HTMLInputElement>('callsign');
-const flow = ref(PLAY_START);
+const flow = ref(join ? PLAY_JOIN : PLAY_START);
+const copied = ref<'idle' | 'done' | 'failed'>('idle');
 
+/** Read when the page opens: a run cannot be under way while the setup is showing. */
+const resumeAt = continueLevel(loadLevelProgress());
 const heading = computed(() => playHeading(flow.value));
 const multi = computed(() => showsServer(flow.value));
 const ready = computed(() => ui.art !== null && !ui.connecting);
 const actionLabel = computed(() => setupActionLabel(multi.value, ui.art !== null, ui.connecting));
 const failure = computed(() => (multi.value ? ui.error : null));
 const defaultServer = `${window.location.hostname}:${DEFAULT_SERVER_PORT}`;
+/** The address friends need: what is typed, or this host's default when the field is blank. */
+const inviteLink = computed(() => buildInviteLink(window.location.href, ui.serverAddress.trim() || defaultServer));
 
 function textOf(event: Event): string {
   return (event.target as HTMLInputElement).value;
+}
+
+async function copyInvite(): Promise<void> {
+  const link = inviteLink.value;
+  if (!link) return;
+  try {
+    await navigator.clipboard.writeText(link);
+    copied.value = 'done';
+  } catch {
+    copied.value = 'failed';
+  }
+  setTimeout(() => (copied.value = 'idle'), 2000);
 }
 
 function pick(mode: PlayMode): void {
@@ -131,6 +158,11 @@ onMounted(() => callsign.value?.focus());
 .setup-field {
   display: flex;
   flex-direction: column;
+}
+
+.setup-invite {
+  align-self: flex-start;
+  margin-top: calc(var(--u) * 2);
 }
 
 .setup-modes {

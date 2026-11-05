@@ -11,6 +11,21 @@ import type {
 
 export { CHEST_HEIGHT } from '../../shared/constants.ts';
 
+/** What fingers leave on screen, all in buffer pixels. */
+export interface TouchMarks {
+  /** The crosshair, while a finger is on it or just off it. */
+  readonly aim: { readonly x: number; readonly y: number } | null;
+  readonly stick: {
+    readonly baseX: number;
+    readonly baseY: number;
+    readonly knobX: number;
+    readonly knobY: number;
+    readonly reach: number;
+  } | null;
+  /** How far from the crosshair a fingertip stops covering the picture. */
+  readonly fingertip: number;
+}
+
 /** Everything the renderer draws this frame. Plain values; nothing here is reactive. */
 export interface SceneView {
   readonly players: readonly PlayerEntity[];
@@ -33,6 +48,8 @@ export interface SceneView {
   readonly pointerX: number | null;
   readonly pointerY: number | null;
   readonly showCrosshair: boolean;
+  /** Set while fingers are playing, when the crosshair follows them and the pointer steers nothing. */
+  readonly touch?: TouchMarks | null;
   readonly phase: GamePhase;
   readonly hostiles: number;
 }

@@ -32,11 +32,11 @@
         <div class="hud-chip hud-medkits" :class="{ 'is-none': hud.medkits === 0 }">
           <SpriteImg :sprite="art.ui.pickupIcons.medkit" />
           <span>{{ hud.medkits }}</span>
-          <span class="hud-slot-key">H</span>
+          <span class="hud-slot-key keys-only">H</span>
         </div>
         <div v-if="hud.knife" class="hud-chip hud-knife">
           <SpriteImg :sprite="art.ui.pickupIcons.knife" />
-          <span class="hud-slot-key">F</span>
+          <span class="hud-slot-key keys-only">F</span>
         </div>
         <div class="hud-chip hud-health" :class="{ 'is-low': isLow }">
           <SpriteImg :sprite="art.ui.heart" />
@@ -48,7 +48,7 @@
       <div class="hud-chip hud-weapon">
         <ul class="hud-slots">
           <li v-for="(weapon, index) in WEAPON_ORDER" :key="weapon" class="hud-slot" :class="slotClass(weapon)">
-            <span class="hud-slot-key">{{ index + 1 }}</span>
+            <span class="hud-slot-key keys-only">{{ index + 1 }}</span>
             <SpriteImg :sprite="art.ui.weaponIcons[weapon]" />
             <span v-if="hud.owned.includes(weapon)" class="hud-slot-rounds">{{ gunRounds(hud, weapon) }}</span>
             <GunFitPips :fit="hud.gear?.fits[weapon]" />
@@ -61,10 +61,10 @@
         <div v-if="hud.reload > 0" class="px-meter hud-reload" :style="fill(hud.reload, 1)"><span /></div>
         <template v-else-if="ammo === 'empty'">
           <strong class="hud-empty">Empty</strong>
-          <span class="hud-sub">F: {{ hud.knife ? 'Shove & Stab' : 'Shove' }}</span>
+          <span class="hud-sub"><span class="keys-only">F: </span>{{ hud.knife ? 'Shove & Stab' : 'Shove' }}</span>
         </template>
-        <span v-else-if="swapKey !== null" class="hud-sub is-threat">Press {{ swapKey }}</span>
-        <span v-else-if="hud.ammo === 0" class="hud-sub is-threat">Press R</span>
+        <span v-else-if="swapKey !== null" class="hud-sub is-threat keys-only">Press {{ swapKey }}</span>
+        <span v-else-if="hud.ammo === 0" class="hud-sub is-threat keys-only">Press R</span>
       </div>
     </footer>
   </section>

@@ -66,4 +66,9 @@ export function recordGameFinished(store: Store | null = browserStore()): LevelP
   return next;
 }
 
+/** The level a continued run starts at, or null while the furthest reached is still the first (nothing to continue). */
+export function continueLevel(progress: LevelProgress): number | null {
+  return progress.highest > FIRST_LEVEL ? progress.highest : null;
+}
+
 export const isLevelUnlocked = (level: number, progress: LevelProgress): boolean => level <= progress.highest;

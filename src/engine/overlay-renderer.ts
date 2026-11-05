@@ -1,13 +1,14 @@
 import { characterOf } from '../../shared/characters.ts';
 import { EXIT_RADIUS, ZOMBIES } from '../../shared/constants.ts';
 import { CONTAINER_LABEL } from '../../shared/containers.ts';
-import { HEAD_MARGIN, isOnHead } from '../../shared/headshots.ts';
+import { HEAD_MARGIN, isOnHead, TOUCH_HEAD_MARGIN } from '../../shared/headshots.ts';
 import type { EntityId, ExitEntity, PlayerEntity, ZombieEntity } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT } from './bitmap-font.ts';
 import type { SceneView } from './scene.ts';
 import { bodyHeight, drawSprite } from './sprite-cache.ts';
+import { drawFingertipBox, drawStick } from './touch-overlay.ts';
 import type { VisualStore } from './visuals.ts';
 
 const POINTER_INSET = 8;
@@ -109,9 +110,10 @@ export function onSeenHead(
   top: number,
   lightAt: (x: number, y: number) => number,
   isKilled: (id: EntityId) => boolean,
+  margin = HEAD_MARGIN,
 ): boolean {
   return zombies.some((zombie) => {
-    const aimedAt = !isKilled(zombie.id) && isOnHead(zombie, screenX + left, screenY + top, HEAD_MARGIN);
+    const aimedAt = !isKilled(zombie.id) && isOnHead(zombie, screenX + left, screenY + top, margin);
     return aimedAt && lightAt(zombie.x - left, zombie.y - top) >= BAR_MIN_LIGHT;
   });
 }
@@ -179,7 +181,7 @@ export class OverlayRenderer {
       const y = Math.round(player.y) - top - this.heightOf(player.id) - SEARCH_TAG_HEIGHT;
       const prompted = player.id === scene.localId && scene.searchable !== null;
       if (player.search > 0) drawBar(ctx, x - SEARCH_BAR_WIDTH / 2, y, SEARCH_BAR_WIDTH, player.search, BONE);
-      else if (prompted) drawOutlinedText(ctx, `HOLD E: ${CONTAINER_LABEL[scene.searchable.kind]}`, x, y, AMBER);
+      else if (prompted) drawOutlinedText(ctx, `${scene.touch ? 'SEARCH' : 'HOLD E'}: ${CONTAINER_LABEL[scene.searchable.kind]}`, x, y, AMBER);
     }
   }
 
@@ -237,11 +239,15 @@ export class OverlayRenderer {
     lightAt: (x: number, y: number) => number,
     isKilled: (id: EntityId) => boolean,
   ): void {
-    const { pointerX: x, pointerY: y } = scene;
+    const { touch } = scene;
+    if (touch?.stick) drawStick(ctx, touch.stick);
+    const x = touch ? touch.aim?.x ?? null : scene.pointerX;
+    const y = touch ? touch.aim?.y ?? null : scene.pointerY;
     const noPointer = x === null || y === null;
     if (noPointer) return;
     const { crosshair, crosshairHead } = this.art.ui;
-    const sprite = onSeenHead(scene.zombies, x, y, left, top, lightAt, isKilled) ? crosshairHead : crosshair;
-    drawSprite(ctx, sprite, Math.round(x), Math.round(y));
+    const onHead = onSeenHead(scene.zombies, x, y, left, top, lightAt, isKilled, touch ? TOUCH_HEAD_MARGIN : HEAD_MARGIN);
+    drawSprite(ctx, onHead ? crosshairHead : crosshair, Math.round(x), Math.round(y));
+    if (touch) drawFingertipBox(ctx, x, y, touch.fingertip, onHead);
   }
 }

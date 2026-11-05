@@ -23,7 +23,7 @@ export interface Character {
 const PLAIN = { sightRange: 1, reloadTime: 1, moveSpeed: 1, shoveForce: 1, dropOdds: 1, searchLuck: 0 } as const;
 
 export const CHARACTERS: readonly Character[] = [
-  { ...PLAIN, id: 'night', name: 'Night', trait: 'Moves more quietly', sightRange: 0.75 },
+  { ...PLAIN, id: 'night', name: 'Night', trait: 'Harder for zombies to see', sightRange: 0.75 },
   { ...PLAIN, id: 'khronus8', name: 'Khronus8', trait: 'Reloads faster', reloadTime: 0.75 },
   { ...PLAIN, id: 'satori', name: 'Satori', trait: 'Runs faster', moveSpeed: 1.12 },
   { ...PLAIN, id: 'rex', name: 'Rex', trait: 'Shoves harder', shoveForce: 1.5 },

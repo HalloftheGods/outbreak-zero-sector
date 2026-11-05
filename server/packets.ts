@@ -28,15 +28,17 @@ function parseAim(aimX: unknown, aimY: unknown): { aimX?: number; aimY?: number 
 
 function parseInput(value: unknown): ClientInputPacket | null {
   if (!isRecord(value)) return null;
-  const { seq, up, down, left, right, angle, aimX, aimY, shoot, reload, weapon, melee, heal, search } = value;
+  const { seq, up, down, left, right, angle, aimX, aimY, touch, shoot, reload, weapon, melee, heal, search } = value;
   const numbersValid = typeof seq === 'number' && Number.isFinite(seq) && seq >= 0 && typeof angle === 'number' && Number.isFinite(angle);
   const flags = [up, down, left, right, shoot, reload, melee, heal, search];
   const aim = parseAim(aimX, aimY);
-  if (!numbersValid || !aim || !flags.every((flag) => typeof flag === 'boolean') || !isWeaponRequest(weapon)) return null;
+  const touchValid = touch === undefined || typeof touch === 'boolean';
+  if (!numbersValid || !aim || !touchValid || !flags.every((flag) => typeof flag === 'boolean') || !isWeaponRequest(weapon)) return null;
   return {
     seq,
     angle,
     ...aim,
+    ...(touch === true ? { touch } : {}),
     weapon,
     up: up as boolean,
     down: down as boolean,

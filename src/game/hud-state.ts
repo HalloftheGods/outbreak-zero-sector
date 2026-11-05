@@ -101,6 +101,8 @@ export interface RunResult {
 
 /** Small, plain and replaced whole; the only game state Vue ever sees. */
 export interface UiState {
+  /** Fingers are how this device plays, so the touch buttons show. */
+  touch: boolean;
   readonly screen: Screen;
   readonly art: ArtBook | null;
   readonly mode: TransportKind;

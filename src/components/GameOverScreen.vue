@@ -30,6 +30,9 @@
       <PixelButton primary silent :disabled="restarting" @press="game.playAgain()">
         {{ restarting ? 'Waiting...' : 'Play again' }}
       </PixelButton>
+      <PixelButton v-if="resumeAt !== null" :disabled="restarting" @press="game.continueAgain()">
+        Continue from level {{ resumeAt }}
+      </PixelButton>
       <PixelButton @press="game.toMenu()">Main menu</PixelButton>
     </div>
   </section>
@@ -40,6 +43,7 @@ import { computed } from 'vue';
 import type { ArtBook } from '../art/types.ts';
 import { difficultyDef } from '../../shared/difficulty.ts';
 import { formatDuration } from '../game/hud-state.ts';
+import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import PixelButton from './PixelButton.vue';
 import SpriteImg from './SpriteImg.vue';
@@ -48,6 +52,8 @@ import { useGame } from './use-game.ts';
 const { result } = defineProps<{ result: RunResult; art: ArtBook | null; restarting: boolean }>();
 const game = useGame();
 
+/** Solo only; read once, since the death has already been recorded by the time this screen shows. */
+const resumeAt = game.ui.value.mode === 'solo' ? continueLevel(loadLevelProgress()) : null;
 const ranked = computed(() => [...result.stats.players].sort((a, b) => b.score - a.score));
 </script>
 

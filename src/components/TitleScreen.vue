@@ -11,7 +11,7 @@
     </p>
   </section>
 
-  <PlaySetup v-else-if="page === 'play'" :ui @close="close" />
+  <PlaySetup v-else-if="page === 'play'" :ui :join="invited" @close="close" />
   <LevelsPage v-else-if="page === 'levels'" @close="close" />
   <HowToPlay v-else-if="page === 'howto'" @close="close" />
   <RecordsPage v-else-if="page === 'records'" :ui @close="close" />
@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { UiState } from '../game/hud-state.ts';
+import { parseJoinParam, withoutJoinParam } from '../game/invite-link.ts';
 import { BRAND_MARK } from '../game/studio-splash.ts';
 import type { TitlePage } from '../game/title-menu.ts';
 import HowToPlay from './HowToPlay.vue';
@@ -30,10 +31,22 @@ import PlaySetup from './PlaySetup.vue';
 import RecordsPage from './RecordsPage.vue';
 import SpriteImg from './SpriteImg.vue';
 import TitleMenu from './TitleMenu.vue';
+import { useGame } from './use-game.ts';
 
 defineProps<{ ui: UiState }>();
 
+const game = useGame();
 const page = ref<TitlePage | null>(null);
+const invited = ref(false);
+
+/** An invite link (?join=host:port) fills in the server address and opens co-op setup. */
+const joinAddress = parseJoinParam(window.location.search);
+if (joinAddress) {
+  game.setServerAddress(joinAddress);
+  invited.value = true;
+  page.value = 'play';
+  window.history.replaceState(null, '', withoutJoinParam(window.location.href));
+}
 /** Lives here, so Back returns to the item the player left from. */
 const selected = ref(0);
 

@@ -46,6 +46,14 @@ export interface SimulationOptions {
   readonly difficulty?: DifficultyId;
   /** Solo holds at the bench, a server times it too, and leaving it out drives straight on. */
   readonly workbench?: WorkbenchMode;
+  /** Begin in this town instead of the first. Anyone joining then arrives with the return kit. */
+  readonly startLevel?: number;
+}
+
+/** A level number held to the real range, so a stale or hand-edited save cannot start a town that is not there. */
+function clampLevel(level: number | undefined): number {
+  const whole = Number.isFinite(level) ? Math.floor(level!) : FIRST_LEVEL;
+  return Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, whole));
 }
 
 const ROUNDED_EVENT_FIELDS = ['x', 'y', 'angle', 'radius'] as const;
@@ -112,7 +120,8 @@ export class GameSimulation {
   private readonly sim: SimState;
 
   constructor(options: SimulationOptions) {
-    const map = generateWorldMap(levelSeed(options.seed, FIRST_LEVEL));
+    const startLevel = clampLevel(options.startLevel);
+    const map = generateWorldMap(levelSeed(options.seed, startLevel));
     this.sim = {
       runSeed: options.seed,
       difficulty: options.difficulty ?? BASELINE_DIFFICULTY,
@@ -124,7 +133,7 @@ export class GameSimulation {
       tick: 0,
       runStartTick: 0,
       phase: 'intermission',
-      level: FIRST_LEVEL,
+      level: startLevel,
       exit: null,
       hordesBehind: 0,
       wave: 0,
@@ -132,7 +141,7 @@ export class GameSimulation {
       hordeLeft: 0,
       spawnQueue: [],
       spawnTimer: 0,
-      populationTarget: levelPopulation(FIRST_LEVEL),
+      populationTarget: levelPopulation(startLevel),
       topUpTimer: 0,
       noises: [],
       players: [],
@@ -184,7 +193,7 @@ export class GameSimulation {
   }
 
   private announceRunStart(): void {
-    emit(this.sim, { type: 'level_start', level: FIRST_LEVEL });
+    emit(this.sim, { type: 'level_start', level: this.sim.level });
     emit(this.sim, { type: 'wave_intermission', wave: 1, seconds: LEAD_IN_SEC });
   }
 
@@ -309,14 +318,18 @@ export class GameSimulation {
     emit(sim, { type: 'game_over', stats });
   }
 
-  /** Starts a new run from level 1 with everyone still connected. Ticks keep counting up. */
-  restart(): void {
+  /**
+   * Starts a new run with everyone still connected, from level 1 unless told otherwise.
+   * Ticks keep counting up. Starting past level 1 hands out the return kit, as for anyone arriving mid-run.
+   */
+  restart(fromLevel?: number): void {
     const sim = this.sim;
+    const level = clampLevel(fromLevel);
     sim.runStartTick = sim.tick;
     sim.hordesBehind = 0;
     sim.gameOver = null;
     sim.departed.clear();
-    enterTown(sim, FIRST_LEVEL);
+    enterTown(sim, level);
 
     for (const p of sim.players) {
       placeAtEntry(sim, p);
@@ -325,7 +338,8 @@ export class GameSimulation {
       p.score = 0;
       p.kills = 0;
       p.dryFireCooldown = 0;
-      giveStartingLoadout(p);
+      if (level > FIRST_LEVEL) giveReturnKit(p);
+      else giveStartingLoadout(p);
     }
     this.announceRunStart();
   }

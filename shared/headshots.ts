@@ -1,5 +1,5 @@
 import { CHEST_HEIGHT } from './constants.ts';
-import type { ZombieEntity, ZombieType } from './protocol.ts';
+import type { EntityId, ZombieEntity, ZombieType } from './protocol.ts';
 import type { BulletState, PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 
@@ -29,6 +29,10 @@ const HEADS: Record<ZombieType, HeadRule> = {
 export const HEAD_MARGIN = 2;
 /** A co-op player also sees every zombie a network trip late. */
 const COOP_HEAD_MARGIN = 4;
+/** A fingertip is broader than a mouse pointer, so a touch player gets this on top of the rest. */
+const TOUCH_HEAD_BONUS = 2;
+/** What the crosshair goes red at under a finger. */
+export const TOUCH_HEAD_MARGIN = HEAD_MARGIN + TOUCH_HEAD_BONUS;
 /** Far enough from an aim point to take in any head that could be under it. */
 const HEAD_SEARCH = 40;
 const GROUND_TILT = 0.5;
@@ -54,7 +58,8 @@ export function isOnHead(z: HeadBearer, x: number, y: number, margin: number): b
 }
 
 /** Only a server times the bench, and only a server's players see zombies over a network. */
-const marginFor = (sim: SimState): number => (sim.workbench === 'timed' ? COOP_HEAD_MARGIN : HEAD_MARGIN);
+const marginFor = (sim: SimState, shooter: PlayerState | undefined): number =>
+  (sim.workbench === 'timed' ? COOP_HEAD_MARGIN : HEAD_MARGIN) + (shooter?.touchAim ? TOUCH_HEAD_BONUS : 0);
 
 /** The head under the crosshair as the trigger breaks, the front one if two overlap. A shot can't reach past `range`. */
 export function headUnderAim(sim: SimState, p: PlayerState, range: number): ZombieState | null {
@@ -65,7 +70,7 @@ export function headUnderAim(sim: SimState, p: PlayerState, range: number): Zomb
   sim.grid.query(aim.x, aim.y, HEAD_SEARCH, nearby);
   let front: ZombieState | null = null;
   for (const z of nearby) {
-    const aimedAt = z.health > 0 && isOnHead(z, aim.x, aim.y, marginFor(sim));
+    const aimedAt = z.health > 0 && isOnHead(z, aim.x, aim.y, marginFor(sim, p));
     const nearerTheCamera = front === null || z.y > front.y;
     if (aimedAt && nearerTheCamera) front = z;
   }
@@ -77,9 +82,10 @@ export function headUnderAim(sim: SimState, p: PlayerState, range: number): Zomb
  * CHEST_HEIGHT over that plane, so a shot drawn through a head passes that far below it,
  * which on a tall zombie is clear of the body circle.
  */
-export function headOnBulletPlane(sim: SimState, z: ZombieState): { x: number; y: number; radius: number } {
+export function headOnBulletPlane(sim: SimState, z: ZombieState, shooterId: EntityId): { x: number; y: number; radius: number } {
   const spot = headSpot(z);
-  return { x: spot.x, y: spot.y + CHEST_HEIGHT, radius: HEADS[z.type].radius + marginFor(sim) };
+  const shooter = sim.players.find((p) => p.id === shooterId);
+  return { x: spot.x, y: spot.y + CHEST_HEIGHT, radius: HEADS[z.type].radius + marginFor(sim, shooter) };
 }
 
 /** Pays out a bullet landing on the zombie it was aimed at the head of, and returns what its damage is multiplied by. */

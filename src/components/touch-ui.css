@@ -1,0 +1,184 @@
+/* Everything only fingers need: a desktop with a mouse never matches `.is-touch`. */
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+.game-root {
+  --tap: 44px;
+  --pad-size: 58px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* A finger in play is the game's: no scroll, no pull to refresh, no double tap zoom. */
+.game-root.is-aiming,
+.game-root.is-aiming * {
+  touch-action: none;
+}
+
+.touch-only {
+  display: none;
+}
+
+.is-touch .touch-only {
+  display: revert;
+}
+
+.is-touch .keys-only {
+  display: none;
+}
+
+/* --- The buttons: the edge the right thumb lies along ---------------------- */
+
+.touch-pad {
+  position: absolute;
+  display: grid;
+  gap: 2px;
+  background: rgba(11, 12, 16, 0.5);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.touch-button {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(23, 24, 31, 0.82);
+  color: var(--bone);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  touch-action: none;
+}
+
+.touch-button.is-held {
+  background: var(--amber);
+  color: var(--ink);
+}
+
+@media (orientation: landscape) {
+  .touch-pad {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: calc(var(--pad-size) + var(--safe-right));
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) 0;
+    grid-auto-rows: 1fr;
+  }
+
+  .is-touch .hud {
+    padding-right: calc(var(--pad-size) + var(--safe-right) + var(--u) * 3);
+    padding-left: calc(var(--safe-left) + var(--u) * 3);
+  }
+}
+
+@media (orientation: portrait) {
+  .touch-pad {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--pad-size) + var(--safe-bottom));
+    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .is-touch .hud {
+    padding-top: calc(var(--safe-top) + var(--u) * 3);
+    padding-bottom: calc(var(--pad-size) + var(--safe-bottom) + var(--u) * 3);
+  }
+}
+
+/* --- Menus ----------------------------------------------------------------- */
+
+.is-touch .px-screen {
+  padding-top: calc(var(--safe-top) + var(--u) * 4);
+  padding-right: calc(var(--safe-right) + var(--u) * 4);
+  padding-bottom: calc(var(--safe-bottom) + var(--u) * 4);
+  padding-left: calc(var(--safe-left) + var(--u) * 4);
+}
+
+.is-touch .px-menu {
+  gap: 0;
+}
+
+.is-touch .px-menu-item,
+.is-touch .px-link,
+.is-touch .px-button,
+.is-touch .how-tab,
+.is-touch .town-close {
+  min-height: var(--tap);
+}
+
+.is-touch .px-input {
+  min-height: var(--tap);
+  /* iOS zooms the page into any field under this. */
+  font-size: 16px;
+}
+
+.is-touch .px-slider {
+  height: var(--tap);
+  background: linear-gradient(var(--ink-line), var(--ink-line)) center / 100% calc(var(--u) * 3) no-repeat;
+}
+
+.is-touch .px-slider::-webkit-slider-thumb {
+  width: 24px;
+  height: var(--tap);
+}
+
+.is-touch .px-slider::-moz-range-thumb {
+  width: 24px;
+  height: var(--tap);
+}
+
+.is-touch .character-option {
+  min-height: var(--tap);
+}
+
+/* The map's whole-size floor is wider than a phone. */
+.is-touch .town .town-canvas {
+  width: min(var(--side), 100%, calc(100dvh - var(--u) * 12));
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* The sheet scrolls inside itself, by finger, whatever the browser's toolbars are doing. */
+.is-touch .px-sheet {
+  max-height: 100%;
+}
+
+.is-touch .px-sheet-body {
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* A phone on its side has no height to spare: the logo stands beside the menu, not over it. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .is-touch .title {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: center;
+    gap: calc(var(--u) * 12);
+    padding-bottom: calc(var(--u) * 6);
+  }
+
+  .is-touch .title-logo {
+    max-width: 50%;
+    height: auto !important;
+  }
+
+  .is-touch .title-credit {
+    bottom: calc(var(--u) * 2);
+  }
+}

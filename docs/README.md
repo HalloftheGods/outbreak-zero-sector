@@ -12,7 +12,7 @@ A Hall of the Gods, Inc. game. A top-down pixel art zombie survival game set in 
 - **Searching**: hold E beside cars, boxes (crates), shelves, or furniture (drawers, lockers, fridges, cabinets) to go through them, from one second for a drawer to two for a car or locker. Moving or taking a hit undoes the search and it wants a fresh press. What was inside falls at your feet, a container stays open for everyone, and about one search in ten knocks something over, which zombies within 170 pixels hear. Most containers hold nothing, so searching stays a choice, but every home has a find in it somewhere. The ammo budget counts floors and containers together, and every town settles on it with half in each, topped up or trimmed at every level and difficulty. Containers follow from the world map and interiors in `shared/containers.ts`, their contents in `shared/container-loot.ts` and the rules in `shared/container-search.ts`.
 - **Out of ammo?** Shove. It makes no noise and pushes back the two nearest zombies. A zombie you just shoved keeps its footing for a moment, so standing still and shoving will not hold off a crowd or a brute.
 - **The knife** turns up in diners, houses, garages and containers. With one the shove becomes Shove & Stab: 18 damage instead of 4, just as silent, with the same two-target limit and stagger immunity. It comes with you from town to town and is lost when you die.
-- **Survivors**: pick one of five on the title screen, and the choice is remembered. Night moves more quietly (zombies spot her from three quarters as far), Khronus8 reloads in three quarters of the time, Satori runs 12% faster, Rex shoves half again as hard, and Sol's kills drop loot twice as often, with about one empty container in seven turning something up anyway. The traits are one table in `shared/characters.ts`. In co-op nobody shares a survivor: you get yours if it is free, otherwise the next free one, and teammates' tags and HUD chips name who they are playing.
+- **Survivors**: pick one of five on the title screen, and the choice is remembered. Night is harder for zombies to see (they spot her from three quarters as far), Khronus8 reloads in three quarters of the time, Satori runs 12% faster, Rex shoves half again as hard, and Sol's kills drop loot twice as often, with about one empty container in seven turning something up anyway. The traits are one table in `shared/characters.ts`. In co-op nobody shares a survivor: you get yours if it is free, otherwise the next free one, and teammates' tags and HUD chips name who they are playing.
 - **Co-op** keeps your run if you refresh: you come back with the same health, guns and spot, and a dead teammate still waits for the next horde. A newcomer after the first horde starts with half health and no spares. If the last player standing leaves, even to refresh, the run ends. Play Again restarts once everyone has asked, or 15 seconds after the first person asked.
 - **Difficulty** has four modes, picked on the setup page and remembered: Night Light On, Stay Close (the default), Lights Out and Undead Tired. Each scales the ammo in town, zombie speed and bite, horde size and the lull between hordes. Lights Out is the balance the game was tuned on. In co-op the first player into an empty room sets it, and the results show it. The table is `shared/difficulty.ts`.
 - **The workbench** opens after each van ride but the last. Barrels, grips, magazines and suppressors from the gun shop, police station, garages and warehouses buy upgrades within a gun's slots: damage, fire rate, magazine size, reload speed, or a suppressor that cuts its noise radius by 65%. A rare toolkit moves one upgrade between guns. A found gun can carry a quirk, good and bad at once. Upgrades stay on the gun across levels and go with it on death, and no build passes 1.5 times stock damage per second. Solo waits until you are ready; co-op gives everyone on their feet 45 seconds.
@@ -49,17 +49,23 @@ A Hall of the Gods, Inc. game. A top-down pixel art zombie survival game set in 
    pnpm install
    ```
 
-2. Start the client on port 8096:
+2. Start the client (default port 8096; set `ZOMBIE_CLIENT_PORT` to change it):
    ```bash
    pnpm --filter zombie-survival dev
    ```
 
-3. For co-op, also start the server on port 8097 (set `ZOMBIE_PORT` to change it):
+3. For co-op, also start the server (default port 8097; set `ZOMBIE_PORT` to change it):
    ```bash
    pnpm --filter zombie-survival dev:server
    ```
 
-4. Open `http://localhost:8096`. Choose Solo, or enter the server address and choose Co-op in each browser window.
+   `ZOMBIE_PORT` must be the same value for the client and the server: the client uses it as the default server address on the setup page. To run on other ports, for example 8196 and 8197:
+   ```bash
+   ZOMBIE_CLIENT_PORT=8196 ZOMBIE_PORT=8197 pnpm --filter zombie-survival dev
+   ZOMBIE_PORT=8197 pnpm --filter zombie-survival dev:server
+   ```
+
+4. Open `http://localhost:8096` (or your `ZOMBIE_CLIENT_PORT`). Choose Solo, or enter the server address and choose Co-op in each browser window.
 
 ## Tests
 

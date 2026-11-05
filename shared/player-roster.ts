@@ -18,6 +18,7 @@ const FRESH_CONNECTION = {
   right: false,
   shoot: false,
   aim: null,
+  touchAim: false,
   queuedSeq: 0,
   reloadQueued: false,
   weaponQueued: null,

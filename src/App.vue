@@ -1,5 +1,5 @@
 <template>
-  <main class="game-root" :class="{ 'is-aiming': aiming }">
+  <main class="game-root" :class="{ 'is-aiming': aiming, 'is-touch': ui.touch }">
     <canvas ref="canvasRef" class="game-canvas" />
 
     <TitleScreen v-if="ui.screen === 'title'" :ui />
@@ -8,6 +8,7 @@
       <template v-if="ui.hud && ui.art">
         <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" />
         <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
+        <TouchControls v-if="ui.touch" />
       </template>
       <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
@@ -42,6 +43,7 @@ import LevelCard from './components/LevelCard.vue';
 import PauseMenu from './components/PauseMenu.vue';
 import StudioSplash from './components/StudioSplash.vue';
 import TitleScreen from './components/TitleScreen.vue';
+import TouchControls from './components/TouchControls.vue';
 import TownMap from './components/TownMap.vue';
 import { GAME_KEY } from './components/use-game.ts';
 import WaveBanner from './components/WaveBanner.vue';
