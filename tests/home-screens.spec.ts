@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { BASELINE_DIFFICULTY } from '../shared/difficulty.ts';
 import type { Loadout, TripReceipt } from '../shared/home-protocol.ts';
@@ -18,7 +19,8 @@ import {
   moveToLocker,
   setupLevelLines,
 } from '../src/game/home-screens.ts';
-import { recordRows, recordStats, TITLE_MENU, titleMenu } from '../src/game/title-menu.ts';
+import { picksStyle, setupStyle } from '../src/game/play-flow.ts';
+import { recordRows, recordStats, TITLE_MENU } from '../src/game/title-menu.ts';
 
 function homeUi(patch: Partial<HomeUi> = {}): HomeUi {
   return {
@@ -75,6 +77,14 @@ describe('the locker', () => {
     expect(back.locker.guns.pistol).toEqual({});
     expect(moveToHands({ locker: gear(), hands }, 'medkit')).toEqual({ locker: gear(), hands });
     expect(locker.medkits).toBe(2);
+  });
+
+  it('a tile keeps room for its name: Take and Stow sit on their own row under it', () => {
+    const strip = readFileSync(new URL('../src/components/LockerShelf.vue', import.meta.url), 'utf8');
+    const moves = strip.match(/<span class="strip-moves">[\s\S]*?<\/span>\s*<\/div>/)?.[0] ?? '';
+    expect(moves).toContain(`@click="emit('take', tile.key)"`);
+    expect(moves).toContain(`@click="emit('stow', tile.key)"`);
+    expect(strip).toMatch(/\.strip-name\s*{[^}]*text-overflow:\s*ellipsis/);
   });
 });
 
@@ -152,38 +162,52 @@ describe('the cursor', () => {
   });
 });
 
-describe('classic runs', () => {
-  it('old best runs are labelled classic', () => {
-    const best = { score: 900, wave: 6, kills: 80, durationSec: 300 };
-    expect(recordStats(best, true)[0].tag).toBe('Best classic score');
-    expect(recordStats(best, false)[0].tag).toBe('Best score');
-    const entry = { callsign: 'A', score: 5, timestamp: 1 } as Parameters<typeof recordRows>[0][number];
-    expect(recordRows([entry], true)[0].classic).toBe(true);
-    expect(recordRows([entry])[0].classic).toBe(false);
+describe('records by style', () => {
+  const best = { score: 900, wave: 6, kills: 80, durationSec: 300 };
+
+  it('tells a best run from a best trip', () => {
+    expect(recordStats(best)[0].tag).toBe('Best score');
+    expect(recordStats(best, 'arcade')[0].tag).toBe('Best score');
+    expect(recordStats(best, 'campaign')[0].tag).toBe('Best trip score');
   });
 
-  it('a trip entry is not labelled classic, in the best or on the board', () => {
-    const trip = { score: 900, wave: 6, kills: 80, durationSec: 300, trip: true };
-    expect(recordStats(trip, true)[0].tag).toBe('Best score');
-    const entry = { callsign: 'A', score: 5, timestamp: 1, trip: true } as Parameters<typeof recordRows>[0][number];
-    const old = { callsign: 'B', score: 4, timestamp: 2 } as Parameters<typeof recordRows>[0][number];
-    expect(recordRows([entry, old], true).map((row) => row.classic)).toEqual([false, true]);
+  it('marks each row on the board with the style it came from', () => {
+    const trip = { callsign: 'A', score: 5, timestamp: 1, trip: true } as Parameters<typeof recordRows>[0][number];
+    const run = { callsign: 'B', score: 4, timestamp: 2 } as Parameters<typeof recordRows>[0][number];
+    expect(recordRows([trip, run]).map((row) => row.style)).toEqual(['campaign', 'arcade']);
   });
 });
 
-describe('setup page in home mode', () => {
-  it('PlaySetup hides level choice in home mode, and the co-op note no longer says level 1', () => {
-    const home = setupLevelLines({ homeLoop: true, multi: true, level: 3, unlocked: true, chosen: 3 });
+describe('setup page', () => {
+  it('hides the level choice in Campaign, where the co-op note no longer says level 1', () => {
+    const home = setupLevelLines({ style: 'campaign', multi: true, level: 3, unlocked: true, chosen: 3 });
     expect(home.startLine).toBeNull();
     expect(home.coopNote).not.toMatch(/level 1/i);
-    expect(setupLevelLines({ homeLoop: true, multi: false, level: 3, unlocked: true, chosen: 3 }).coopNote).toBeNull();
-    const legacy = setupLevelLines({ homeLoop: false, multi: true, level: 3, unlocked: true, chosen: 3 });
-    expect(legacy.coopNote).toMatch(/level 1/);
-    expect(setupLevelLines({ homeLoop: false, multi: false, level: 2, unlocked: true, chosen: 2 }).startLine).toMatch(/Start at level 2/);
+    expect(setupLevelLines({ style: 'campaign', multi: false, level: 3, unlocked: true, chosen: 3 }).coopNote).toBeNull();
+    const arcade = setupLevelLines({ style: 'arcade', multi: true, level: 3, unlocked: true, chosen: 3 });
+    expect(arcade.coopNote).toMatch(/level 1/);
+    expect(setupLevelLines({ style: 'arcade', multi: false, level: 2, unlocked: true, chosen: 2 }).startLine).toMatch(/Start at level 2/);
   });
 
-  it('drops the Levels page from the title in home mode', () => {
-    expect(titleMenu(true).some((item) => item.page === 'levels')).toBe(false);
-    expect(titleMenu(false)).toEqual(TITLE_MENU);
+  it('claims no style for a room that decides: no level hint, and a neutral co-op line that names neither style', () => {
+    const joining = setupLevelLines({ style: null, multi: true, level: null, unlocked: false, chosen: null });
+    expect(joining.startLine).toBeNull();
+    expect(joining.coopNote).toMatch(/room decides/i);
+    expect(joining.coopNote).not.toMatch(/level|garage|map/i);
+    expect(setupLevelLines({ style: null, multi: false, level: null, unlocked: false, chosen: null })).toEqual({ startLine: null, coopNote: null });
+  });
+
+  it('always keeps the Levels page on the title: it is Arcade\'s', () => {
+    expect(TITLE_MENU.some((item) => item.page === 'levels')).toBe(true);
+  });
+
+  it('a picked level means Arcade, and an invite or a level leaves no style to pick', () => {
+    expect(setupStyle(null, 'campaign')).toBe('campaign');
+    expect(setupStyle(null, 'arcade')).toBe('arcade');
+    expect(setupStyle(3, 'campaign')).toBe('arcade');
+    expect(setupStyle(1, 'campaign')).toBe('arcade');
+    expect(picksStyle(false, null)).toBe(true);
+    expect(picksStyle(true, null)).toBe(false);
+    expect(picksStyle(false, 2)).toBe(false);
   });
 });

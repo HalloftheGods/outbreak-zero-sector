@@ -1,5 +1,6 @@
 import { isDifficultyId } from '../../shared/difficulty.ts';
 import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from '../../shared/events.ts';
+import { isGameStyle } from '../../shared/game-style.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import { EFFECT_ORDER } from '../../shared/round-effect-data.ts';
 import type {
@@ -9,6 +10,7 @@ import type {
   GameOverStats,
   PickupEntity,
   PlayerEntity,
+  RoomPacket,
   ServerPacket,
   SnapshotPacket,
   TrackEntity,
@@ -55,6 +57,8 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && (v.indoors === null || isString(v.indoors))
     && (v.gear === undefined || isPlayerGear(v.gear))
     && (v.bottles === undefined || isNumber(v.bottles))
+    && (v.stamina === undefined || isNumber(v.stamina))
+    && isFlag(v.winded)
     && (v.home === undefined || isHomeView(v.home))
     && hasNumbers(v, [
       'skin', 'x', 'y', 'angle', 'health', 'maxHealth', 'ammo', 'magSize', 'reserve', 'medkits',
@@ -115,6 +119,10 @@ export function isGameOverStats(v: unknown): v is GameOverStats {
       && hasNumbers(p, ['skin', 'kills', 'score']));
 }
 
+export function isRoomPacket(v: unknown): v is RoomPacket {
+  return isFields(v) && v.type === 'room' && (v.style === null || isGameStyle(v.style));
+}
+
 export function isWelcomePacket(v: unknown): v is WelcomePacket {
   return isFields(v)
     && v.type === 'welcome'
@@ -152,7 +160,7 @@ export function parseServerPacket(raw: unknown): ServerPacket | null {
   } catch {
     return null;
   }
-  if (isSnapshotPacket(value) || isWelcomePacket(value)) return value;
+  if (isSnapshotPacket(value) || isWelcomePacket(value) || isRoomPacket(value)) return value;
   if (isFields(value) && value.type === 'player_disconnected' && isString(value.playerId)) {
     return { type: 'player_disconnected', playerId: value.playerId };
   }

@@ -10,7 +10,7 @@ import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../../share
 import type { TransportKind } from '../../network/transport.ts';
 import type { LevelProgress } from '../level-progress.ts';
 import { SMELT_SECONDS, smeltTick } from './forge.ts';
-import { settleHands } from './gear-pool.ts';
+import { armedHands, settleHands } from './gear-pool.ts';
 import type { HomeSave, HomeStore, SaveResult } from './home-store.ts';
 import { SaveQueue } from './save-queue.ts';
 import type { SaveChange } from './save-queue.ts';
@@ -85,6 +85,8 @@ export class HomeSync {
   /** The equip or join the room has not yet answered. Its answer settles against the locker; any other change in hand is a bench action. */
   private request: HandsRequest | null = null;
   private tripWait: ReturnType<typeof setTimeout> | null = null;
+  /** Asked the room for a level while standing at the van with none picked. */
+  private pickAsked = false;
   /** Back in a body the room kept, which may already be waiting at the van. */
   private bodyResumed = false;
 
@@ -173,13 +175,16 @@ export class HomeSync {
     this.clearTripWait();
   }
 
-  private get now(): number {
-    return this.tick ?? 0;
+  /** Quitting on purpose from the van, before it leaves, is stepping away: no trip was made, so none is left on file to count as a death. */
+  leave(): void {
+    const boarded = this.van === 'ready' || this.van === 'boarding';
+    if (!boarded) return;
+    this.atVan = false;
+    this.stepAway();
   }
 
-  /** A gun left in the locker is a choice, so the room issues no free pistol to someone boarding without one. */
-  private get lockerHoldsAGun(): boolean {
-    return Object.keys(this.saves.save?.locker.guns ?? {}).length > 0;
+  private get now(): number {
+    return this.tick ?? 0;
   }
 
   private get mustWait(): boolean {
@@ -266,13 +271,36 @@ export class HomeSync {
     const { exit } = snapshot;
     const level = snapshot.home?.pickedLevel ?? null;
     const inReach = exit !== null && Math.hypot(entity.x - exit.x, entity.y - exit.y) <= EXIT_RADIUS;
-    this.atVan = inReach && level !== null && entity.status === 'alive';
+    const standing = inReach && entity.status === 'alive';
+    this.atVan = standing && level !== null;
+    this.pickFurthest(snapshot, standing && level === null);
     const shouldBoard = this.atVan && this.van === 'away' && !this.mustWait;
-    if (shouldBoard) this.board(level as number);
+    if (shouldBoard) this.boardArmed(level as number);
     const walkedOff = !this.atVan && this.van === 'ready';
     if (walkedOff) this.stepAway();
     const mayTryAgain = !this.atVan && this.van === 'refused';
     if (mayTryAgain) this.van = 'away';
+  }
+
+  /** Nobody stands at the van with nowhere to go. The map can still pick another level. */
+  private pickFurthest(snapshot: SnapshotPacket, nothingPicked: boolean): void {
+    const level = snapshot.home?.roomHighest;
+    const shouldAsk = nothingPicked && !this.pickAsked && level !== undefined;
+    this.pickAsked = nothingPicked;
+    if (shouldAsk) this.options.sendHome({ kind: 'pick_level', level });
+  }
+
+  /** Empty hands take the gun from the locker first: once a trip is on file, hands stop settling against the locker. */
+  private boardArmed(level: number): void {
+    const save = this.saves.save;
+    const gear = save && armedHands(save);
+    if (!gear) {
+      this.board(level);
+      return;
+    }
+    const asked = this.request;
+    const stillAsking = asked !== null && asked.text !== null && this.now <= asked.expires;
+    if (!stillAsking) this.equip(gear);
   }
 
   /** The trip is on file before the room hears ready, so nothing leaves on gear the save does not know about. */
@@ -292,7 +320,7 @@ export class HomeSync {
     const anotherTabHasIt = landed && !opened;
     if (anotherTabHasIt) this.saves.fail(TRIP_ALREADY_OPEN);
     if (!onFile) return;
-    if (this.atVan) this.options.sendHome({ kind: 'ready', ready: true, ownsGun: this.lockerHoldsAGun });
+    if (this.atVan) this.options.sendHome({ kind: 'ready', ready: true });
     else this.stepAway();
   }
 

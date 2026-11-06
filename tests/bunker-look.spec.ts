@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateBunkerMap } from '../shared/bunker-map.ts';
-import { HOME_LOOP_LIVE, STATION_IDS } from '../shared/home-protocol.ts';
+import { STATION_IDS } from '../shared/home-protocol.ts';
 import { TREASURE_TYPES } from '../shared/events.ts';
 import { TILE_SIZE } from '../shared/protocol.ts';
 import { buildArtBook } from '../src/art/index.ts';
@@ -125,29 +125,29 @@ describe('the bunker art', () => {
 });
 
 describe('the bunker music', () => {
-  it('plays the bunker track only with HOME_LOOP_LIVE', () => {
-    expect(playlistFor('bunker', 0).files).toEqual(playlistFor('bunker', 0, HOME_LOOP_LIVE).files);
-    const off = playlistFor('bunker', 0, false);
+  it('gives the bunker track to the bunker in Campaign, and leaves it on level 6 in Arcade', () => {
+    expect(playlistFor('bunker', 0).files).toEqual(playlistFor('bunker', 0, 'arcade').files);
+    const off = playlistFor('bunker', 0, 'arcade');
     expect(off.files).not.toContain(BUNKER_TRACK);
-    expect(off).toBe(playlistFor('intermission', 1, false));
-    expect(playlistFor('intermission', 6, false).files).toContain(BUNKER_TRACK);
+    expect(off).toBe(playlistFor('intermission', 1, 'arcade'));
+    expect(playlistFor('intermission', 6, 'arcade').files).toContain(BUNKER_TRACK);
 
-    const on = playlistFor('bunker', 0, true);
+    const on = playlistFor('bunker', 0, 'campaign');
     expect(on.files).toEqual([BUNKER_TRACK]);
-    expect(playlistFor('intermission', 6, true).files).not.toContain(BUNKER_TRACK);
-    expect(playlistFor('wave', 6, true).files).not.toContain(BUNKER_TRACK);
+    expect(playlistFor('intermission', 6, 'campaign').files).not.toContain(BUNKER_TRACK);
+    expect(playlistFor('wave', 6, 'campaign').files).not.toContain(BUNKER_TRACK);
     expect(LULLS.flatMap((playlist) => playlist.files)).toContain(BUNKER_TRACK);
   });
 
-  it('lists the bunker track from the start in home mode', () => {
-    const home = musicEntries(NO_PROGRESS, true);
+  it('lists the bunker track from the start in Campaign', () => {
+    const home = musicEntries(NO_PROGRESS, 'campaign');
     const entry = home.find((each) => each.file === BUNKER_TRACK);
     expect(entry).toMatchObject({ unlocked: true, where: 'BUNKER', label: 'Underground Bunker' });
     expect(home.filter((each) => each.file === BUNKER_TRACK)).toHaveLength(1);
-    expect(home.map((each) => each.file)).toEqual(allTracks(true).map((track) => track.file));
+    expect(home.map((each) => each.file)).toEqual(allTracks('campaign').map((track) => track.file));
 
-    const classic = musicEntries(NO_PROGRESS, false).find((each) => each.file === BUNKER_TRACK);
-    expect(classic).toMatchObject({ unlocked: false, where: 'LEVEL 06' });
+    const arcade = musicEntries(NO_PROGRESS, 'arcade').find((each) => each.file === BUNKER_TRACK);
+    expect(arcade).toMatchObject({ unlocked: false, where: 'LEVEL 06' });
   });
 });
 

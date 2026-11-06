@@ -3,10 +3,16 @@ import { TILE_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { WorldMap } from '../shared/protocol.ts';
 import { generateWorldMap } from '../shared/world-map.ts';
 import { Atmosphere, MAX_FLAKES } from '../src/engine/atmosphere.ts';
-import { GroundMotion, MAX_GROUND_MARKS, windSpeed, windTravel } from '../src/engine/ground-motion.ts';
+import { GroundMotion, MAX_GROUND_MARKS, rippleLength, windSpeed, windTravel } from '../src/engine/ground-motion.ts';
 
 const VIEW_W = 480;
 const VIEW_H = 270;
+
+describe('a ripple', () => {
+  it('runs longer the higher the swell', () => {
+    expect([0.3, 0.45, 0.46, 0.75, 0.76].map(rippleLength)).toEqual([2, 2, 3, 3, 4]);
+  });
+});
 
 interface Mark {
   x: number;

@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { ServerPacket, SnapshotPacket } from '../../shared/protocol.ts';
 
 const WAIT_MS = 3000;
@@ -43,9 +44,9 @@ export class TestClient {
     return this.received.findLast((packet): packet is SnapshotPacket => packet.type === 'snapshot');
   }
 
-  async join(name = 'Tester', token = `token-${tokens++}`): Promise<string> {
+  async join(name = 'Tester', token = `token-${tokens++}`, style?: GameStyle): Promise<string> {
     await this.opened();
-    this.send({ type: 'join', name, token });
+    this.send({ type: 'join', name, token, style });
     const welcome = await this.until(() => this.received.find((packet) => packet.type === 'welcome'));
     return welcome.type === 'welcome' ? welcome.yourId : '';
   }

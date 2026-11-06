@@ -156,7 +156,7 @@ function renderContaminated(canvas: PixelCanvas): void {
   canvas.ellipse(28, 31, 8, 2, acid[2]);
 }
 
-/** Level 6: Underground Bunker - Blackout tunnels, faint emergency lamp, red eyes. */
+/** Level 6: Blackout - dark tunnels, faint emergency lamp, red eyes. */
 function renderBlackout(canvas: PixelCanvas): void {
   canvas.fill(ink[0]);
   // Bunker archway

@@ -3,12 +3,16 @@
 import type { TripReceipt } from '../../shared/home-protocol.ts';
 import type { GameOverStats } from '../../shared/protocol.ts';
 import type { RunResult } from './hud-state.ts';
-import { recordLeaderboardEntry, recordRun } from './storage.ts';
+import { beatsBest, loadBest, recordLeaderboardEntry } from './storage.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 const FALLBACK_CALLSIGN = 'SURVIVOR';
+/** Apart from `outbreak.best`, which may hold a whole run's hordes that a trip's cannot be compared to. */
+const BEST_TRIP_KEY = 'outbreak.best-trip';
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
+
+export type BestTrip = BestRun & TripMarked;
 
 /** Marks a record as one trip, so the Records page can tell it from a whole run played before the bunker. */
 interface TripMarked {
@@ -23,35 +27,55 @@ function browserStore(): Store | null {
   }
 }
 
-/**
- * `recordRun` writes the best run and a leaderboard entry together and marks neither as a trip.
- * This lets the best run through, marked, and drops the leaderboard write, which is made marked below.
- */
-function bestRunOnly(store: Store): Store {
-  const isLeaderboard = (json: string): boolean => json.startsWith('[');
-  return {
-    getItem: (key) => store.getItem(key),
-    setItem: (key, value) => {
-      if (!isLeaderboard(value)) store.setItem(key, value);
-    },
-  };
+function isBestTrip(value: unknown): value is BestTrip {
+  const isObject = typeof value === 'object' && value !== null;
+  if (!isObject) return false;
+  const run = value as Record<string, unknown>;
+  const numbers = ['score', 'wave', 'kills', 'durationSec'].every((key) => Number.isFinite(run[key]));
+  return numbers && run.trip === true;
+}
+
+/** The best single trip, which a returning player's old best run never stands in for. */
+export function loadBestTrip(store: Store | null = browserStore()): BestTrip | null {
+  try {
+    const raw = store?.getItem(BEST_TRIP_KEY);
+    const value: unknown = raw ? JSON.parse(raw) : null;
+    return isBestTrip(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Each style's own best: a whole Arcade run and a single Campaign trip are never compared. */
+export function loadBests(): { readonly best: BestRun | null; readonly bestTrip: BestTrip | null } {
+  return { best: loadBest(), bestTrip: loadBestTrip() };
+}
+
+function saveBestTrip(store: Store, run: BestTrip): void {
+  try {
+    store.setItem(BEST_TRIP_KEY, JSON.stringify(run));
+  } catch {
+    // A best that does not persist is not worth interrupting the trip's end for.
+  }
 }
 
 /**
- * Records a trip from its receipt, banked or not, and reports whether it is the new best.
- * Score, kills and hordes count per trip, so this is the trip's own best, not a run's.
+ * Records a trip from its receipt, banked or not, and reports whether it is the new best trip.
+ * Score, kills and hordes count per trip, so it is compared only with other trips.
  */
 export function recordTrip(receipt: TripReceipt, callsign: string): boolean {
   const store = browserStore();
   if (!store) return false;
   const { score, kills, hordes, seconds } = receipt;
-  const run: BestRun & TripMarked = { score, kills, wave: hordes, durationSec: seconds, trip: true };
+  const run: BestTrip = { score, kills, wave: hordes, durationSec: seconds, trip: true };
   const qualifies = score > 0 || hordes > 0;
   if (qualifies) {
     const entry: LeaderboardEntry & TripMarked = { ...run, callsign: callsign.trim() || FALLBACK_CALLSIGN, timestamp: Date.now() };
     recordLeaderboardEntry(entry, store);
   }
-  return recordRun(run, bestRunOnly(store), callsign);
+  const isNewBest = beatsBest(run, loadBestTrip(store));
+  if (isNewBest) saveBestTrip(store, run);
+  return isNewBest;
 }
 
 export interface Survivor {

@@ -6,6 +6,7 @@ import {
   menuOwnsKey,
   menuStep,
   recordRows,
+  recordSections,
   recordStats,
   setupActionLabel,
   steppedIndex,
@@ -101,5 +102,23 @@ describe('records page', () => {
     const rows = recordRows(runs as never);
     expect(rows).toHaveLength(5);
     expect(rows[0]).toMatchObject({ rank: '#1', name: 'SURVIVOR', score: 100 });
+  });
+
+  it('shows a section for each style, Campaign first, with its own best', () => {
+    const arcade = { score: 1200, wave: 4, kills: 57, durationSec: 125 };
+    const trip = { score: 300, wave: 1, kills: 9, durationSec: 61 };
+    const sections = recordSections(arcade, trip);
+    expect(sections.map((section) => [section.style, section.heading])).toEqual([
+      ['campaign', 'Campaign'],
+      ['arcade', 'Arcade'],
+    ]);
+    expect(sections[0].stats.map((stat) => stat.value)).toEqual(['300', '1', '9', '1:01']);
+    expect(sections[1].stats.map((stat) => stat.value)).toEqual(['1200', '4', '57', '2:05']);
+  });
+
+  it('labels each run by the style it came from, a marked trip as a Campaign trip', () => {
+    const trip = { callsign: 'A', score: 5, timestamp: 1, trip: true };
+    const run = { callsign: 'B', score: 4, timestamp: 2 };
+    expect(recordRows([trip, run] as never).map((row) => row.label)).toEqual(['Campaign trip', 'Arcade run']);
   });
 });

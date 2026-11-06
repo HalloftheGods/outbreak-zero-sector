@@ -1,7 +1,9 @@
 <template>
   <TitlePage :heading size="extra-wide" @close="back">
-    <template v-if="flow.step === 'mode'">
-      <ModeSelect :art="ui.art" :mode="flow.mode" @choose="pick" />
+    <StyleSelect v-if="flow.step === 'style'" ref="styles" :art="ui.art" :game-style="ui.style" @choose="chooseStyle" />
+
+    <template v-else-if="flow.step === 'mode'">
+      <ModeSelect :art="ui.art" :mode="flow.mode" :game-style="shownStyle" @choose="pick" />
 
       <!-- The server half keeps its room on Solo, hidden, so choosing a mode moves nothing. -->
       <div class="setup-fields">
@@ -46,6 +48,7 @@
 
     <template v-else>
       <CharacterSelect ref="survivors" :art="ui.art" />
+      <p v-if="showsStyleLabel(join, flow.mode)" class="px-label setup-start-at">{{ STYLE_LABELS[runStyle] }}</p>
       <p v-if="startLine" class="px-label setup-start-at">{{ startLine }}</p>
       <p v-if="coopNote" class="px-label setup-start-at">{{ coopNote }}</p>
       <p v-if="failure" class="px-error" role="alert">{{ failure }}</p>
@@ -55,7 +58,7 @@
       <MenuLink v-if="!startsRun(flow)" @press="next">Next</MenuLink>
       <template v-else>
         <PixelButton primary silent :disabled="!ready" @press="start">{{ actionLabel }}</PixelButton>
-        <PixelButton v-if="resumeAt !== null && !multi" :disabled="!ready" @press="game.continueSolo()">
+        <PixelButton v-if="resumeAt !== null && !multi && runStyle === 'arcade'" :disabled="!ready" @press="game.continueSolo()">
           Continue from level {{ resumeAt }}
         </PixelButton>
       </template>
@@ -66,13 +69,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import { trackTitlePage } from '../game/analytics/index.ts';
+import { setupLevelLines } from '../game/home-screens.ts';
 import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { buildInviteLink } from '../game/invite-link.ts';
 import { chosenStartLevel, continueLevel, isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
-import { COOP_LEVEL_NOTE, startAtLabel } from '../game/level-select.ts';
-import { advance, chooseMode, PLAY_JOIN, PLAY_START, playHeading, retreat, showsServer, startsRun } from '../game/play-flow.ts';
+import { advance, chooseMode, claimedStyle, playHeading, retreat, setupFailure, setupStyle, showsServer, showsStyleLabel, startFlow, startsRun, STYLE_LABELS } from '../game/play-flow.ts';
 import type { PlayMode } from '../game/play-flow.ts';
 import { setupActionLabel } from '../game/title-menu.ts';
 import CharacterSelect from './CharacterSelect.vue';
@@ -80,6 +84,7 @@ import DifficultySelect from './DifficultySelect.vue';
 import MenuLink from './MenuLink.vue';
 import ModeSelect from './ModeSelect.vue';
 import PixelButton from './PixelButton.vue';
+import StyleSelect from './StyleSelect.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
 
@@ -87,9 +92,10 @@ const { ui, join = false, level = null } = defineProps<{ ui: UiState; join?: boo
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 const callsign = useTemplateRef<HTMLInputElement>('callsign');
+const styles = useTemplateRef<InstanceType<typeof StyleSelect>>('styles');
 const survivors = useTemplateRef<InstanceType<typeof CharacterSelect>>('survivors');
 const difficulty = useTemplateRef<InstanceType<typeof DifficultySelect>>('difficulty');
-const flow = ref(join ? PLAY_JOIN : PLAY_START);
+const flow = ref(startFlow(join, level));
 const copied = ref<'idle' | 'done' | 'failed'>('idle');
 const INVITE_LABELS = { idle: 'Copy invite link', done: 'Link copied', failed: 'Copy failed' } as const;
 
@@ -98,15 +104,19 @@ const resumeAt = continueLevel(loadLevelProgress());
 /** The level picked on the Levels page, kept only while it is still unlocked and past the first. */
 const chosen = level === null ? null : chosenStartLevel(level, loadLevelProgress());
 const isChosenUnlocked = level !== null && isLevelUnlocked(level, loadLevelProgress());
-const startLine = computed(() => (!multi.value && isChosenUnlocked ? startAtLabel(level) : null));
-const coopNote = computed(() => (multi.value && chosen !== null ? COOP_LEVEL_NOTE : null));
+const runStyle = computed(() => setupStyle(level, ui.style));
+/** What this page may say about the style: nothing on an invite link, since the room decides. The run still offers the remembered one to an empty room. */
+const shownStyle = computed(() => claimedStyle(join, runStyle.value));
+const levelLines = computed(() => setupLevelLines({ style: shownStyle.value, multi: multi.value, level, unlocked: isChosenUnlocked, chosen }));
+const startLine = computed(() => levelLines.value.startLine);
+const coopNote = computed(() => levelLines.value.coopNote);
 const heading = computed(() => playHeading(flow.value));
 /** Co-op on either step: the mode decides how the run starts. The server field shows on the first step only. */
 const multi = computed(() => flow.value.mode === 'multi');
 const serverShown = computed(() => showsServer(flow.value));
 const ready = computed(() => ui.art !== null && !ui.connecting);
 const actionLabel = computed(() => setupActionLabel(multi.value, ui.art !== null, ui.connecting));
-const failure = computed(() => (multi.value ? ui.error : null));
+const failure = computed(() => setupFailure(flow.value.mode, runStyle.value, ui.error));
 const defaultServer = `${window.location.hostname}:${DEFAULT_SERVER_PORT}`;
 /** The address friends need: what is typed, or this host's default when the field is blank. */
 const inviteLink = computed(() => buildInviteLink(window.location.href, ui.serverAddress.trim() || defaultServer));
@@ -127,19 +137,25 @@ async function copyInvite(): Promise<void> {
   setTimeout(() => (copied.value = 'idle'), 2000);
 }
 
+/** A method handed to the template loses its `this`, so the pick goes through here. */
+function chooseStyle(style: GameStyle): void {
+  game.chooseStyle(style);
+}
+
 function pick(mode: PlayMode): void {
   flow.value = chooseMode(flow.value, mode);
 }
 
 function start(): void {
-  if (multi.value) game.startCoop();
+  if (multi.value) game.startCoop(runStyle.value);
   else if (chosen !== null) game.continueSolo(chosen);
-  else game.startSolo();
+  else game.startSolo(runStyle.value);
 }
 
-/** Puts the keyboard where each step starts: the callsign, the chosen difficulty, or the chosen survivor. */
+/** Puts the keyboard where each step starts: the chosen style, the callsign, the chosen difficulty, or the chosen survivor. */
 function focusStep(): void {
   void nextTick(() => {
+    styles.value?.focus();
     callsign.value?.focus();
     difficulty.value?.focus();
     survivors.value?.focus();
@@ -166,6 +182,7 @@ function back(): void {
 }
 
 onMounted(() => {
+  styles.value?.focus();
   callsign.value?.focus();
   trackTitlePage('play');
 });

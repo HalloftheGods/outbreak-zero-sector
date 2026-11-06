@@ -145,7 +145,7 @@ describe('home over sockets', () => {
       expect(tab.save.locker).toMatchObject({ guns: GEAR.guns, medkits: MEDKIT_MAX, knife: true });
     });
 
-    it('refused gear stays in the locker when the join lands beside a teammate at the van', async () => {
+    it('refused gear stays in the locker when the join lands beside a teammate at the van, bar the gun the van hands over', async () => {
       await openRoom();
       const friend = await joined();
       friend.client.send({ type: 'home', action: { kind: 'pick_level', level: 1 } });
@@ -154,8 +154,11 @@ describe('home over sockets', () => {
       await waitFor(() => homeOf(bodyOf(friend)).ready);
       const overCap = { ...GEAR, medkits: MEDKIT_MAX + 1 };
       const tab = await joined({ hands: overCap });
-      expect(tab.save.hands).toEqual(emptyLoadout());
-      expect(tab.save.locker).toEqual(overCap);
+      await waitFor(() => Object.keys(tab.save.hands.guns).length === 1);
+      const [gun] = Object.keys(tab.save.hands.guns);
+      expect(tab.save.locker.guns).not.toHaveProperty(gun);
+      expect(tab.save.hands).toMatchObject({ medkits: 0, knife: false });
+      expect(tab.save.locker).toMatchObject({ medkits: MEDKIT_MAX + 1, knife: GEAR.knife });
     });
 
     it('an equip the room refuses changes nothing on either side', async () => {
@@ -169,19 +172,20 @@ describe('home over sockets', () => {
       expect(tab.save.locker.medkits).toBe(1);
     });
 
-    it('a stale save takes the room\'s word on what is in hand, and nothing is doubled', async () => {
+    it('a body left in the bunker is not kept, so the save is the word on what is in hand and nothing is doubled', async () => {
       await openRoom();
       const friend = await joined();
       const tab = await joined({ hands: GEAR });
       const { token } = bodyOf(tab);
       tab.crash();
-      await left(1);
+      await waitFor(() => state.players.length === 1);
+      expect(state.departed.size).toBe(0);
       const movedBackToLocker = browserWith({ locker: GEAR });
       const back = await tabOn(movedBackToLocker).join({ token: token as string });
-      expect(back.welcome?.resumed).toBe(true);
-      await waitFor(() => back.sync.save?.hands.knife);
-      expect(heldBy(back)).toEqual(GEAR);
-      expect(back.save.locker).toEqual(emptyLoadout());
+      expect(back.welcome?.resumed).toBeUndefined();
+      await back.nextFrame();
+      expect(heldBy(back)).toEqual(emptyLoadout());
+      expect(back.save.locker).toEqual(GEAR);
       expect(friend.client.closeCode).toBeNull();
     });
 
@@ -213,7 +217,7 @@ describe('home over sockets', () => {
       const loadout = worstLoadout();
       expect(validateLoadout(loadout)).not.toBeNull();
       const home = { loadout, highest: FINAL_LEVEL, finished: true };
-      const packet = { type: 'join', name: '\u{1F9DF}'.repeat(16), token: 'x'.repeat(JOIN_TOKEN_MAX_LENGTH), character: 4, difficulty: longestDifficulty(), home };
+      const packet = { type: 'join', name: '\u{1F9DF}'.repeat(16), token: 'x'.repeat(JOIN_TOKEN_MAX_LENGTH), character: 4, difficulty: longestDifficulty(), style: 'campaign', home };
       const bytes = Buffer.byteLength(JSON.stringify(packet));
       expect(bytes).toBeLessThanOrEqual(MAX_PACKET_BYTES);
       expect(Buffer.byteLength(JSON.stringify({ type: 'home', action: { kind: 'equip', loadout } }))).toBeLessThan(bytes);

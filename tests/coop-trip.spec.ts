@@ -291,12 +291,12 @@ describe('a banked receipt nobody has applied yet', () => {
 });
 
 describe('leaving the bunker', () => {
-  it('forgets a body that left before the van did, so it comes back as a newcomer', () => {
+  it('does not keep a body that left the bunker unready, so it comes back as a newcomer', () => {
     const { sim, state } = homeSim({ players: [] });
     sim.addPlayer('a', 'a', 'token-a');
     sim.addPlayer('b', 'b', 'token-b');
     sim.removePlayer('b');
-    expect(sim.hasBodyFor('token-b')).toBe(true);
+    expect(sim.hasBodyFor('token-b')).toBe(false);
     driveToTown(sim, state);
     expect(sim.level).toBe(FIRST_LEVEL);
     expect(sim.hasBodyFor('token-b')).toBe(false);

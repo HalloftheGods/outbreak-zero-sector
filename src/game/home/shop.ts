@@ -154,6 +154,13 @@ export function buy(save: HomeSave, merchant: MerchantId, item: string, context:
   return { ...save, silver: save.silver - def.price, locker: granted(save.locker, def, context), shop: { ...save.shop, merchants } };
 }
 
+/** One unit of an item into the locker as a reward, or null when it does not fit. A quest pays silver at the shop price instead. */
+export function stow(save: HomeSave, item: ItemDef, difficulty: DifficultyId): HomeSave | null {
+  const context: ShopContext = { highest: 0, station: null, difficulty };
+  if (!fits(save, item, context)) return null;
+  return { ...save, locker: granted(save.locker, item, context) };
+}
+
 /** What the screen lists: what is on the shelf this trip and of use to the player. Sold-out lines drop off. */
 export function shopRows(save: HomeSave, merchant: MerchantId, context: ShopContext): ShopRow[] {
   return MERCHANTS[merchant].items

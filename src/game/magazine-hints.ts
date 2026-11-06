@@ -328,8 +328,97 @@ const coop: HintMaker = ({ photos }) => ({
   ],
 });
 
+const styles: HintMaker = ({ art, photos }) => ({
+  layout: 'column',
+  color: 'sky',
+  kicker: 'Two ways to travel',
+  deck: 'Pick a package. Both end at the van.',
+  coverline: 'Campaign or Arcade: choose your holiday',
+  left: [
+    gallery('pair', getSectionVisuals('styles', art), 'Pick one'),
+    sticky('Your choice is remembered. The Bureau remembers everything.', -2),
+    aside(photo(photos.town, 'The town you will be visiting either way.', 1.4, 'normal', [])),
+  ],
+  right: [head, article('bullets'), tip('Each package keeps its own save. Changing your mind costs nothing.')],
+});
+
+const bunker: HintMaker = ({ art, photos }) => ({
+  layout: 'classifieds',
+  color: 'mustard',
+  kicker: 'Accommodation',
+  deck: 'Underground, windowless and entirely yours.',
+  left: [
+    head,
+    article('bullets'),
+    aside(photo(photos.workshop, 'The workshop, tidied for the inspection.', 1.6, 'small', [{ kind: 'circle', x: 52, y: 32, r: 26 }])),
+  ],
+  right: [gallery('classifieds', getSectionVisuals('bunker', art), 'Amenities'), tip('Nothing in the bunker bites. The Bureau checked twice.')],
+});
+
+const trips: HintMaker = ({ photos }) => ({
+  layout: 'postcard',
+  color: 'teal',
+  kicker: 'Day trips',
+  deck: 'Out in the morning, home by dark, mostly.',
+  left: [head, photo(photos.vanRoad, 'The van, leaving on time. It will not wait for you.', -2, 'hero', [{ kind: 'note', x: 34, y: 18, text: 'bring it home' }])],
+  right: [article('numbered'), sticky('Keep the van in sight.', 2.5)],
+});
+
+const treasure: HintMaker = ({ art }) => ({
+  layout: 'catalog',
+  color: 'pink',
+  kicker: 'Souvenirs',
+  deck: 'Small, shiny and worth carrying home.',
+  left: [head, gallery('catalog', getSectionVisuals('treasure', art), 'The souvenir shop')],
+  right: [article('bullets'), tip('A souvenir you drop on the way back is only a story.'), sticky('Not yours until the van says so.', -2.5)],
+});
+
+const forge: HintMaker = ({ art }) => ({
+  layout: 'hero',
+  color: 'violet',
+  kicker: 'Craft corner',
+  deck: 'Turn a pocketful of jewels into something spendable.',
+  left: [{ kind: 'hero', sprite: art.ui.pickupIcons.jewel_large, burst: 'Three seconds a jewel!', caption: 'A large jewel, shown actual size.' }],
+  right: [
+    head,
+    { kind: 'review', stars: 4, quote: 'Does exactly what it says, as long as you stand there. Would wait again.' },
+    article('plain'),
+    sticky('Please do not lean on the forge.', -2.5),
+  ],
+});
+
+const merchants: HintMaker = ({ art, photos }) => ({
+  layout: 'wildlife',
+  color: 'mustard',
+  kicker: 'Meet the neighbours',
+  deck: 'Four stalls, four opinions about your budget.',
+  left: [gallery('spotter', getSectionVisuals('merchants', art), 'Stallholders, as listed')],
+  right: [
+    head,
+    article('bullets'),
+    sticky('Haggling is not offered.', 3),
+    aside(photo(photos.stockroom, 'The stock. There is not much of it.', 1.4, 'normal', [])),
+  ],
+});
+
+const dying: HintMaker = ({ photos }) => ({
+  layout: 'column',
+  color: 'tomato',
+  kicker: 'Small print',
+  deck: 'A setback, not the end of the holiday.',
+  left: [head, article('numbered'), tip('Nobody is ever stuck without a gun. The van will not allow it.')],
+  right: [stamp('Not final', -8), photo(photos.crowd, 'A trip, shortly before it was cut short.', 1.2, 'normal', [{ kind: 'circle', x: 150, y: 84, r: 30 }])],
+});
+
 const HINTS: Readonly<Record<string, HintMaker>> = {
   goal,
+  styles,
+  bunker,
+  trips,
+  treasure,
+  forge,
+  merchants,
+  dying,
   controls,
   noise,
   supplies,

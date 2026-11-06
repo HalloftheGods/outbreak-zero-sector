@@ -1,4 +1,6 @@
+import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { ArtBook } from '../art/types.ts';
+import { MERCHANTS } from './home/merchant-data.ts';
 import type { GalleryCard } from './magazine-types.ts';
 
 /** The game's own pictures for each How to Play section. The captions are the magazine's voice, never new rules. */
@@ -61,6 +63,43 @@ const rounds: CardList = (art) => [
   { id: 'tranq', title: 'Tranq rounds', sprite: art.ui.pickupIcons.tranq_kit, scale: 3, tag: 'Calm', caption: 'Slower, if not quite sorry.' },
 ];
 
+const styles: CardList = (art) => [
+  { id: 'campaign', title: 'Campaign', sprite: art.ui.style.campaign, scale: 2.2, tag: 'Option A' },
+  { id: 'arcade', title: 'Arcade', sprite: art.ui.style.arcade, scale: 2.2, tag: 'Option B' },
+];
+
+const bunker: CardList = (art) => [
+  { id: 'locker', title: 'Locker', sprite: art.ui.stations.locker, scale: 1.4, tag: 'Bunks', caption: 'Your things, laid out neatly.' },
+  { id: 'forge', title: 'Forge', sprite: art.ui.stations.forge, scale: 1.4, tag: 'Workshop', caption: 'Hot. Please do not lean.' },
+  { id: 'bench', title: 'Bench', sprite: art.ui.stations.bench, scale: 1.4, tag: 'Workshop', caption: 'Some assembly required.' },
+  { id: 'jukebox', title: 'Jukebox', sprite: art.ui.stations.jukebox, scale: 1.4, tag: 'Quarters', caption: 'Plays whatever you have heard.' },
+];
+
+const treasure: CardList = (art) => [
+  { id: 'silver', title: 'Silver', sprite: art.ui.pickupIcons.silver, scale: 4, tag: 'No. 301', caption: 'One hundred make a gold.' },
+  { id: 'jewel-small', title: 'Small jewel', sprite: art.ui.pickupIcons.jewel_small, scale: 4, tag: 'No. 302', caption: 'Forty silver, once smelted.' },
+  { id: 'jewel-large', title: 'Large jewel', sprite: art.ui.pickupIcons.jewel_large, scale: 4, tag: 'No. 303', caption: 'Two hundred. Lift with your knees.' },
+];
+
+const MERCHANT_ORDER: readonly MerchantId[] = ['gunsmith', 'quartermaster', 'medic', 'powder'];
+
+const MERCHANT_CAPTIONS: Readonly<Record<MerchantId, string>> = {
+  gunsmith: 'Everything here has been fired once.',
+  quartermaster: 'Counts rounds. Twice.',
+  medic: 'Prefers you in one piece.',
+  powder: 'Loud, bright and not sorry.',
+};
+
+const merchants: CardList = (art) =>
+  MERCHANT_ORDER.map((id) => ({
+    id,
+    title: MERCHANTS[id].name,
+    sprite: art.merchants[id].portrait,
+    scale: 3.4,
+    tag: MERCHANTS[id].role,
+    caption: MERCHANT_CAPTIONS[id],
+  }));
+
 const SECTION_CARDS: Readonly<Record<string, CardList>> = {
   supplies,
   searching,
@@ -69,6 +108,13 @@ const SECTION_CARDS: Readonly<Record<string, CardList>> = {
   noise,
   difficulty,
   goal: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],
+  styles,
+  bunker,
+  trips: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],
+  treasure,
+  forge: (art) => [{ id: 'forge', title: 'Forge', sprite: art.ui.stations.forge, scale: 1.6 }],
+  merchants,
+  dying: (art) => [{ id: 'skull', title: 'Skull', sprite: art.ui.skull, scale: 3 }],
   controls: (art) => [{ id: 'crosshair', title: 'Crosshair', sprite: art.ui.crosshair, scale: 2 }],
   melee: (art) => [{ id: 'knife', title: 'Knife', sprite: art.ui.pickupIcons.knife, scale: 2 }],
   van: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],

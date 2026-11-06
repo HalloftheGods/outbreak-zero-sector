@@ -7,9 +7,6 @@ import type { GunFit } from './gun-upgrades.ts';
 import type { WeaponId, WorldMap } from './protocol.ts';
 import type { KitCounts } from './round-effect-data.ts';
 
-/** The one switch. Off, players see nothing of any of this. */
-export const HOME_LOOP_LIVE = false;
-
 /** The bunker is a map like any other, reached by a seed no town can have. */
 export const BUNKER_SEED = -1;
 /** `sim.level` in the bunker, which clamps to level 1's look and triggers no town rule. */
@@ -55,8 +52,7 @@ export interface JoinHome {
 export type HomeAction =
   | { kind: 'pick_level'; level: number }
   | { kind: 'equip'; loadout: Loadout }
-  /** `ownsGun`: the locker holds a gun, so boarding empty-handed is a choice and no free pistol is issued. Left off for no. */
-  | { kind: 'ready'; ready: boolean; ownsGun?: boolean }
+  | { kind: 'ready'; ready: boolean }
   | { kind: 'leave_station' }
   | { kind: 'highest'; highest: number };
 

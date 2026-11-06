@@ -1,7 +1,7 @@
 <template>
   <div class="select">
     <SceneCard :sprite="art?.ui.mode[card.mode] ?? null" :name="card.label" :line="card.line">
-      <ModeFacts :mode="card.mode" />
+      <ModeFacts :mode="card.mode" :game-style />
     </SceneCard>
     <SceneRoster ref="roster" label="Mode" :items="tiles" :chosen="modeIndex(mode)" @choose="choose" @preview="preview">
       <template #default="{ index }">
@@ -18,6 +18,7 @@
  * The mode itself lives in the Play flow; this only reports a pick.
  */
 import { computed, ref, useTemplateRef } from 'vue';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { ArtBook } from '../art/types.ts';
 import { MODE_CARDS, modeIndex } from '../game/mode-select-view.ts';
 import type { PlayMode } from '../game/play-flow.ts';
@@ -26,7 +27,7 @@ import SceneCard from './SceneCard.vue';
 import SceneRoster from './SceneRoster.vue';
 import { useGame } from './use-game.ts';
 
-const { art, mode } = defineProps<{ art: ArtBook | null; mode: PlayMode }>();
+const { art, mode, gameStyle } = defineProps<{ art: ArtBook | null; mode: PlayMode; gameStyle: GameStyle | null }>();
 const emit = defineEmits<{ choose: [mode: PlayMode] }>();
 const game = useGame();
 const roster = useTemplateRef<InstanceType<typeof SceneRoster>>('roster');

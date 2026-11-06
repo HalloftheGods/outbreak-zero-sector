@@ -30,19 +30,11 @@ describe('home commands', () => {
     expect(state.homeRun).toMatchObject({ roomHighest: 2, pickedLevel: null });
   });
 
-  it('boarding with no gun in hand is issued the free pistol, unless a gun is owned in the locker', () => {
-    const bareHanded = () => {
-      const parts = homeSim({ players: [] });
-      parts.sim.addPlayer('a', 'a', null, undefined, { loadout: emptyLoadout(), highest: FIRST_LEVEL });
-      return parts;
-    };
-    const empty = bareHanded();
-    driveToTown(empty.sim, empty.state);
-    expect(empty.state.players[0].owned).toEqual(['pistol']);
-    const owner = bareHanded();
-    driveToTown(owner.sim, owner.state, FIRST_LEVEL, true);
-    expect(owner.state.players[0].owned).toEqual([]);
-    expect(owner.state.players[0].guns).toEqual({});
+  it('boarding with no gun in hand is issued the free pistol', () => {
+    const { sim, state } = homeSim({ players: [] });
+    sim.addPlayer('a', 'a', null, undefined, { loadout: emptyLoadout(), highest: FIRST_LEVEL });
+    driveToTown(sim, state);
+    expect(state.players[0].owned).toEqual(['pistol']);
   });
 
   it('picks no level on a trip', () => {

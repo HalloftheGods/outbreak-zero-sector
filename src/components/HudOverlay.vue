@@ -44,6 +44,10 @@
           <SpriteImg :sprite="art.ui.pickupIcons.knife" />
           <span class="hud-slot-key keys-only">F</span>
         </div>
+        <div v-if="hud.stamina < 1" class="hud-chip hud-sprint" :class="{ 'is-winded': hud.winded }">
+          <span class="hud-sub">Sprint</span>
+          <div class="px-meter hud-sprint-meter" :style="fill(hud.stamina, 1)"><span /></div>
+        </div>
         <div class="hud-chip hud-health" :class="{ 'is-low': isLow }">
           <SpriteImg :sprite="art.ui.heart" />
           <div class="px-meter hud-health-meter" :style="fill(hud.health, hud.maxHealth)"><span /></div>
@@ -253,6 +257,30 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 .hud-health-meter {
   width: calc(var(--u) * 60);
   height: calc(var(--u) * 4);
+}
+
+.hud-sprint {
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+}
+
+.hud-sprint-meter {
+  width: calc(var(--u) * 40);
+  height: calc(var(--u) * 2);
+}
+
+.hud-sprint-meter > span {
+  background: var(--amber);
+}
+
+.hud-sprint.is-winded .hud-sub {
+  color: var(--blood-bright);
+}
+
+.hud-sprint.is-winded .px-meter > span {
+  background: var(--blood-bright);
+  animation: px-blink 0.6s steps(2) infinite;
 }
 
 .hud-health.is-low .px-meter > span {

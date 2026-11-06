@@ -14,7 +14,10 @@ export interface SpinTimers {
 
 // Wrapped, so each call runs on the global scope: a browser throws Illegal invocation when they run as a method.
 const BROWSER_TIMERS: SpinTimers = {
-  set: (tick, ms) => setInterval(tick, ms),
+  set: (tick, ms) => {
+    const handle = setInterval(tick, ms);
+    return handle;
+  },
   clear: (handle) => clearInterval(handle),
 };
 

@@ -112,7 +112,7 @@ export function issueFreePistol(p: PlayerState): void {
   syncHands(p);
 }
 
-const modsOn = (fit: GunFit | undefined): number => slotsUsed(fit) + (effectOf(fit) ? 1 : 0);
+export const modsOn = (fit: GunFit | undefined): number => slotsUsed(fit) + (effectOf(fit) ? 1 : 0);
 
 function refundParts(parts: PartCounts, fit: GunFit | undefined): void {
   for (const upgrade of UPGRADE_ORDER) {

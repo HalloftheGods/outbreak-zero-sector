@@ -21,7 +21,7 @@ import { openGroundNear } from './sim-state.ts';
 import { buildSnapshot, playerSnapshot } from './snapshot-build.ts';
 import { updatePopulation } from './town-population.ts';
 import { enterHome, homeCommand } from './trip.ts';
-import { arriveInRoom, leaveRoom, updateLeftBodies } from './trip-roster.ts';
+import { arriveInRoom, keepsBodyOnLeaving, leaveRoom, updateLeftBodies } from './trip-roster.ts';
 import { updateWaves } from './waves.ts';
 import { updateZombieStatuses } from './zombie-burn.ts';
 import { benchCommand, updateBench } from './workbench.ts';
@@ -37,7 +37,7 @@ export type { SimulationOptions } from './sim-factory.ts';
  * reproducible from its seed and its inputs.
  */
 export class GameSimulation {
-  private readonly sim: SimState;
+  private sim: SimState;
 
   constructor(options: SimulationOptions) {
     this.sim = createSimState(options);
@@ -72,6 +72,20 @@ export class GameSimulation {
     if (roomInUse || unchanged) return;
     sim.difficulty = difficulty;
     this.restart();
+  }
+
+  /** This room is played from the bunker, in trips, rather than as one run through the towns. */
+  get playsHome(): boolean {
+    return this.sim.homeRun !== null;
+  }
+
+  /** Only an empty room can change it, and it takes a new start: the bunker, or level 1's town. The rolls carry on. */
+  setHome(home: boolean): void {
+    const { players, homeRun, runSeed, difficulty, rng, workbench } = this.sim;
+    const roomInUse = players.length > 0;
+    const unchanged = (homeRun !== null) === home;
+    if (roomInUse || unchanged) return;
+    this.sim = createSimState({ seed: runSeed, random: rng, difficulty, workbench, home });
   }
 
   /** Near a living teammate if there is one, otherwise at the map spawn. */
@@ -122,7 +136,7 @@ export class GameSimulation {
   removePlayer(id: string): void {
     const sim = this.sim;
     const leaving = sim.players.find((p) => p.id === id);
-    if (leaving) rememberDeparted(sim, leaving);
+    if (leaving && keepsBodyOnLeaving(sim, leaving)) rememberDeparted(sim, leaving);
     sim.players = sim.players.filter((p) => p.id !== id);
     if (leaving) leaveRoom(sim, leaving);
 

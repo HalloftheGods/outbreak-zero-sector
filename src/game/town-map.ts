@@ -15,6 +15,8 @@ const BUNKER_TILE_PX = 6;
 const BUNKER_FLOOR: readonly [number, number, number] = [70, 58, 46];
 const BUNKER_WALL: readonly [number, number, number] = [22, 20, 24];
 const STATION_COLOR = '#ffb066';
+/** What the bunker map's one colour means: the machines you hold E at. The rooms are named on the map itself. */
+export const BUNKER_LEGEND: readonly (readonly [string, string])[] = [[STATION_COLOR, 'Stations']];
 
 const ROAD: readonly [number, number, number] = [40, 41, 47];
 const PAVEMENT: readonly [number, number, number] = [62, 62, 66];

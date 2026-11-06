@@ -10,90 +10,7 @@ import type { HomeSave, HomeStore, OpenTrip, SaveResult } from '../src/game/home
 import { HomeSync, joinHomeFor, OPEN_TRIP_WAIT_MS } from '../src/game/home/home-sync.ts';
 import { SaveQueue } from '../src/game/home/save-queue.ts';
 
-const ME = 'me';
-const TOWN_SEED = 4242;
-const VAN = { x: 500, y: 500, progress: 0 };
-
-const QUIET: HomeView = { silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null };
-
-const entity = (patch: Partial<PlayerEntity> = {}): PlayerEntity => ({
-  id: ME, name: 'ANA', skin: 0, x: 1, y: 2, angle: 0, moving: false, status: 'alive',
-  health: 100, maxHealth: 100, weapon: 'pistol', ammo: 0, magSize: 12, reserve: 0,
-  owned: [], ammoBag: { pistol: 0, carbine: 0, shotgun: 0 }, mags: { pistol: 0, carbine: 0, shotgun: 0 },
-  medkits: 0, indoors: null,
-  reload: 0, bleedout: 0, revive: 0, score: 0, kills: 0, lastInputSeq: 3, knife: false, search: 0,
-  home: QUIET, ...patch,
-});
-
-interface FrameOptions {
-  readonly tick?: number;
-  readonly mapSeed?: number;
-  readonly level?: number;
-  readonly picked?: number | null;
-  readonly player?: Partial<PlayerEntity>;
-  readonly home?: Partial<HomeView>;
-}
-
-function frame({ tick = 100, mapSeed = BUNKER_SEED, level = 0, picked = null, player, home }: FrameOptions = {}): SnapshotPacket {
-  return {
-    type: 'snapshot', tick, phase: 'intermission', level, mapSeed, wave: 0, intermission: 0, hostiles: 0,
-    players: [entity({ ...player, home: { ...QUIET, ...home } })], zombies: [], bullets: [], pickups: [], exit: VAN,
-    openedContainers: [], events: [], gameOver: null, home: { pickedLevel: picked, roomHighest: 3 },
-  };
-}
-
-const atVan = { x: VAN.x, y: VAN.y };
-const inTown = { mapSeed: TOWN_SEED, level: 2 };
-
-const receipt = (patch: Partial<TripReceipt> = {}): TripReceipt => ({
-  simId: 'sim-a', serial: 1, outcome: 'banked', level: 2, difficulty: 'stay_close', silver: 50, jewels: { small: 0, large: 0 },
-  replay: false, score: 10, kills: 1, hordes: 1, seconds: 60, ending: false, gear: null, ...patch,
-});
-
-const trip = (patch: Partial<OpenTrip> = {}): OpenTrip => ({ level: 2, mode: 'solo', difficulty: 'stay_close', startedAt: 1, ...patch });
-
-/** A store over one shared slot, as two tabs see one localStorage, with the next results scripted when a test needs them. */
-function sharedStore(initial: Partial<HomeSave> = {}) {
-  const slot: { save: HomeSave } = { save: { ...emptySave(7), ...initial } };
-  const scripted: SaveResult[] = [];
-  const store: HomeStore = {
-    load: async () => slot.save,
-    async save(next) {
-      const forced = scripted.shift();
-      if (forced) return forced;
-      const stale = next.version !== slot.save.version;
-      if (stale) return { kind: 'conflict' };
-      const version = next.version + 1;
-      slot.save = { ...next, version };
-      return { kind: 'saved', version };
-    },
-  };
-  return { slot, scripted, store };
-}
-
-function syncOver(store: HomeStore, mode: 'solo' | 'coop' = 'solo') {
-  const sent: HomeAction[] = [];
-  const credited: TripReceipt[] = [];
-  const sync = new HomeSync({ store, mode, sendHome: (action) => sent.push(action), onReceipt: (r) => credited.push(r) });
-  return { sync, sent, credited };
-}
-
-async function opened(store: HomeStore, mode: 'solo' | 'coop' = 'solo') {
-  const parts = syncOver(store, mode);
-  await parts.sync.open();
-  parts.sync.welcomed({ type: 'welcome', yourId: ME, tickRate: TICK_RATE, mapSeed: BUNKER_SEED, difficulty: 'stay_close' });
-  await parts.sync.settled();
-  return parts;
-}
-
-async function see(sync: HomeSync, ...frames: SnapshotPacket[]): Promise<void> {
-  for (const next of frames) {
-    sync.observe(next, ME);
-    await sync.settled();
-  }
-}
-
-const readyCalls = (sent: readonly HomeAction[]) => sent.filter((action) => action.kind === 'ready');
+import { ME, TOWN_SEED, entity, frame, atVan, inTown, receipt, trip, sharedStore, syncOver, opened, see, readyCalls, equipCalls, lockerGuns, holdingCarbine } from './helpers/home-sync-frames.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -109,22 +26,93 @@ describe('boarding the van', () => {
     const { sync, sent } = await opened(store);
     await see(sync, frame({ picked: 2, player: atVan }));
     expect(slot.save.openTrip).toMatchObject({ level: 2, mode: 'solo', difficulty: 'stay_close' });
-    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true, ownsGun: false }]);
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
   });
 
-  it('says a gun in the locker is owned, so no free pistol is issued', async () => {
-    const { store } = sharedStore({ locker: { ...emptyLoadout(), guns: { carbine: {} } } });
+  it('owning no gun at all boards as it is, for the free pistol', async () => {
+    const { store } = sharedStore();
     const { sync, sent } = await opened(store);
     await see(sync, frame({ picked: 2, player: atVan }));
-    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true, ownsGun: true }]);
+    expect(equipCalls(sent)).toEqual([]);
   });
 
-  it('does nothing until a level is picked', async () => {
-    const { slot, store } = sharedStore();
+  it('a gun already in hand boards with nothing moved', async () => {
+    const hands = { ...emptyLoadout(), guns: { pistol: {} } };
+    const { slot, store } = sharedStore({ hands, locker: lockerGuns });
     const { sync, sent } = await opened(store);
-    await see(sync, frame({ player: atVan }));
+    await see(sync, frame({ picked: 2, player: { ...atVan, owned: ['pistol'] } }));
+    expect(equipCalls(sent)).toEqual([]);
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
+    expect(slot.save.locker).toEqual(lockerGuns);
+  });
+
+  it('empty hands take the gun from the locker, and the trip opens once it is in the save', async () => {
+    const { slot, store } = sharedStore({ locker: lockerGuns });
+    const { sync, sent } = await opened(store);
+    await see(sync, frame({ picked: 2, player: atVan }));
+    expect(equipCalls(sent)).toHaveLength(1);
+    expect(readyCalls(sent)).toEqual([]);
+    expect(slot.save.openTrip).toBeNull();
+    await see(sync, frame({ tick: 101, picked: 2, player: holdingCarbine }));
+    expect(slot.save.hands.guns).toEqual({ carbine: {} });
+    expect(slot.save.hands.ammoBag.carbine).toBe(40);
+    expect(slot.save.locker.guns).toEqual({ pistol: {} });
+    expect(slot.save.locker.ammoBag.carbine).toBe(0);
+    expect(slot.save.locker.ammoBag.pistol).toBe(10);
+    await see(sync, frame({ tick: 102, picked: 2, player: holdingCarbine }));
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
+    expect(slot.save.openTrip).toMatchObject({ level: 2 });
+    expect(equipCalls(sent)).toHaveLength(1);
+  });
+
+  it('asks once while the room has not answered', async () => {
+    const { store } = sharedStore({ locker: lockerGuns });
+    const { sync, sent } = await opened(store);
+    await see(sync, frame({ picked: 2, player: atVan }), frame({ tick: 101, picked: 2, player: atVan }), frame({ tick: 102, picked: 2, player: atVan }));
+    expect(equipCalls(sent)).toHaveLength(1);
+  });
+
+  it('walking off mid-handover keeps the gun in hand and opens no trip', async () => {
+    const { slot, store } = sharedStore({ locker: lockerGuns });
+    const { sync, sent } = await opened(store);
+    await see(sync, frame({ picked: 2, player: atVan }));
+    await see(sync, frame({ tick: 101, picked: 2, player: { owned: ['carbine'], ammoBag: { pistol: 0, carbine: 40, shotgun: 0 } } }));
+    expect(slot.save.hands.guns).toEqual({ carbine: {} });
+    expect(slot.save.locker.guns).toEqual({ pistol: {} });
     expect(slot.save.openTrip).toBeNull();
     expect(readyCalls(sent)).toEqual([]);
+  });
+
+  it('a failed save of the handover settles on the retry, with no second gun', async () => {
+    const { slot, scripted, store } = sharedStore({ locker: lockerGuns });
+    const { sync, sent } = await opened(store);
+    await see(sync, frame({ picked: 2, player: atVan }));
+    scripted.push({ kind: 'failed', reason: 'quota' });
+    await see(sync, frame({ tick: 101, picked: 2, player: holdingCarbine }));
+    expect(readyCalls(sent)).toEqual([]);
+    await see(sync, frame({ tick: 101 + TICK_RATE * 3, picked: 2, player: holdingCarbine }), frame({ tick: 102 + TICK_RATE * 3, picked: 2, player: holdingCarbine }));
+    expect(slot.save.locker.guns).toEqual({ pistol: {} });
+    expect(slot.save.hands.guns).toEqual({ carbine: {} });
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
+  });
+
+  it('with no level picked, the van asks for the furthest the room has reached, and boards when it lands', async () => {
+    const { slot, store } = sharedStore();
+    const { sync, sent } = await opened(store);
+    await see(sync, frame({ player: atVan }), frame({ tick: 101, player: atVan }));
+    expect(sent.filter((action) => action.kind === 'pick_level')).toEqual([{ kind: 'pick_level', level: 3 }]);
+    expect(slot.save.openTrip).toBeNull();
+    expect(readyCalls(sent)).toEqual([]);
+    await see(sync, frame({ tick: 102, picked: 3, player: atVan }));
+    expect(slot.save.openTrip).toMatchObject({ level: 3 });
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
+  });
+
+  it('picks nothing away from the van, or for the dead, and leaves a pick alone', async () => {
+    const { store } = sharedStore();
+    const { sync, sent } = await opened(store);
+    await see(sync, frame(), frame({ tick: 101, player: { ...atVan, status: 'dead' } }), frame({ tick: 102, picked: 1, player: atVan }));
+    expect(sent.filter((action) => action.kind === 'pick_level')).toEqual([]);
   });
 
   it('stepping away before the van leaves cancels the trip', async () => {
@@ -132,7 +120,7 @@ describe('boarding the van', () => {
     const { sync, sent } = await opened(store);
     await see(sync, frame({ picked: 2, player: atVan }), frame({ picked: 2 }));
     expect(slot.save.openTrip).toBeNull();
-    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true, ownsGun: false }, { kind: 'ready', ready: false }]);
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }, { kind: 'ready', ready: false }]);
   });
 
   it('the player is never ready on a failed save', async () => {
@@ -158,7 +146,7 @@ describe('boarding the van', () => {
     const { sync, sent } = await opened(store);
     scripted.push({ kind: 'failed', reason: 'quota' });
     await see(sync, frame({ picked: 2, player: atVan }), frame({ tick: 110, picked: 2 }), frame({ tick: 100 + TICK_RATE * 3, picked: 2, player: atVan }));
-    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true, ownsGun: false }]);
+    expect(readyCalls(sent)).toEqual([{ kind: 'ready', ready: true }]);
     expect(sync.saveError).toBeNull();
   });
 

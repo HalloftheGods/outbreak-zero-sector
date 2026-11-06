@@ -9,6 +9,7 @@ import {
   TICK_DT,
 } from './constants.ts';
 import { stopSearch, updateSearch } from './container-search.ts';
+import { effectiveStance, updateStamina } from './stamina.ts';
 import { updateMelee } from './melee.ts';
 import { stepMovement } from './movement.ts';
 import { useMedkit } from './player-health.ts';
@@ -77,7 +78,7 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   if (input.heal === true) p.healQueued = true;
   p.throwQueued ||= input.throw === true;
   p.searchHeld = input.search === true;
-  p.stance = stanceOf(input);
+  p.stanceWanted = stanceOf(input);
   if (input.weapon) p.weaponQueued = input.weapon;
 }
 
@@ -116,12 +117,14 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   const dirX = Number(p.right) - Number(p.left);
   const dirY = Number(p.down) - Number(p.up);
   p.moving = dirX !== 0 || dirY !== 0;
+  p.stance = effectiveStance(p.stanceWanted, p.winded);
   if (p.moving) {
     const speed = playerSpeed(p.skin, p.stance) * groundSpeedScale(sim.level, sim.map, p.x, p.y);
     const moved = stepMovement(sim.map, p.x, p.y, dirX, dirY, speed, TICK_DT, PLAYER_RADIUS);
     p.x = moved.x;
     p.y = moved.y;
   }
+  updateStamina(p);
   footsteps(sim, p);
   p.indoors = buildingAt(sim.map, p.x, p.y)?.id ?? null;
   leaveFootprint(sim, p);

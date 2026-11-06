@@ -87,7 +87,7 @@ describe('the Sound Test lists', () => {
   });
 
   it('opens a level\'s tracks once it is reached', () => {
-    const entries = musicEntries({ highest: 3, finished: false }, false, new Set(LULLS[2].files));
+    const entries = musicEntries({ highest: 3, finished: false }, 'arcade', new Set(LULLS[2].files));
     expect(entries.filter((entry) => entry.where === 'LEVEL 03').every((entry) => entry.unlocked)).toBe(true);
     expect(entries.filter((entry) => entry.where === 'LEVEL 04').some((entry) => entry.unlocked)).toBe(false);
   });
@@ -95,20 +95,20 @@ describe('the Sound Test lists', () => {
   it('opens victory and credits only on finishing the game, and then everything', () => {
     const early = musicEntries({ highest: FINAL_LEVEL, finished: false });
     expect(early.filter((entry) => entry.where === 'VICTORY' || entry.where === 'CREDITS').some((entry) => entry.unlocked)).toBe(false);
-    const done = musicEntries({ highest: FINAL_LEVEL, finished: true }, false, ALL_FOUND);
+    const done = musicEntries({ highest: FINAL_LEVEL, finished: true }, 'arcade', ALL_FOUND);
     expect(done.every((entry) => entry.unlocked && entry.label === entry.name)).toBe(true);
     expect(FIRST_LEVEL).toBe(1);
   });
 
   it('keeps a level\'s finds as ??? until a Radio gives them up, and counts what is missing', () => {
     const progress = { highest: FINAL_LEVEL, finished: true };
-    const none = musicEntries(progress, false, new Set());
+    const none = musicEntries(progress, 'arcade', new Set());
     const finds = none.filter((entry) => entry.find);
     expect(finds.length).toBe(LULLS.reduce((sum, playlist) => sum + playlist.files.length - 1, 0));
     for (const entry of finds) expect(entry.label).toBe(HIDDEN_LABEL);
     expect(none.filter((entry) => entry.where === 'LEVEL 03' && !entry.find).every((entry) => entry.unlocked)).toBe(true);
     expect(findCount(none)).toEqual({ found: 0, total: finds.length });
-    const one = musicEntries(progress, false, new Set([LULLS[2].files[1]]));
+    const one = musicEntries(progress, 'arcade', new Set([LULLS[2].files[1]]));
     expect(findCount(one)).toEqual({ found: 1, total: finds.length });
     expect(one.find((entry) => entry.file === LULLS[2].files[1])?.label).toBe('Factory Raid');
   });
@@ -116,7 +116,7 @@ describe('the Sound Test lists', () => {
   it('lets the bunker jukebox play only what has been heard or found', () => {
     const progress = { highest: 3, finished: false };
     const found = new Set([LULLS[2].files[1]]);
-    const entries = jukeboxEntries(progress, false, found);
+    const entries = jukeboxEntries(progress, found);
     expect(entries.every((entry) => entry.unlocked)).toBe(true);
     expect(entries.map((entry) => entry.file)).toContain(LULLS[2].files[1]);
     expect(entries.map((entry) => entry.file)).not.toContain(LULLS[2].files[2]);

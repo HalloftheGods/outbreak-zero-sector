@@ -5,6 +5,7 @@ import { CHARACTERS } from './characters.ts';
 import type { DifficultyId } from './difficulty.ts';
 import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from './events.ts';
 import type { Point } from './flow-field.ts';
+import type { GameStyle } from './game-style.ts';
 import type { PartId } from './gun-upgrade-data.ts';
 import type { PlayerGear } from './gun-upgrades.ts';
 import type { HomeAction, HomeView, JoinHome, RoomHomeView, Station } from './home-protocol.ts';
@@ -57,6 +58,10 @@ export interface PlayerEntity {
   knife: boolean;
   /** Empty bottles to throw. Left off at none. */
   bottles?: number;
+  /** Sprint stamina, 1 full to 0 empty. Left off while full. */
+  stamina?: number;
+  /** Ran dry: sprint is off until the bar refills past the re-arm mark. Left off when not. */
+  winded?: boolean;
   /** 0 when not searching, otherwise 0..1 through the search. */
   search: number;
   /** Id of the building this player stands in, or null outdoors. */
@@ -275,14 +280,24 @@ export interface WelcomePacket {
   readonly resumed?: boolean;
 }
 
+/**
+ * What the room plays, or null for an empty one that the next join decides. Sent on connection, so a client
+ * knows what to bring before it joins, and again to a join that named another style, which the room did not take.
+ */
+export interface RoomPacket {
+  readonly type: 'room';
+  readonly style: GameStyle | null;
+}
+
 export type ServerPacket =
+  | RoomPacket
   | WelcomePacket
   | SnapshotPacket
   | { readonly type: 'player_disconnected'; readonly playerId: EntityId };
 
 export type ClientPacket =
-  /** The difficulty is read from the first player into an empty room and ignored from everyone after. */
-  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number; readonly home?: JoinHome }
+  /** The difficulty is read from the first player into an empty room and ignored from everyone after. The style must be the room's; an empty room takes it, and left off it is Arcade. */
+  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number; readonly home?: JoinHome; readonly style?: GameStyle }
   | { readonly type: 'input'; readonly input: ClientInputPacket }
   | { readonly type: 'bench'; readonly action: BenchAction }
   | { readonly type: 'home'; readonly action: HomeAction }

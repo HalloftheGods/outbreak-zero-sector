@@ -4,6 +4,7 @@ import { isDifficultyId } from '../../../shared/difficulty.ts';
 import { MERCHANT_IDS } from '../../../shared/home-protocol.ts';
 import { isJewels, isLoadout } from '../../network/home-guards.ts';
 import type { HomeSave, OpenTrip, TripRecord } from './home-store.ts';
+import { reviveQuests } from './quest-revive.ts';
 import type { ShopState } from './shop.ts';
 
 type Fields = Record<string, unknown>;
@@ -57,5 +58,6 @@ export function reviveSave(value: unknown, blank: HomeSave): HomeSave | null {
     appliedReceipts: listOf(value.appliedReceipts, isString),
     ledger: listOf(value.ledger, isTripRecord),
     shop: isShopState(value.shop) ? value.shop : blank.shop,
+    quests: reviveQuests(value.quests, blank.quests),
   };
 }

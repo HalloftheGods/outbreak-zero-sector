@@ -48,7 +48,8 @@ describe('magazine pages', () => {
   it('does not lay two chapters in a row out the same way', () => {
     const layouts = magazine.spreads.slice(FRONT_SPREADS).map((spread) => spread.pages[0].layout);
     layouts.slice(1).forEach((layout, index) => expect(layout).not.toBe(layouts[index]));
-    expect(new Set(layouts).size).toBe(layouts.length);
+    // Twenty chapters share thirteen layouts, so one can return, but never next door, and every layout is still printed.
+    expect(new Set(layouts).size).toBe(13);
   });
 
   it('numbers pages in order with the left page even', () => {

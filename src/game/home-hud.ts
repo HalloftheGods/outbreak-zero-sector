@@ -49,6 +49,8 @@ export interface HomeActions {
   pickLevel(level: number): void;
   equip(loadout: Loadout): void;
   closeStation(): void;
+  /** A screen with something still to settle says how to close it, so Esc does what its Close button does. Null when it goes. */
+  closeWith(closer: (() => void) | null): void;
   smelt(): void;
   /** Builds its `ShopContext` from `UiState.home` with `shopContext`, so a screen never has to. */
   buy(merchant: MerchantId, item: string): void;
@@ -61,6 +63,7 @@ export const NO_HOME_ACTIONS: HomeActions = {
   pickLevel() {},
   equip() {},
   closeStation() {},
+  closeWith() {},
   smelt() {},
   buy() {},
   wake() {},

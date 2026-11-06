@@ -1,4 +1,6 @@
 import { TICK_DT, TICK_RATE } from '../../shared/constants.ts';
+import { playsFromHome } from '../../shared/game-style.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import { GameSimulation } from '../../shared/simulation.ts';
@@ -44,10 +46,10 @@ export class LocalSession implements GameTransport {
 
   /**
    * Every run in solo gets a fresh city. Plain Play again goes back to level 1; Continue passes its level.
-   * Home play has no runs to restart: one sim stays up across trips, so its receipts keep their serials.
+   * Campaign has no runs to restart: one sim stays up across trips, so its receipts keep their serials.
    */
   requestRestart(fromLevel?: number): void {
-    if (this.options.homeLoop) return;
+    if (this.playsHome) return;
     this.options = { ...this.options, startLevel: fromLevel };
     this.clock.stop();
     this.beginRun();
@@ -65,10 +67,15 @@ export class LocalSession implements GameTransport {
     this.sim = null;
   }
 
+  private get playsHome(): boolean {
+    const style: GameStyle = this.options.style ?? 'arcade';
+    return playsFromHome(style);
+  }
+
   private beginRun(): void {
-    const { name, difficulty, character, startLevel, home, homeLoop } = this.options;
+    const { name, difficulty, character, startLevel, home } = this.options;
     const seed = Math.floor(Math.random() * 0x7fffffff);
-    const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: homeLoop });
+    const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: this.playsHome });
     sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);
     this.sim = sim;
     this.paused = false;

@@ -13,14 +13,10 @@ import type { HomeActions, HomeDeath, HomeFacts } from './home-hud.ts';
 import type { HomeStore } from './home/home-store.ts';
 import { HomeSync, joinHomeFor } from './home/home-sync.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
-import { loadLevelProgress, recordGameFinished, recordLevelCleared } from './level-progress.ts';
+import { loadCampaignProgress, recordCampaignFinished, recordLevelCleared } from './level-progress.ts';
 import { endingResult, recordTrip } from './trip-record.ts';
 
-/** A banner lasts this long, so a question still waiting is put again after it. */
-const ASK_AGAIN_MS = 2600;
-
-const VAN_HINT: Omit<Banner, 'key'> = { title: 'THE VAN IS IN THE GARAGE', subtitle: 'PICK A LEVEL AT THE MAP, THEN STAND IN THE RING', tone: 'hope' };
-const NO_GUN_ASK: Omit<Banner, 'key'> = { title: 'NO GUN IN HAND', subtitle: 'ONE WAITS IN THE LOCKER. PRESS ENTER TO GO WITHOUT', tone: 'danger' };
+const VAN_HINT: Omit<Banner, 'key'> = { title: 'THE VAN IS IN THE GARAGE', subtitle: 'STAND BESIDE IT TO LEAVE. THE MAP PICKS ANOTHER LEVEL', tone: 'hope' };
 
 /** The parts of the controller a home session reaches into. */
 export interface HomeLinkHost {
@@ -37,41 +33,41 @@ export interface HomeLinkHost {
 }
 
 export interface HomeLinkOptions {
-  /** The game is played from the bunker. */
-  readonly enabled: boolean;
   readonly store: () => HomeStore;
   readonly host: HomeLinkHost;
 }
 
+/** Stands idle until a Campaign run opens it, and an Arcade run never does. */
 export class HomeLink {
-  readonly enabled: boolean;
   /** What the screens can ask for. */
   readonly actions: HomeActions;
 
   private readonly createStore: () => HomeStore;
   private readonly host: HomeLinkHost;
   private sync: HomeSync | null = null;
-  private highest = loadLevelProgress().highest;
+  private highest = loadCampaignProgress().highest;
   private difficulty: DifficultyId = BASELINE_DIFFICULTY;
   /** The station this player has open. */
   private station: StationId | null = null;
+  /** What the open screen says closing means, if it has anything to settle first. */
+  private closer: (() => void) | null = null;
   private death: HomeDeath | null = null;
   private ending = false;
   /** The gear this trip took out, which a death takes with it. */
   private takenOut: Loadout = emptyLoadout();
   private greeted = false;
-  /** A word that the player is boarding with no gun, held back until they say they mean it. */
-  private heldReady: HomeAction | null = null;
-  private askedAtMs = Number.NEGATIVE_INFINITY;
+  private saidError: string | null = null;
 
-  constructor({ enabled, store, host }: HomeLinkOptions) {
-    this.enabled = enabled;
+  constructor({ store, host }: HomeLinkOptions) {
     this.createStore = store;
     this.host = host;
     this.actions = {
       pickLevel: (level) => this.send({ kind: 'pick_level', level }),
       equip: (loadout) => this.sync?.equip(loadout),
-      closeStation: () => void this.closeOpenStation(),
+      closeStation: () => void this.putStationAway(),
+      closeWith: (closer) => {
+        this.closer = closer;
+      },
       // The forge runs by itself for as long as the player stays at it.
       smelt: () => {},
       buy: (merchant, item) => this.buy(merchant, item),
@@ -105,18 +101,18 @@ export class HomeLink {
   /** Reads the save and settles what can be settled, then says what to bring to the room. */
   async open(kind: TransportKind): Promise<JoinHome> {
     this.close();
-    const sync = new HomeSync({
+    const current = (): boolean => this.sync === sync;
+    const sync: HomeSync = new HomeSync({
       store: this.createStore(),
       mode: kind,
       sendHome: (action) => this.send(action),
-      onChange: () => this.host.refresh(),
-      onReceipt: (receipt) => this.onReceipt(receipt),
+      onChange: () => current() && this.host.refresh(),
+      onReceipt: (receipt) => current() && this.onReceipt(receipt),
     });
     this.sync = sync;
     const save = await sync.open();
-    const progress = loadLevelProgress();
-    const stillCurrent = this.sync === sync;
-    if (stillCurrent) this.highest = progress.highest;
+    const progress = loadCampaignProgress();
+    if (current()) this.highest = progress.highest;
     return joinHomeFor(save, progress);
   }
 
@@ -135,28 +131,36 @@ export class HomeLink {
     sync.observe(snapshot, localId);
     this.watchStation(entity?.home?.station ?? null);
     this.greet(snapshot, nowMs);
-    this.askAgain(nowMs);
+    this.sayError(nowMs);
   }
 
-  /** Esc and the Close button: the room puts the station away, and the next snapshot says so. True if one was open. */
+  /** Esc: the same as the screen's Close button. True if a station was open. */
   closeOpenStation(): boolean {
+    const { closer } = this;
+    const screenCloses = closer !== null && this.station !== null;
+    if (!screenCloses) return this.putStationAway();
+    closer();
+    return true;
+  }
+
+  /** The room puts the station away, and the next snapshot says so. True if one was open. */
+  private putStationAway(): boolean {
     const nothingOpen = this.station === null;
     if (nothingOpen) return false;
     this.send({ kind: 'leave_station' });
     return true;
   }
 
-  /** Enter: reads the death summary, or means it about boarding without a gun. True if it did something. */
+  /** Enter: reads the death summary. True if it did something. */
   confirm(): boolean {
-    if (this.death) {
-      this.wake();
-      return true;
-    }
-    const held = this.heldReady;
-    if (!held) return false;
-    this.heldReady = null;
-    this.host.transport()?.sendHome(held);
+    if (!this.death) return false;
+    this.wake();
     return true;
+  }
+
+  /** The player is leaving the run for the menu: a boarded van that has not left is called off first. */
+  leave(): void {
+    this.sync?.leave();
   }
 
   /** The run is over, or this session was never going to start. */
@@ -164,36 +168,16 @@ export class HomeLink {
     this.sync?.close();
     this.sync = null;
     this.station = null;
+    this.closer = null;
     this.death = null;
     this.ending = false;
     this.takenOut = emptyLoadout();
     this.greeted = false;
-    this.heldReady = null;
+    this.saidError = null;
   }
 
   private send(action: HomeAction): void {
-    const isReadyWord = action.kind === 'ready';
-    if (isReadyWord) this.heldReady = null;
-    if (this.mustAsk(action)) {
-      this.heldReady = action;
-      this.askedAtMs = Number.NEGATIVE_INFINITY;
-      return;
-    }
     this.host.transport()?.sendHome(action);
-  }
-
-  /** Boarding with no gun in hand, while one waits in the locker, is a choice the room cannot make for them. */
-  private mustAsk(action: HomeAction): boolean {
-    const boardingForGood = action.kind === 'ready' && action.ready && action.ownsGun === true;
-    const handsHoldAGun = Object.keys(this.sync?.save?.hands.guns ?? {}).length > 0;
-    return boardingForGood && !handsHoldAGun;
-  }
-
-  private askAgain(nowMs: number): void {
-    const waiting = this.heldReady !== null && nowMs - this.askedAtMs >= ASK_AGAIN_MS;
-    if (!waiting) return;
-    this.askedAtMs = nowMs;
-    this.host.say(NO_GUN_ASK, nowMs);
   }
 
   private watchStation(station: StationId | null): void {
@@ -210,6 +194,14 @@ export class HomeLink {
     this.greeted = true;
     const newHere = save.ledger.length === 0;
     if (newHere) this.host.say(VAN_HINT, nowMs);
+  }
+
+  /** A save that did not land can hold the van back, and the locker and shops are not the only place to hear of it. */
+  private sayError(nowMs: number): void {
+    const error = this.sync?.saveError ?? null;
+    const isNew = error !== null && error !== this.saidError;
+    this.saidError = error;
+    if (isNew) this.host.say({ title: 'THE SAVE DID NOT LAND', subtitle: error.toUpperCase(), tone: 'danger' }, nowMs);
   }
 
   /** Credited here, once. */
@@ -232,7 +224,7 @@ export class HomeLink {
     this.highest = recordLevelCleared(receipt.level).highest;
     this.takenOut = emptyLoadout();
     if (!receipt.ending) return;
-    recordGameFinished();
+    recordCampaignFinished();
     const me = this.host.localPlayer();
     const survivor = { id: me?.id ?? '', name: me?.name ?? this.host.ui().callsign, skin: me?.skin ?? 0 };
     this.ending = true;

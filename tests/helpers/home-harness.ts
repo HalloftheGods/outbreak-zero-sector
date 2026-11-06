@@ -40,13 +40,13 @@ export function standAtStation(state: SimState, p: PlayerState, id: StationId): 
 }
 
 /** Everyone stands at the van ready for this level, as if they had reached it, and waits it out. */
-export function driveToTown(sim: GameSimulation, state: SimState, level = FIRST_LEVEL, ownsGun = false): void {
+export function driveToTown(sim: GameSimulation, state: SimState, level = FIRST_LEVEL): void {
   const [first] = state.players;
   sim.homeCommand(first.id, { kind: 'highest', highest: level });
   sim.homeCommand(first.id, { kind: 'pick_level', level });
   for (const p of state.players) {
     standAtVan(state, p);
-    sim.homeCommand(p.id, { kind: 'ready', ready: true, ownsGun });
+    sim.homeCommand(p.id, { kind: 'ready', ready: true });
   }
   steps(sim, VAN_WAIT_TICKS);
 }

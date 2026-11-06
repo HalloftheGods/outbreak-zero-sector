@@ -13,7 +13,7 @@ import type { PickupType } from '../shared/protocol.ts';
 import type { PlayerState, SimState } from '../shared/sim-state.ts';
 import type { GameSimulation } from '../shared/simulation.ts';
 import { isTreasurePickup } from '../shared/treasure.ts';
-import { settleHands } from '../src/game/home/gear-pool.ts';
+import { armedHands, settleHands } from '../src/game/home/gear-pool.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import type { HomeSave } from '../src/game/home/home-store.ts';
 import { applyReceipt } from '../src/game/home/trip-ledger.ts';
@@ -316,17 +316,21 @@ describe('the loop, over and over', () => {
     p.bottles = BOTTLE_CARRY;
   }
 
-  const ownsAGun = (save: HomeSave): boolean => Object.keys(save.locker.guns).length > 0;
+  /** The van puts a gun from the locker in empty hands, as HomeSync does at the ring. */
+  function handOver(sim: GameSimulation, id: string, save: HomeSave): HomeSave {
+    const gear = armedHands(save);
+    if (!gear) return save;
+    sim.homeCommand(id, { kind: 'equip', loadout: gear });
+    return settleHands(save, gear);
+  }
 
-  /** The save at the end, and for each trip whether the van issued a free pistol. */
-  function loopTrips(takeGearOut: boolean): { save: HomeSave; issued: boolean[] } {
+  /** The save at the end. */
+  function loopTrips(takeGearOut: boolean): HomeSave {
     const { sim, state } = homeSim();
-    const issued: boolean[] = [];
     let save = emptySave(SHOP_SEED);
     for (let trip = 0; trip < AMMO_TRIPS; trip++) {
-      if (takeGearOut) save = takeOutEverything(sim, state, 'a', save);
-      driveToTown(sim, state, FIRST_LEVEL, ownsAGun(save));
-      issued.push(playerNamed(state, 'a').owned.length === 1 && !takeGearOut);
+      save = takeGearOut ? takeOutEverything(sim, state, 'a', save) : handOver(sim, 'a', save);
+      driveToTown(sim, state);
       quietTown(state);
       if (takeGearOut) loadUp(state, playerNamed(state, 'a'));
       steps(sim, 2);
@@ -334,11 +338,11 @@ describe('the loop, over and over', () => {
       save = applyReceipt(save, receiptFor(state, 'a'));
       expectWithinCaps(save);
     }
-    return { save, issued };
+    return save;
   }
 
   it('repeated trips cannot grow ammo past the caps', () => {
-    const { locker } = loopTrips(true).save;
+    const { locker } = loopTrips(true);
     for (const weapon of WEAPON_ORDER) expect(locker.ammoBag[weapon]).toBe(WEAPONS[weapon].reserveCap);
     expect(locker.parts.barrel).toBe(PART_CARRY_CAP);
     expect(locker.medkits).toBe(MEDKIT_MAX);
@@ -346,9 +350,7 @@ describe('the loop, over and over', () => {
   }, SOAK_TIMEOUT_MS);
 
   it('the free pistol is issued only until a gun is owned, so empty trips cannot farm its rounds', () => {
-    const { save, issued } = loopTrips(false);
-    expect(issued[0]).toBe(true);
-    expect(issued.slice(1).some(Boolean)).toBe(false);
+    const save = loopTrips(false);
     expect(Object.keys(save.locker.guns)).toEqual(['pistol']);
     expect(save.locker.ammoBag.pistol).toBeLessThanOrEqual(WEAPONS.pistol.magSize + START_SPARE_ROUNDS);
     expect(save.locker.ammoBag.pistol).toBeGreaterThan(0);

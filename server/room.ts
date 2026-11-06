@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { MAX_PLAYERS, TICK_RATE } from '../shared/constants.ts';
-import type { DifficultyId } from '../shared/difficulty.ts';
-import type { JoinHome } from '../shared/home-protocol.ts';
+import { playsFromHome, STYLELESS_CLIENT } from '../shared/game-style.ts';
+import type { GameStyle } from '../shared/game-style.ts';
 import type { ClientPacket, ServerPacket, SnapshotPacket } from '../shared/protocol.ts';
 import type { GameSimulation } from '../shared/simulation.ts';
 import { viewFor } from '../shared/snapshot-view.ts';
@@ -10,6 +10,8 @@ import { MAX_BUFFERED_BYTES, MAX_CATCH_UP_TICKS, MAX_LAG_MS, ROOM_FULL_CODE } fr
 import { createRestartVote } from './restart-vote.ts';
 
 const TICK_MS = 1000 / TICK_RATE;
+
+type JoinPacket = Extract<ClientPacket, { type: 'join' }>;
 
 export interface Client {
   readonly socket: WebSocket;
@@ -28,6 +30,8 @@ export interface Client {
 export interface Room {
   readonly clients: Set<Client>;
   unjoined(): Client[];
+  /** Tells a new socket what the room plays, before it joins. */
+  greet(client: Client): void;
   receive(client: Client, packet: ClientPacket): void;
   disconnect(client: Client): void;
   /** Stops ticking and any pending vote. */
@@ -45,6 +49,29 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
 
   function send(client: Client, packet: ServerPacket): void {
     if (client.socket.readyState === WebSocket.OPEN) client.socket.send(JSON.stringify(packet));
+  }
+
+  /** What the room plays while someone is in it. An empty room plays nothing, so the next one in can change it. */
+  function roomStyle(): GameStyle | null {
+    if (sim.playerCount === 0) return null;
+    return sim.playsHome ? 'campaign' : 'arcade';
+  }
+
+  function greet(client: Client): void {
+    send(client, { type: 'room', style: roomStyle() });
+  }
+
+  /** True if this join can go ahead as the room's style. If not, it hears what the room plays, and a client that knows styles asks again with the right gear. */
+  function settleStyle(client: Client, asked: GameStyle | undefined): boolean {
+    const style = asked ?? STYLELESS_CLIENT;
+    const current = roomStyle();
+    if (current === null) sim.setHome(playsFromHome(style));
+    const agreed = current === null || current === style;
+    if (agreed) return true;
+    // A client from before styles has no way to play this room, and this is the nearest thing it can show.
+    if (asked === undefined) client.socket.close(ROOM_FULL_CODE, 'room full');
+    else greet(client);
+    return false;
   }
 
   /** Each client gets its own cut of the frame, unless it is already too far behind to take one. */
@@ -77,7 +104,7 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
     tickTimer = null;
   }
 
-  function join(client: Client, name: string, token: string, character?: number, difficulty?: DifficultyId, home?: JoinHome): void {
+  function join(client: Client, { name, token, character, difficulty, home, style }: JoinPacket): void {
     if (client.playerId) return;
     // A dropped link can outlive its refresh: the old socket goes and the new one takes that body over.
     const heldBy = sim.playerWithToken(token);
@@ -86,6 +113,7 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
       client.socket.close(ROOM_FULL_CODE, 'room full');
       return;
     }
+    if (!settleStyle(client, style)) return;
     const id = randomUUID();
     // The first player into an empty room sets how hard the run is.
     if (difficulty && sim.playerCount === 0) sim.setDifficulty(difficulty);
@@ -100,7 +128,7 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
   }
 
   function receive(client: Client, packet: ClientPacket): void {
-    if (packet.type === 'join') join(client, packet.name, packet.token, packet.character, packet.difficulty, packet.home);
+    if (packet.type === 'join') join(client, packet);
     else if (client.playerId === null) return;
     else if (packet.type === 'input') sim.setInput(client.playerId, packet.input);
     else if (packet.type === 'bench') sim.benchCommand(client.playerId, packet.action);
@@ -128,5 +156,5 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
     vote.end();
   }
 
-  return { clients, unjoined, receive, disconnect, shutdown };
+  return { clients, unjoined, greet, receive, disconnect, shutdown };
 }

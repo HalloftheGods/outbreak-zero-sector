@@ -1,3 +1,4 @@
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { Scene } from './music.ts';
 import { playlistFor } from './playlists.ts';
 import type { Playlist } from './playlists.ts';
@@ -30,6 +31,7 @@ export class Soundtrack {
   private playlist: Playlist | null = null;
   private scene: Scene = 'menu';
   private level = 1;
+  private style: GameStyle = 'arcade';
   private current: Track | null = null;
   /** Set while the Sound Test is playing one track on its own. */
   private auditionEnd: (() => void) | null = null;
@@ -50,6 +52,12 @@ export class Soundtrack {
   /** The town being played picks the music between hordes. */
   setLevel(level: number): void {
     this.level = level;
+    this.retune();
+  }
+
+  /** The run's style, which says what the bunker and level 6 play. */
+  setStyle(style: GameStyle): void {
+    this.style = style;
     this.retune();
   }
 
@@ -88,7 +96,7 @@ export class Soundtrack {
 
   private retune(): void {
     if (this.auditionEnd) return;
-    const playlist = playlistFor(this.scene, this.level);
+    const playlist = playlistFor(this.scene, this.level, this.style);
     const unchanged = playlist === this.playlist;
     if (unchanged) return;
     this.playlist = playlist;

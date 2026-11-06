@@ -1,20 +1,79 @@
-/** The Play page's three steps: how you play (mode, server, callsign), then the difficulty, then who you are (the survivor, where Start lives). The component only shows the step it is told; every move is decided here. */
-export type PlayStep = 'mode' | 'difficulty' | 'who';
+import type { GameStyle } from '../../shared/game-style.ts';
+import type { TransportKind } from '../network/transport.ts';
+
+/**
+ * The Play page's steps: the game style (Campaign or Arcade), how you play (mode, server, callsign), the difficulty, then who you are
+ * (the survivor, where Start lives). The component only shows the step it is told; every move is decided here.
+ */
+export type PlayStep = 'style' | 'mode' | 'difficulty' | 'who';
 export type PlayMode = 'solo' | 'multi';
 
 export interface PlayFlow {
   readonly step: PlayStep;
   readonly mode: PlayMode;
+  /** Whether the Style step is part of this walk. An invite link (the room decides) and a level picked on the Levels page (Arcade) settle the style already. */
+  readonly styled: boolean;
 }
 
-/** The steps in the order Next walks them. */
-const STEPS: readonly PlayStep[] = ['mode', 'difficulty', 'who'];
-const HEADINGS: Record<PlayStep, string> = { mode: 'Play', difficulty: 'Difficulty', who: 'Choose Survivor' };
+const WITH_STYLE: readonly PlayStep[] = ['style', 'mode', 'difficulty', 'who'];
+const WITHOUT_STYLE: readonly PlayStep[] = ['mode', 'difficulty', 'who'];
+const HEADINGS: Record<PlayStep, string> = { style: 'Choose Style', mode: 'Play', difficulty: 'Difficulty', who: 'Choose Survivor' };
 
-export const PLAY_START: PlayFlow = { step: 'mode', mode: 'solo' };
+/** A plain visit to Play: the style is the first thing to pick. */
+export const PLAY_START: PlayFlow = { step: 'style', mode: 'solo', styled: true };
 
-/** An invite link lands on the co-op setup step; the callsign is on that step, so nothing is skipped. */
-export const PLAY_JOIN: PlayFlow = { step: 'mode', mode: 'multi' };
+/** An invite link lands on the co-op setup step; the callsign is on that step, so nothing else is skipped. */
+export const PLAY_JOIN: PlayFlow = { step: 'mode', mode: 'multi', styled: false };
+
+/** A level picked on the Levels page: Arcade already, so the walk starts at how you play. */
+export const PLAY_LEVEL: PlayFlow = { step: 'mode', mode: 'solo', styled: false };
+
+export const STYLE_LABELS: Readonly<Record<GameStyle, string>> = { campaign: 'Campaign', arcade: 'Arcade' };
+
+/** Said on the setup page when Campaign could not start. */
+export const HOME_UNREADABLE = 'The game could not open your saved home.';
+
+/** Where the walk starts: an invite wins over a level, and a visit with neither starts on Style. */
+export function startFlow(join: boolean, level: number | null): PlayFlow {
+  if (picksStyle(join, level)) return PLAY_START;
+  return join ? PLAY_JOIN : PLAY_LEVEL;
+}
+
+/** The steps Next walks, in order. */
+export function playSteps(flow: PlayFlow): readonly PlayStep[] {
+  return flow.styled ? WITH_STYLE : WITHOUT_STYLE;
+}
+
+/** Starting from the Levels page means Arcade, so the run's style is the player's choice only when no level was picked. */
+export function setupStyle(level: number | null, chosen: GameStyle): GameStyle {
+  return level === null ? chosen : 'arcade';
+}
+
+/** The style the setup page may name: none on an invite link, since the room decides and only says so once the socket is open. */
+export function claimedStyle(join: boolean, runStyle: GameStyle): GameStyle | null {
+  return join ? null : runStyle;
+}
+
+/** The style is the player's to pick unless an invite (the room decides) or a level (Arcade) has already settled it. */
+export function picksStyle(join: boolean, level: number | null): boolean {
+  return !join && level === null;
+}
+
+/** A solo setup has no server to fail, so what an earlier co-op try left behind stays off it; only Campaign's unread save is worth saying there. */
+export function setupFailure(mode: PlayMode, runStyle: GameStyle, error: string | null): string | null {
+  const unreadSave = runStyle === 'campaign' && error === HOME_UNREADABLE;
+  return mode === 'multi' || unreadSave ? error : null;
+}
+
+/** An invite hides the style only while the room decides it: a player who turns to Solo plays their remembered one, and is told. */
+export function showsStyleLabel(join: boolean, mode: PlayMode): boolean {
+  return !join || mode === 'solo';
+}
+
+/** Continue is Arcade's, and only solo: co-op restarts stay at level 1, and a Campaign run has no level to go back to. */
+export function continuesAfterDeath(mode: TransportKind, runStyle: GameStyle | null): boolean {
+  return mode === 'solo' && runStyle === 'arcade';
+}
 
 export function chooseMode(flow: PlayFlow, mode: PlayMode): PlayFlow {
   return { ...flow, mode };
@@ -22,13 +81,15 @@ export function chooseMode(flow: PlayFlow, mode: PlayMode): PlayFlow {
 
 /** Enter, or the Next link: one step on, and the last step stays put (starting is the button's job). */
 export function advance(flow: PlayFlow): PlayFlow {
-  const next = STEPS[STEPS.indexOf(flow.step) + 1];
+  const steps = playSteps(flow);
+  const next = steps[steps.indexOf(flow.step) + 1];
   return next ? { ...flow, step: next } : flow;
 }
 
 /** Back or Esc: one step back, and the first step returns null, meaning leave Play for the title. */
 export function retreat(flow: PlayFlow): PlayFlow | null {
-  const earlier = STEPS[STEPS.indexOf(flow.step) - 1];
+  const steps = playSteps(flow);
+  const earlier = steps[steps.indexOf(flow.step) - 1];
   return earlier ? { ...flow, step: earlier } : null;
 }
 

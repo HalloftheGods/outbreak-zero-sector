@@ -1,5 +1,6 @@
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
-import type { HomeAction } from '../../shared/home-protocol.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
+import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, ClientPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { tapRoomDifficulty } from '../game/analytics/event-tap.ts';
@@ -46,8 +47,11 @@ export class SocketSession implements GameTransport {
   onWelcome: (packet: WelcomePacket) => void = () => {};
   onSnapshot: (packet: SnapshotPacket) => void = () => {};
   onClosed: (reason: string) => void = () => {};
+  /** What the room plays, or null for an empty one. Heard before joining, and answered with `join`; heard again if the room moved on first. */
+  onRoom: (style: GameStyle | null) => void = () => {};
 
   private readonly url: string;
+  private joiner: ConnectOptions = { name: '' };
   private socket: WebSocket | null = null;
   private timeout: ReturnType<typeof setTimeout> | null = null;
   private welcomed = false;
@@ -57,7 +61,9 @@ export class SocketSession implements GameTransport {
     this.url = url;
   }
 
-  connect({ name, difficulty, character, home }: ConnectOptions): void {
+  /** Opens the socket. The room speaks first, so nothing is sent until `onRoom` has been answered. */
+  connect(options: ConnectOptions): void {
+    this.joiner = options;
     let socket: WebSocket;
     try {
       socket = new WebSocket(this.url);
@@ -70,9 +76,14 @@ export class SocketSession implements GameTransport {
       this.finish(`No answer from ${this.url}. Is the server running?`);
     }, CONNECT_TIMEOUT_MS);
 
-    socket.onopen = () => this.send({ type: 'join', name, token: tabToken(), difficulty, character, home });
     socket.onmessage = (event) => this.receive(event.data);
     socket.onclose = (event) => this.finish(this.closeReason(event.code));
+  }
+
+  /** Asks in, as the style the room said it plays. Campaign brings its gear; Arcade has none to bring. */
+  join(style: GameStyle, home?: JoinHome): void {
+    const { name, difficulty, character } = this.joiner;
+    this.send({ type: 'join', name, token: tabToken(), difficulty, character, style, home });
   }
 
   sendInput(input: ClientInputPacket): void {
@@ -106,7 +117,9 @@ export class SocketSession implements GameTransport {
   private receive(raw: unknown): void {
     const packet = parseServerPacket(raw);
     if (!packet || this.finished) return;
-    if (packet.type === 'welcome') {
+    if (packet.type === 'room') {
+      if (!this.welcomed) this.onRoom(packet.style);
+    } else if (packet.type === 'welcome') {
       this.welcomed = true;
       this.clearTimeout();
       if (packet.difficulty) tapRoomDifficulty(packet.difficulty);
@@ -140,7 +153,6 @@ export class SocketSession implements GameTransport {
     const socket = this.socket;
     this.socket = null;
     if (!socket) return;
-    socket.onopen = null;
     socket.onmessage = null;
     socket.onclose = null;
     socket.close();

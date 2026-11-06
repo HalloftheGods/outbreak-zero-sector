@@ -16,7 +16,7 @@ import { stateOf } from './helpers/sim-harness.ts';
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4242, 0x7ffffffe];
 const TITLES = [
   'Silent Ruins', 'Escalation', 'Into the Breach', 'Abyssal Depths', 'Contamination Zone',
-  'Underground Bunker', 'Quarantine Breach', 'Frozen Wasteland', 'The Hive', 'Final Stand',
+  'Blackout', 'Quarantine Breach', 'Frozen Wasteland', 'The Hive', 'Final Stand',
 ];
 const FAR_FROM_ENTRY = 1000;
 

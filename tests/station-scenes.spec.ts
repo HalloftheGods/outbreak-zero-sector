@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest';
+import { CARD_H, CARD_W, cardOf } from '../src/art/difficulty-card.ts';
+import type { CardDef } from '../src/art/difficulty-card.ts';
+import { inPalette } from '../src/art/palette.ts';
+import { buildStationCards } from '../src/art/station-cards.ts';
+import { BENCH_CARD } from '../src/art/stations/bench.ts';
+import { FORGE_CARD } from '../src/art/stations/forge.ts';
+import { JUKEBOX_CARD } from '../src/art/stations/jukebox.ts';
+import { LOCKER_CARD } from '../src/art/stations/locker.ts';
+import type { PixelSprite } from '../src/art/types.ts';
+
+const CARDS: ReadonlyArray<readonly [string, CardDef]> = [
+  ['locker', LOCKER_CARD],
+  ['forge', FORGE_CARD],
+  ['jukebox', JUKEBOX_CARD],
+  ['bench', BENCH_CARD],
+];
+
+function alphaAt(sprite: PixelSprite, x: number, y: number): number {
+  return sprite.rgba[(y * sprite.w + x) * 4 + 3];
+}
+
+function colourAt(sprite: PixelSprite, x: number, y: number): string {
+  const at = (y * sprite.w + x) * 4;
+  return `${sprite.rgba[at]},${sprite.rgba[at + 1]},${sprite.rgba[at + 2]},${sprite.rgba[at + 3]}`;
+}
+
+/** Fraction of pixels that differ between two same-size sprites. */
+function differing(a: PixelSprite, b: PixelSprite): number {
+  let diff = 0;
+  for (let y = 0; y < CARD_H; y++) {
+    for (let x = 0; x < CARD_W; x++) if (colourAt(a, x, y) !== colourAt(b, x, y)) diff++;
+  }
+  return diff / (CARD_W * CARD_H);
+}
+
+describe('station scene pictures (#7210)', () => {
+  for (const [id, def] of CARDS) {
+    describe(id, () => {
+      it('is a CARD_H by CARD_W grid', () => {
+        expect(def.rows).toHaveLength(CARD_H);
+        expect(def.rows.map((row) => row.length)).toEqual(def.rows.map(() => CARD_W));
+      });
+
+      it('has every grid letter in its legend and every colour in the palette', () => {
+        const letters = new Set(def.rows.join('').replaceAll('.', ''));
+        const missing = [...letters].filter((letter) => !(letter in def.legend));
+        expect(missing).toEqual([]);
+        const off = Object.values(def.legend).filter((colour) => colour !== null && !inPalette(colour));
+        expect(off).toEqual([]);
+      });
+
+      it('builds a full-scene, hard-edged card', () => {
+        const sprite = cardOf(def);
+        expect([sprite.w, sprite.h]).toEqual([CARD_W, CARD_H]);
+
+        let opaque = 0;
+        const colours = new Set<string>();
+        for (let y = 0; y < CARD_H; y++) {
+          for (let x = 0; x < CARD_W; x++) {
+            const alpha = alphaAt(sprite, x, y);
+            expect([0, 255]).toContain(alpha);
+            if (alpha === 255) {
+              opaque++;
+              colours.add(colourAt(sprite, x, y));
+            }
+          }
+        }
+        expect(opaque / (CARD_W * CARD_H)).toBeGreaterThanOrEqual(0.92);
+        expect(colours.size).toBeLessThanOrEqual(28);
+      });
+    });
+  }
+
+  it('keys the built cards by station id, in order', () => {
+    expect(Object.keys(buildStationCards())).toEqual(['locker', 'forge', 'jukebox', 'bench']);
+  });
+
+  it('draws every pair of scenes at least 40% differently', () => {
+    const built = buildStationCards();
+    const ids = Object.keys(built) as Array<keyof typeof built>;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        expect(differing(built[ids[i]], built[ids[j]]), `${ids[i]} vs ${ids[j]}`).toBeGreaterThanOrEqual(0.4);
+      }
+    }
+  });
+});

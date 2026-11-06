@@ -1,4 +1,5 @@
 import { characterOf } from '../../shared/characters.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
 import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
 import { levelDef } from '../../shared/levels.ts';
@@ -57,6 +58,10 @@ export interface HudState {
   readonly kills: number;
   readonly bleedout: number;
   readonly revive: number;
+  /** Sprint stamina, 1 full to 0 empty. */
+  readonly stamina: number;
+  /** Out of breath: the bar is locked until it refills a little. */
+  readonly winded: boolean;
   readonly phase: GamePhase;
   readonly level: number;
   /** The van has come for this town. */
@@ -120,15 +125,20 @@ export interface UiState {
   readonly banner: Banner | null;
   readonly place: PlaceBanner | null;
   readonly levelCard: LevelCard | null;
-  /** The bunker and the trip, on a run in home mode. */
+  /** The bunker and the trip, on a Campaign run. */
   readonly home: HomeUi | null;
-  /** The game is played from the bunker. Known before any run, which `home` is not. */
-  readonly homeLoop: boolean;
+  /** The style the player last chose: what the Play page offers, and what an empty room is given. */
+  readonly style: GameStyle;
+  /** The style of the run under way, and null off a run. In co-op it is the room's, which can differ from `style`. */
+  readonly runStyle: GameStyle | null;
   readonly result: RunResult | null;
   readonly restarting: boolean;
   readonly lostReason: string;
   readonly signalWeak: boolean;
+  /** Arcade's best run. */
   readonly best: BestRun | null;
+  /** Campaign's best single trip, which a whole run is never compared to. */
+  readonly bestTrip: BestRun | null;
   readonly leaderboard: readonly LeaderboardEntry[];
   readonly callsign: string;
   readonly serverAddress: string;
@@ -156,6 +166,8 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     kills: local.kills,
     bleedout: local.bleedout,
     revive: local.revive,
+    stamina: local.stamina ?? 1,
+    winded: local.winded === true,
     phase: snapshot.phase,
     level: snapshot.level,
     exitOpen: snapshot.exit !== null,

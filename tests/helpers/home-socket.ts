@@ -69,7 +69,7 @@ export class HomeTab {
     const save = await this.sync.open();
     this.brought = joinHomeFor(save, { highest, finished });
     await this.client.opened();
-    this.client.send({ type: 'join', name: 'Tester', token, home: this.brought, ...(difficulty ? { difficulty } : {}) });
+    this.client.send({ type: 'join', name: 'Tester', token, style: 'campaign', home: this.brought, ...(difficulty ? { difficulty } : {}) });
     const welcome = await waitFor(() => this.client.received.find((packet) => packet.type === 'welcome'));
     this.welcome = welcome as WelcomePacket;
     this.id = this.welcome.yourId;

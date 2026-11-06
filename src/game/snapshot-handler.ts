@@ -5,7 +5,8 @@ import { recordGameFinished, recordLevelReached } from './level-progress.ts';
 import { finishRun } from './run-hud.ts';
 import { pickupNote } from './run-notices.ts';
 import type { RunHost } from './run-session.ts';
-import { loadBest, loadLeaderboard } from './storage.ts';
+import { loadLeaderboard } from './storage.ts';
+import { loadBests } from './trip-record.ts';
 
 const EVENT_MUSIC: Partial<Record<GameEvent['type'], 'wave' | 'intermission'>> = {
   wave_start: 'wave',
@@ -37,12 +38,13 @@ export class SnapshotHandler {
     audio.setLevel(snapshot.level);
     const before = world.localPlayer;
     const after = snapshot.players.find((player) => player.id === world.localId) ?? null;
-    // Reaching a town on a trip opens nothing: only the van home does, and that comes on a receipt.
     const onATrip = after?.home !== undefined;
-    const newLevel = snapshot.level > state.levelNoted;
+    // Reaching a town on a trip opens nothing: only the van home does, and that comes on a receipt.
+    const inArcade = snapshot.home === undefined;
+    const newLevel = inArcade && snapshot.level > state.levelNoted;
     if (newLevel) {
       state.levelNoted = snapshot.level;
-      if (!onATrip) recordLevelReached(snapshot.level);
+      recordLevelReached(snapshot.level);
     }
     this.setMood(snapshot, world.latest === null);
     state.lastSnapshotMs = now;
@@ -89,6 +91,6 @@ export class SnapshotHandler {
     state.gameOverAtMs = now;
     input.setEnabled(false);
     audio.setScene(won ? 'victory' : 'gameover');
-    this.host.publish({ paused: false, mapOpen: false, banner: null, place: null, best: loadBest(), leaderboard: loadLeaderboard() });
+    this.host.publish({ paused: false, mapOpen: false, banner: null, place: null, ...loadBests(), leaderboard: loadLeaderboard() });
   }
 }

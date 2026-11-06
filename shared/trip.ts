@@ -37,7 +37,6 @@ export function enterHome(sim: SimState, p: PlayerState, join?: JoinHome): void 
     highest: clampLevel(join?.highest),
     finished: join?.finished === true,
     lost: { silver: 0, jewels: { small: 0, large: 0 } },
-    ownsGun: false,
     lastActiveTick: sim.tick,
     leftTick: null,
   };
@@ -72,7 +71,7 @@ function setOut(sim: SimState, p: PlayerState): void {
   home.lastActiveTick = sim.tick;
   p.score = 0;
   p.kills = 0;
-  if (!home.ownsGun) issueFreePistol(p);
+  issueFreePistol(p);
 }
 
 /** The van leaves the bunker: a fresh town, and a clean slate for this trip's result. */
@@ -190,10 +189,7 @@ export function homeCommand(sim: SimState, p: PlayerState, action: HomeAction): 
       if (inBunker) equip(p, home, action.loadout);
       break;
     case 'ready':
-      if (inBunker) {
-        home.ready = action.ready;
-        home.ownsGun = action.ownsGun === true;
-      }
+      if (inBunker) home.ready = action.ready;
       break;
   }
 }

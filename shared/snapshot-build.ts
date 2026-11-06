@@ -55,6 +55,13 @@ function magazines(p: PlayerState): Record<WeaponId, number> {
   return Object.fromEntries(entries) as Record<WeaponId, number>;
 }
 
+/** Left off while the bar is full, which is nearly always. */
+function staminaField(p: PlayerState): Pick<PlayerEntity, 'stamina' | 'winded'> {
+  const tired = p.stamina < 1;
+  if (!tired) return {};
+  return { stamina: round2(p.stamina), ...(p.winded ? { winded: true } : {}) };
+}
+
 export function playerSnapshot(p: PlayerState): PlayerEntity {
   return {
     id: p.id,
@@ -77,6 +84,7 @@ export function playerSnapshot(p: PlayerState): PlayerEntity {
     medkits: p.medkits,
     knife: p.knife,
     ...(p.bottles > 0 ? { bottles: p.bottles } : {}),
+    ...staminaField(p),
     search: round2(p.search),
     indoors: p.indoors,
     reload: round2(p.reload),

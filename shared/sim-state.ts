@@ -42,8 +42,6 @@ export interface PlayerHome extends HomeView {
   finished: boolean;
   /** What `dropCarried` took off them on this trip, for a died receipt, since their carried treasure is gone by then. */
   lost: { silver: number; jewels: Jewels };
-  /** Said at the van: they own a gun they left in the locker, so boarding without one gets no free pistol. */
-  ownsGun: boolean;
   /** When they last pressed a key or had a station open. */
   lastActiveTick: number;
   /** When a body out on a trip lost its player, while its carried treasure waits out the grace period. Null otherwise. */
@@ -97,8 +95,16 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottl
   searchLeft: number;
   /** Health at the last tick, so a hit shows up as a drop. */
   searchHealth: number;
-  /** Sneaking, walking or sprinting, from the held keys. */
+  /** Sneaking, walking or sprinting, once a winded survivor's sprint is taken out. */
   stance: Stance;
+  /** What the held keys ask for, before stamina has its say. */
+  stanceWanted: Stance;
+  /** Sprint stamina, 1 full to 0 empty. */
+  stamina: number;
+  /** Ran dry and cannot sprint until the bar is back past the re-arm mark. */
+  winded: boolean;
+  /** Seconds until the bar starts to refill. */
+  staminaRest: number;
   /** Seconds until the next loud footstep while sprinting. */
   stepNoiseLeft: number;
 }

@@ -16,11 +16,12 @@
  * Compact keeps only the Players cells, the thumbnail under a roster tile.
  */
 import { computed } from 'vue';
+import type { GameStyle } from '../../shared/game-style.ts';
 import { modeFacts, PLAYER_SLOTS } from '../game/mode-select-view.ts';
 import type { PlayMode } from '../game/play-flow.ts';
 
-const { mode, compact = false } = defineProps<{ mode: PlayMode; compact?: boolean }>();
-const shown = computed(() => modeFacts(mode).filter((fact) => !compact || fact.filled !== undefined));
+const { mode, gameStyle = 'arcade', compact = false } = defineProps<{ mode: PlayMode; gameStyle?: GameStyle | null; compact?: boolean }>();
+const shown = computed(() => modeFacts(mode, gameStyle).filter((fact) => !compact || fact.filled !== undefined));
 </script>
 
 <style scoped>

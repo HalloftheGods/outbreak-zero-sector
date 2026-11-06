@@ -1,5 +1,7 @@
 // What the home screens say and decide. The components only lay these out.
 
+import { playsFromHome } from '../../shared/game-style.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import { EFFECT_ORDER, GUN_EFFECTS } from '../../shared/round-effect-data.ts';
 import { PART_LABELS, PART_ORDER } from '../../shared/gun-upgrade-data.ts';
 import type { Jewels, Loadout } from '../../shared/home-protocol.ts';
@@ -13,6 +15,9 @@ import { COOP_LEVEL_NOTE, startAtLabel } from './level-select.ts';
 const SMELT_SECONDS = 3;
 
 const WEAPON_LABELS: Readonly<Record<WeaponId, string>> = { pistol: 'Pistol', carbine: 'Carbine', shotgun: 'Shotgun' };
+
+/** Shown in place of either style's note on an invite link, where the room says which style it plays once connected. */
+export const ROOM_DECIDES_NOTE = 'The room decides the style.';
 
 export const HOME_COOP_NOTE = 'Pick the level at the garage map. The room can go as far as its best player has.';
 
@@ -224,17 +229,20 @@ export function aimsCursor(state: AimState): boolean {
 }
 
 export interface SetupLevelInput {
-  readonly homeLoop: boolean;
+  /** Null when the room decides (an invite link), so neither style's note is claimed. */
+  readonly style: GameStyle | null;
   readonly multi: boolean;
   readonly level: number | null;
   readonly unlocked: boolean;
   readonly chosen: number | null;
 }
 
-/** The level lines under the setup page. Home mode picks the level at the garage, so it shows none of its own. */
+/** The level lines under the setup page. Campaign picks the level at the garage, so it shows none of its own. */
 export function setupLevelLines(input: SetupLevelInput): { readonly startLine: string | null; readonly coopNote: string | null } {
-  const { homeLoop, multi, level, unlocked, chosen } = input;
-  if (homeLoop) return { startLine: null, coopNote: multi ? HOME_COOP_NOTE : null };
+  const { style, multi, level, unlocked, chosen } = input;
+  const roomDecides = style === null;
+  if (roomDecides) return { startLine: null, coopNote: multi ? ROOM_DECIDES_NOTE : null };
+  if (playsFromHome(style)) return { startLine: null, coopNote: multi ? HOME_COOP_NOTE : null };
   return {
     startLine: !multi && unlocked ? startAtLabel(level) : null,
     coopNote: multi && chosen !== null ? COOP_LEVEL_NOTE : null,

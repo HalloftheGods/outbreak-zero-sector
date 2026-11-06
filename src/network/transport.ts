@@ -1,4 +1,5 @@
 import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
@@ -11,10 +12,10 @@ export interface ConnectOptions {
   readonly difficulty?: DifficultyId;
   readonly character?: number;
   readonly startLevel?: number;
-  /** The gear and highest level this player brings. */
+  /** The gear and highest level this player brings to a Campaign run. */
   readonly home?: JoinHome;
-  /** Solo plays from the bunker. In co-op the server decides, and this is ignored. */
-  readonly homeLoop?: boolean;
+  /** Solo plays in this style, and left off that is Arcade. In co-op the room decides, so `SocketSession.join` is told instead. */
+  readonly style?: GameStyle;
 }
 
 /** The one seam between the game client and a simulation, in-browser or over ws. */

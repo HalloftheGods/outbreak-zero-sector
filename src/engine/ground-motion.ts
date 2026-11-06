@@ -43,6 +43,12 @@ const SPARKLE_COLOR = '#ffffff';
 const MAX_SPARKLES = 50;
 
 /** A fraction 0..1 that is the same for the same inputs. */
+/** A ripple runs longer the higher the swell. */
+export function rippleLength(swell: number): number {
+  if (swell > 0.75) return 4;
+  return swell > 0.45 ? 3 : 2;
+}
+
 function hash(a: number, b: number): number {
   const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
   return n - Math.floor(n);
@@ -138,7 +144,7 @@ export class GroundMotion {
         const wy = row * RIPPLE_CELL + hash(row, col) * RIPPLE_CELL + driftY;
         const sx = Math.round(wx - left);
         const sy = Math.round(wy - top);
-        const length = swell > 0.75 ? 4 : swell > 0.45 ? 3 : 2;
+        const length = rippleLength(swell);
         const x0 = sx - (length >> 1);
         const onScreen = x0 >= 0 && x0 + length <= viewW && sy >= 0 && sy < viewH;
         if (!onScreen || !this.openRun(left, top, x0, sy, length)) continue;

@@ -1,4 +1,6 @@
+import type { GameStyle } from '../../shared/game-style.ts';
 import { formatDuration } from './hud-state.ts';
+import { STYLE_LABELS } from './play-flow.ts';
 import type { SoundUnlock } from './sound-unlock.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
@@ -27,20 +29,20 @@ export const TITLE_MENU: readonly TitleMenuItem[] = [
   { page: 'options', label: 'Options' },
 ];
 
-/** The menu as this game shows it. Home mode picks its level at the garage map, so the Levels page goes. */
-export function titleMenu(homeLoop: boolean): readonly TitleMenuItem[] {
-  return homeLoop ? TITLE_MENU.filter((item) => item.page !== 'levels') : TITLE_MENU;
-}
+/** The Levels page belongs to Arcade; Campaign picks its level at the garage map in the bunker. */
+export const LEVELS_PAGE_NOTE = 'Arcade levels: pick one you have reached to start there. Campaign picks its level at the garage map.';
 
 export const CONTROLS: readonly (readonly [keys: string, action: string])[] = [
   ['WASD', 'Move'],
+  ['Shift', 'Hold to sprint, loud and it tires you out'],
+  ['C', 'Hold to sneak, slow and quiet'],
   ['Mouse', 'Aim, hold to fire'],
   ['F / Right', 'Shove & Stab, makes no noise'],
   ['E', 'Hold to search'],
   ['R', 'Reload'],
   ['H', 'Use a medkit'],
   ['1 2 3 Q', 'Weapons'],
-  ['Tab / N', 'Town map'],
+  ['Tab / N', 'Map'],
   ['Esc', 'Pause'],
   ['M', 'Mute'],
 ];
@@ -88,23 +90,14 @@ export interface RecordStat {
   readonly value: string;
 }
 
-const CLASSIC_TAGS = ['Best classic score', 'Classic hordes', 'Classic kills', 'Best classic time'] as const;
-const PLAIN_TAGS = ['Best score', 'Hordes', 'Kills', 'Best time'] as const;
+const RECORD_TAGS: Readonly<Record<GameStyle, readonly [string, string, string, string]>> = {
+  arcade: ['Best score', 'Hordes', 'Kills', 'Best time'],
+  campaign: ['Best trip score', 'Trip hordes', 'Trip kills', 'Best trip time'],
+};
 
-/** The trip-end recorder marks what it saves; an entry without the mark is a whole run from before the bunker. */
-interface TripMarked {
-  readonly trip?: boolean;
-}
-
-/** Once the game plays from the bunker, an unmarked entry is a whole run, which a trip cannot be compared to. */
-function isClassic(entry: TripMarked, homeLoop: boolean): boolean {
-  return homeLoop && entry.trip !== true;
-}
-
-export function recordStats(best: (BestRun & TripMarked) | null, homeLoop = false): readonly RecordStat[] {
-  const noRunYet = best === null;
-  const labelledClassic = noRunYet ? homeLoop : isClassic(best, homeLoop);
-  const tags = labelledClassic ? CLASSIC_TAGS : PLAIN_TAGS;
+/** A style's own best: Arcade's whole run, or Campaign's single trip. The two are never compared. */
+export function recordStats(best: BestRun | null, style: GameStyle = 'arcade'): readonly RecordStat[] {
+  const tags = RECORD_TAGS[style];
   return [
     { tag: tags[0], value: String(best?.score ?? 0) },
     { tag: tags[1], value: String(best?.wave ?? 0) },
@@ -113,6 +106,23 @@ export function recordStats(best: (BestRun & TripMarked) | null, homeLoop = fals
   ];
 }
 
+export interface RecordSection {
+  readonly style: GameStyle;
+  readonly heading: string;
+  readonly stats: readonly RecordStat[];
+}
+
+/** One block of stats for each style, Campaign first. A style with no run yet shows its empty stats. */
+export function recordSections(arcadeBest: BestRun | null, campaignBest: BestRun | null): readonly RecordSection[] {
+  return [
+    { style: 'campaign', heading: STYLE_LABELS.campaign, stats: recordStats(campaignBest, 'campaign') },
+    { style: 'arcade', heading: STYLE_LABELS.arcade, stats: recordStats(arcadeBest, 'arcade') },
+  ];
+}
+
+/** What a leaderboard row says about where it came from: a Campaign entry is one trip, an Arcade entry a whole run. */
+const ROW_LABELS: Readonly<Record<GameStyle, string>> = { campaign: 'Campaign trip', arcade: 'Arcade run' };
+
 const SHOWN_RUNS = 5;
 
 export interface RecordRow {
@@ -120,16 +130,16 @@ export interface RecordRow {
   readonly rank: string;
   readonly name: string;
   readonly score: number;
-  /** A whole run from before the bunker. */
-  readonly classic: boolean;
+  /** Where the run came from. */
+  readonly style: GameStyle;
+  /** The same, in words. */
+  readonly label: string;
 }
 
-export function recordRows(leaderboard: readonly (LeaderboardEntry & TripMarked)[], homeLoop = false): readonly RecordRow[] {
-  return leaderboard.slice(0, SHOWN_RUNS).map((entry, index) => ({
-    key: `${entry.timestamp}-${index}`,
-    rank: `#${index + 1}`,
-    name: entry.callsign || 'SURVIVOR',
-    score: entry.score,
-    classic: isClassic(entry, homeLoop),
-  }));
+/** The trip-end recorder marks what it saves, and an entry without the mark is a whole Arcade run. */
+export function recordRows(leaderboard: readonly (LeaderboardEntry & { readonly trip?: boolean })[]): readonly RecordRow[] {
+  return leaderboard.slice(0, SHOWN_RUNS).map((entry, index) => {
+    const style: GameStyle = entry.trip === true ? 'campaign' : 'arcade';
+    return { key: `${entry.timestamp}-${index}`, rank: `#${index + 1}`, name: entry.callsign || 'SURVIVOR', score: entry.score, style, label: ROW_LABELS[style] };
+  });
 }

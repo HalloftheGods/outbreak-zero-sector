@@ -1,18 +1,21 @@
 <template>
   <TitlePage heading="Records" @close="emit('close')">
-    <dl class="records-stats">
-      <div v-for="stat in stats" :key="stat.tag" class="records-stat">
-        <dt class="px-label">{{ stat.tag }}</dt>
-        <dd class="records-value">{{ stat.value }}</dd>
-      </div>
-    </dl>
+    <section v-for="section in sections" :key="section.style" class="records-section" :aria-label="section.heading">
+      <h2 class="px-label records-heading">{{ section.heading }}</h2>
+      <dl class="records-stats">
+        <div v-for="stat in section.stats" :key="stat.tag" class="records-stat">
+          <dt class="px-label">{{ stat.tag }}</dt>
+          <dd class="records-value">{{ stat.value }}</dd>
+        </div>
+      </dl>
+    </section>
 
     <div>
       <p class="px-label">Leaderboard</p>
       <ol v-if="rows.length > 0" class="px-rows">
         <li v-for="row in rows" :key="row.key" class="px-row">
           <span class="records-rank">{{ row.rank }}</span>
-          <span class="records-name">{{ row.name }}<span v-if="row.classic" class="records-classic"> classic</span></span>
+          <span class="records-name">{{ row.name }}<span class="records-style"> {{ row.label }}</span></span>
           <span class="records-score">{{ row.score }}</span>
         </li>
       </ol>
@@ -24,20 +27,31 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { UiState } from '../game/hud-state.ts';
-import { recordRows, recordStats } from '../game/title-menu.ts';
+import { recordRows, recordSections } from '../game/title-menu.ts';
 import TitlePage from './TitlePage.vue';
 
 const { ui } = defineProps<{ ui: UiState }>();
 const emit = defineEmits<{ close: [] }>();
 
-const stats = computed(() => recordStats(ui.best, ui.homeLoop));
-const rows = computed(() => recordRows(ui.leaderboard, ui.homeLoop));
+const sections = computed(() => recordSections(ui.best, ui.bestTrip));
+const rows = computed(() => recordRows(ui.leaderboard));
 </script>
 
 <style scoped>
+.records-section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 3);
+}
+
+.records-heading {
+  margin: 0;
+  color: var(--amber);
+}
+
 .records-stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--u) * 40), 1fr));
   gap: calc(var(--u) * 4);
   margin: 0;
 }
@@ -67,7 +81,9 @@ const rows = computed(() => recordRows(ui.leaderboard, ui.homeLoop));
   white-space: nowrap;
 }
 
-.records-classic {
+/* A margin, since the compiler drops the space a template leaves at the start of the span. */
+.records-style {
+  margin-left: calc(var(--u) * 4);
   color: var(--bone-dim);
 }
 

@@ -1,5 +1,6 @@
 <template>
   <TitlePage heading="Levels" size="wide" class="levels-screen" @close="emit('close')">
+    <p class="px-label levels-note">{{ LEVELS_PAGE_NOTE }}</p>
     <div class="levels">
       <SceneCard :sprite="featured.scene" :name="featured.name" :line="featured.line" :class="{ 'is-locked': !featured.unlocked }">
         <LevelBars :def="featured.def" />
@@ -20,6 +21,7 @@ import type { ArtBook } from '../art/types.ts';
 import { isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
 import { THEME_NAMES } from '../game/level-select.ts';
 import { LEVEL_SWATCH } from '../game/level-swatches.ts';
+import { LEVELS_PAGE_NOTE } from '../game/title-menu.ts';
 import LevelBars from './LevelBars.vue';
 import LevelGrid from './LevelGrid.vue';
 import type { LevelGridRow } from './LevelGrid.vue';
@@ -79,6 +81,10 @@ const rows = computed<readonly LevelGridRow[]>(() =>
 <style scoped>
 :deep(.px-sheet-body) {
   gap: calc(var(--u) * 2);
+}
+
+.levels-note {
+  margin: 0;
 }
 
 .levels {

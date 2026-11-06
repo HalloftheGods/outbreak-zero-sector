@@ -1,3 +1,4 @@
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import type { GunEffect } from '../../shared/round-effect-data.ts';
 import { HEARING_RANGE, Mixer } from './mixer.ts';
@@ -63,6 +64,7 @@ export class AudioEngine {
   private prefs: Prefs = loadPrefs();
   private scene: Scene = 'menu';
   private town = 1;
+  private style: GameStyle = 'arcade';
   private intensity = 0;
   private health = 1;
   private groanIn = 2;
@@ -81,6 +83,7 @@ export class AudioEngine {
         this.music.setIntensity(this.intensity);
         this.soundtrack = this.makeSoundtrack(this.mixer);
         this.soundtrack?.setLevel(this.town);
+        this.soundtrack?.setStyle(this.style);
         this.soundtrack?.setScene(this.scene);
       } catch {
         this.mixer = null;
@@ -111,6 +114,11 @@ export class AudioEngine {
 
   playUi(name: 'click' | 'hover' | 'start' | 'pause' | 'resume'): void {
     this.mixer?.play(`ui_${name}`);
+  }
+
+  /** The van's engine and door over the drive between the bunker and a town. */
+  playVan(name: 'depart' | 'arrive' | 'door'): void {
+    this.mixer?.play(`van_${name}`);
   }
 
   /** The Sound Test opens quiet: the scene's music steps aside until leavePreview(). */
@@ -158,6 +166,12 @@ export class AudioEngine {
   setLevel(level: number): void {
     this.town = level;
     this.soundtrack?.setLevel(level);
+  }
+
+  /** The style of the run being played, which picks the bunker's music and level 6's. */
+  setStyle(style: GameStyle): void {
+    this.style = style;
+    this.soundtrack?.setStyle(style);
   }
 
   setScene(scene: Scene): void {

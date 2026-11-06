@@ -21,7 +21,7 @@
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { loadSoundUnlock } from '../game/sound-unlock.ts';
 import { isConfirmKey, menuLabel, menuOwnsKey, menuStep, steppedIndex, TITLE_MENU } from '../game/title-menu.ts';
-import type { TitleMenuItem } from '../game/title-menu.ts';
+import type { KeyFocus, TitleMenuItem } from '../game/title-menu.ts';
 import type { TitlePage } from '../game/title-menu.ts';
 import { useGame } from './use-game.ts';
 
@@ -56,15 +56,19 @@ function open(index: number): void {
   emit('open', entries[index].page);
 }
 
+function focusOf(eventTarget: EventTarget | null): KeyFocus {
+  const target = eventTarget instanceof Element ? eventTarget : null;
+  const focusInMenu = target !== null && menu.value?.contains(target) === true;
+  const focusOnControl = target !== null && target.closest(CONTROLS) !== null;
+  return { focusInMenu, focusOnControl };
+}
+
 /**
  * Listens as the page bubbles, not in capture: the studio splash stops a key on its way
  * down, so the key that skips the splash never opens a page behind it.
  */
 function onKey(event: KeyboardEvent): void {
-  const target = event.target instanceof Element ? event.target : null;
-  const focusInMenu = target !== null && menu.value?.contains(target) === true;
-  const focusOnControl = target !== null && target.closest(CONTROLS) !== null;
-  const otherControlHasFocus = !menuOwnsKey({ focusInMenu, focusOnControl });
+  const otherControlHasFocus = !menuOwnsKey(focusOf(event.target));
   if (otherControlHasFocus) return;
   const browserShortcut = event.ctrlKey || event.metaKey || event.altKey;
   const step = browserShortcut ? 0 : menuStep(event.code);

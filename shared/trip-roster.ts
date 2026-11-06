@@ -50,6 +50,17 @@ export function arriveInRoom(sim: SimState, p: PlayerState): void {
   syncRoomHighest(sim);
 }
 
+/**
+ * Whether the room holds this body for its token to come back to. In the bunker with nothing at stake (not ready for the van, no result left to credit) the
+ * save is the newer word on the gear and the level, since a solo run can have changed both while the tab was away, so the body goes and a rejoin is a newcomer.
+ */
+export function keepsBodyOnLeaving(sim: SimState, p: PlayerState): boolean {
+  const { home } = p;
+  const inBunker = sim.homeRun !== null && sim.homeRun.tripLevel === null;
+  const nothingAtStake = home !== null && !home.ready && home.receipt === null;
+  return !(inBunker && nothingAtStake);
+}
+
 /** Closing the tab is never an escape: a downed body or one nobody can reclaim drops at once, and the rest get the grace period. */
 export function leaveRoom(sim: SimState, p: PlayerState): void {
   const { home } = p;

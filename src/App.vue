@@ -14,15 +14,16 @@
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
       <WorkbenchScreen v-if="ui.hud?.bench && ui.art" :hud="ui.hud" :bench="ui.hud.bench" :art="ui.art" />
       <template v-if="ui.home">
-        <LockerScreen v-if="ui.home.station === 'locker'" :home="ui.home" />
-        <ForgeScreen v-else-if="ui.home.station === 'forge'" :home="ui.home" />
-        <GarageMap v-else-if="ui.home.station === 'level_map'" :home="ui.home" />
-        <JukeboxScreen v-else-if="ui.home.station === 'jukebox'" />
+        <LockerScreen v-if="ui.home.station === 'locker'" :home="ui.home" :art="ui.art" />
+        <ForgeScreen v-else-if="ui.home.station === 'forge'" :home="ui.home" :art="ui.art" />
+        <GarageMap v-else-if="ui.home.station === 'level_map'" :home="ui.home" :art="ui.art" />
+        <JukeboxScreen v-else-if="ui.home.station === 'jukebox'" :art="ui.art" />
         <MerchantScreen v-else-if="ui.home.shop && ui.art" :home="ui.home" :art="ui.art" />
         <DeathSummary v-if="ui.home.death" :death="ui.home.death" />
       </template>
-      <TownMap v-if="ui.mapOpen" :mode="ui.mode" />
+      <TownMap v-if="ui.mapOpen" :mode="ui.mode" :in-bunker="ui.home?.inBunker === true" />
       <PauseMenu v-if="ui.paused" :ui :mode="ui.mode" />
+      <VanTransition :in-bunker="ui.home?.inBunker ?? null" :art="ui.art" />
     </template>
 
     <EndingFlow v-else-if="ui.screen === 'gameover' && ui.result && ui.result.stats.outcome === 'victory'" :result="ui.result" :art="ui.art" />
@@ -63,6 +64,7 @@ import TitleScreen from './components/TitleScreen.vue';
 import TouchControls from './components/TouchControls.vue';
 import TownMap from './components/TownMap.vue';
 import { GAME_KEY } from './components/use-game.ts';
+import VanTransition from './components/VanTransition.vue';
 import WaveBanner from './components/WaveBanner.vue';
 import WorkbenchScreen from './components/WorkbenchScreen.vue';
 import { privacyOpen, startAnalytics } from './game/analytics/index.ts';

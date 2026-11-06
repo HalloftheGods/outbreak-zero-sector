@@ -88,6 +88,9 @@ export const SFX = {
   ui_start: def(U.uiStart, 0.6, { gain: 1.4, voices: 1, cooldown: 0.3, vary: 0 }),
   ui_pause: def(U.uiPause, 0.3, { gain: 1.2, voices: 1, cooldown: 0.1, vary: 0 }),
   ui_resume: def(U.uiResume, 0.3, { gain: 1.2, voices: 1, cooldown: 0.1, vary: 0 }),
+  van_depart: def(U.vanDepart, 2.0, { gain: 1.2, voices: 1, cooldown: 0.5, vary: 0.02 }),
+  van_arrive: def(U.vanArrive, 1.7, { gain: 1.2, voices: 1, cooldown: 0.5, vary: 0.02 }),
+  van_door: def(U.vanDoor, 0.45, { gain: 1.4, voices: 1, cooldown: 0.3, vary: 0.04 }),
 } as const satisfies Record<string, SfxDef>;
 
 export type SfxName = keyof typeof SFX;

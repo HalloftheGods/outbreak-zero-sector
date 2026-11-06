@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { trackTitlePage } from '../game/analytics/index.ts';
-import { loadLevelProgress } from '../game/level-progress.ts';
+import { loadFurthestProgress } from '../game/level-progress.ts';
 import { FINDS_HINT, findCount, musicEntries, playEntry, sfxEntries } from '../game/sound-test.ts';
 import type { SoundEntry } from '../game/sound-test.ts';
 import PixelButton from './PixelButton.vue';
@@ -41,7 +41,7 @@ import { useGame } from './use-game.ts';
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 trackTitlePage('sound');
-const music = musicEntries(loadLevelProgress());
+const music = musicEntries(loadFurthestProgress(), game.ui.value.style);
 const sections = [
   { heading: 'Music', entries: music },
   { heading: 'Sound effects', entries: sfxEntries() },
@@ -111,8 +111,8 @@ onBeforeUnmount(() => {
 
 .sound-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 84), 1fr));
-  gap: calc(var(--u) * 2);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(var(--u) * 4);
   margin: 0;
   padding: calc(var(--u) * 2);
   list-style: none;

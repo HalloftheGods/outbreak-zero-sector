@@ -1,11 +1,13 @@
 import type { ShallowRef } from 'vue';
+import { playsFromHome } from '../../shared/game-style.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { JoinHome } from '../../shared/home-protocol.ts';
 import type { SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/protocol.ts';
 import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
-import type { ConnectOptions, GameTransport } from '../network/transport.ts';
+import type { GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
 import { ClientWorld } from './client-world.ts';
 import { loadCharacter } from './character-pref.ts';
@@ -15,13 +17,14 @@ import type { RunResult, UiState } from './hud-state.ts';
 import type { InputManager } from './input-manager.ts';
 import type { InputSender } from './input-sender.ts';
 import { continueLevel, loadLevelProgress, soloStartLevel } from './level-progress.ts';
+import { continuesAfterDeath, HOME_UNREADABLE } from './play-flow.ts';
 import { NO_RUN_UI } from './run-hud.ts';
 import type { RunHud } from './run-hud.ts';
 import type { RunStage } from './run-stage.ts';
-import { loadBest, loadLeaderboard } from './storage.ts';
+import { loadLeaderboard } from './storage.ts';
+import { loadBests } from './trip-record.ts';
 
 const FALLBACK_CALLSIGN = 'SURVIVOR';
-const HOME_UNREADABLE = 'The game could not open your saved home.';
 
 /** What a run keeps between snapshots, shared by the session and the snapshot handler. */
 export interface RunState {
@@ -61,27 +64,31 @@ export function newRunState(): RunState {
 
 /** Starts, restarts and ends a run: the connection from menu to welcome to menu. */
 export class RunSession {
+  /** Counts reads of the save, so a room that changes its answer outdates the read before it. */
+  private homeReads = 0;
+
   constructor(
     private readonly host: RunHost,
     private readonly onSnapshot: (snapshot: SnapshotPacket) => void,
   ) {}
 
-  /** A fresh solo run from level 1, or from `fromLevel` with the return kit. */
-  startSolo(fromLevel?: number): void {
+  /** A fresh solo run: Campaign into the bunker, Arcade at level 1, or Arcade from `fromLevel` with the return kit. */
+  startSolo(style: GameStyle, fromLevel?: number): void {
     if (!this.canStart()) return;
     this.host.audio.unlock();
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'solo', error: null });
-    this.beginSession(new LocalSession(), fromLevel);
+    this.beginSession(new LocalSession(), style, fromLevel);
   }
 
-  /** Solo from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
+  /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
   continueSolo(chosen?: number): void {
     const level = soloStartLevel(chosen, loadLevelProgress());
-    if (level !== null) this.startSolo(level);
+    if (level !== null) this.startSolo('arcade', level);
   }
 
-  startCoop(): void {
+  /** `style` is offered to an empty room. A room already playing keeps its own, and this run follows it. */
+  startCoop(style: GameStyle): void {
     if (!this.canStart()) return;
     this.host.audio.unlock();
     const url = resolveServerUrl(this.host.ui.value.serverAddress, window.location);
@@ -92,7 +99,9 @@ export class RunSession {
     }
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'coop', error: null, connecting: true });
-    this.beginSession(new SocketSession(url));
+    const session = new SocketSession(url);
+    session.onRoom = (room) => this.answerRoom(session, room ?? style);
+    this.beginSession(session, style);
   }
 
   playAgain(fromLevel?: number): void {
@@ -105,15 +114,17 @@ export class RunSession {
     state.transport?.requestRestart(fromLevel);
   }
 
-  /** After a solo death: back in at the furthest level reached. Co-op restarts stay at level 1. */
+  /** After a solo death in Arcade: back in at the furthest level reached. Co-op restarts stay at level 1. */
   continueAgain(): void {
-    if (this.host.state.transport?.kind !== 'solo') return;
+    const { mode, runStyle } = this.host.ui.value;
+    if (!continuesAfterDeath(mode, runStyle)) return;
     const level = continueLevel(loadLevelProgress());
     if (level !== null) this.playAgain(level);
   }
 
   toMenu(): void {
     const { state, input, audio, titleMap, renderer } = this.host;
+    this.host.home.leave();
     this.host.home.close();
     state.transport?.disconnect();
     state.transport = null;
@@ -124,7 +135,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, best: loadBest(), leaderboard: loadLeaderboard() });
+    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, runStyle: null, ...loadBests(), leaderboard: loadLeaderboard() });
   }
 
   onWelcome(packet: WelcomePacket): void {
@@ -151,7 +162,7 @@ export class RunSession {
     this.host.home.close();
     state.transport = null;
     if (!state.welcomed) {
-      this.host.publish({ connecting: false, error: reason });
+      this.host.publish({ connecting: false, runStyle: null, error: reason });
       return;
     }
     state.world = null;
@@ -161,7 +172,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'lost', lostReason: reason });
+    this.host.publish({ ...NO_RUN_UI, screen: 'lost', runStyle: null, lostReason: reason });
   }
 
   private canStart(): boolean {
@@ -169,36 +180,58 @@ export class RunSession {
     return art !== null && !connecting && screen === 'title';
   }
 
-  private beginSession(transport: GameTransport, startLevel?: number): void {
-    const { state, ui, home } = this.host;
+  /** The run plays this style from here on. What the player last chose stays apart from it, in `ui.style`. */
+  private followStyle(style: GameStyle): void {
+    this.host.audio.setStyle(style);
+    this.host.publish({ runStyle: style });
+  }
+
+  private beginSession(transport: GameTransport, style: GameStyle, startLevel?: number): void {
+    const { state, ui } = this.host;
     state.transport = transport;
     state.welcomed = false;
     transport.onWelcome = (packet) => this.onWelcome(packet);
     transport.onSnapshot = this.onSnapshot;
     transport.onClosed = (reason) => this.onClosed(reason);
-    const options = { name: ui.value.callsign.trim() || FALLBACK_CALLSIGN, difficulty: loadDifficulty(), character: loadCharacter() };
-    if (!home.enabled) {
-      transport.connect({ ...options, startLevel });
+    this.followStyle(style);
+    const options = { name: ui.value.callsign.trim() || FALLBACK_CALLSIGN, difficulty: loadDifficulty(), character: loadCharacter(), style };
+    const roomDecides = transport.kind === 'coop';
+    if (roomDecides || !playsFromHome(style)) transport.connect({ ...options, startLevel });
+    else this.readHome(transport, (home) => transport.connect({ ...options, home }));
+  }
+
+  /** The room has said what it plays, and the screens, the music and the save follow it. */
+  private answerRoom(session: SocketSession, style: GameStyle): void {
+    this.followStyle(style);
+    if (playsFromHome(style)) {
+      this.readHome(session, (home) => session.join(style, home));
       return;
     }
-    this.connectHome(transport, options);
+    this.homeReads += 1;
+    this.host.home.close();
+    session.join(style);
   }
 
   /** The save is read first, so the room hears of the gear before it hears of the player. A level is picked at the garage, not here. */
-  private connectHome(transport: GameTransport, options: Pick<ConnectOptions, 'name' | 'difficulty' | 'character'>): void {
+  private readHome(transport: GameTransport, bring: (home: JoinHome) => void): void {
     const { state, home } = this.host;
     this.host.publish({ connecting: true });
-    const stillWanted = (): boolean => state.transport === transport;
-    const connect = (join: JoinHome): void => {
+    this.homeReads += 1;
+    const read = this.homeReads;
+    const stillWanted = (): boolean => state.transport === transport && read === this.homeReads;
+    const answer = (join: JoinHome): void => {
       const wanted = stillWanted();
-      if (wanted) transport.connect({ ...options, home: join, homeLoop: true });
+      if (wanted) bring(join);
     };
     const giveUp = (): void => {
       const gone = !stillWanted();
       if (gone) return;
       state.transport = null;
-      this.host.publish({ connecting: false, error: HOME_UNREADABLE });
+      transport.disconnect();
+      // Left open, the next run would write through a save that never finished opening.
+      home.close();
+      this.host.publish({ connecting: false, runStyle: null, error: HOME_UNREADABLE });
     };
-    void home.open(transport.kind).then(connect, giveUp);
+    void home.open(transport.kind).then(answer, giveUp);
   }
 }

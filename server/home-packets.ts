@@ -16,11 +16,7 @@ function parseEquip(value: Record<string, unknown>): HomeAction | null {
   return loadout ? { kind: 'equip', loadout } : null;
 }
 
-function parseReady({ ready, ownsGun }: Record<string, unknown>): HomeAction | null {
-  const flags = typeof ready === 'boolean' && (ownsGun === undefined || typeof ownsGun === 'boolean');
-  if (!flags) return null;
-  return { kind: 'ready', ready, ...(ownsGun === true ? { ownsGun } : {}) };
-}
+const parseReady = ({ ready }: Record<string, unknown>): HomeAction | null => (typeof ready === 'boolean' ? { kind: 'ready', ready } : null);
 
 const ACTION_PARSERS: Readonly<Record<HomeAction['kind'], (value: Record<string, unknown>) => HomeAction | null>> = {
   pick_level: ({ level }) => (isLevel(level) ? { kind: 'pick_level', level } : null),

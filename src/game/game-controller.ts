@@ -1,5 +1,6 @@
 import { shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { WorldMap } from '../../shared/protocol.ts';
 import { generateWorldMap } from '../../shared/world-map.ts';
 import { buildArtBook } from '../art/index.ts';
@@ -13,7 +14,6 @@ import { BenchLink } from './bench-link.ts';
 import type { ClientWorld } from './client-world.ts';
 import { HomeLink } from './home-link.ts';
 import type { HomeLinkHost } from './home-link.ts';
-import { homeLoopOn } from './home-mode.ts';
 import type { HomeActions } from './home-hud.ts';
 import { createBrowserHomeStore } from './home/browser-home-store.ts';
 import type { HomeStore } from './home/home-store.ts';
@@ -26,7 +26,9 @@ import { newRunState, RunSession } from './run-session.ts';
 import type { RunHost, RunState } from './run-session.ts';
 import { RunStage } from './run-stage.ts';
 import { SnapshotHandler } from './snapshot-handler.ts';
-import { DEFAULT_PREFS, loadBest, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
+import { DEFAULT_PREFS, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
+import { loadStyle, saveStyle } from './style-pref.ts';
+import { loadBests } from './trip-record.ts';
 import { isTouchDevice } from './touch-input.ts';
 import { touchMarks } from './touch-marks.ts';
 import { fitWindow, watchDpr } from './view-fit.ts';
@@ -41,8 +43,6 @@ const ART_DELAY_MS = 40;
 type UiSound = 'click' | 'hover' | 'start' | 'pause' | 'resume';
 
 export interface GameControllerOptions {
-  /** Plays from the bunker. By default the page decides: once the switch is flipped, or in a dev build with `?home`. */
-  readonly homeLoop?: boolean;
   /** Where the home save lives. */
   readonly homeStore?: () => HomeStore;
 }
@@ -78,7 +78,6 @@ export class GameController {
 
   constructor(options: GameControllerOptions = {}) {
     const prefs = loadPrefs();
-    const homeLoop = options.homeLoop ?? homeLoopOn(window.location.search ?? '', import.meta.env.DEV);
     this.ui = shallowRef<UiState>({
       touch: isTouchDevice(),
       screen: 'title',
@@ -86,18 +85,19 @@ export class GameController {
       mode: 'solo',
       connecting: false,
       error: null,
-      homeLoop,
+      style: loadStyle(),
+      runStyle: null,
       ...NO_RUN_UI,
       lostReason: '',
       signalWeak: false,
-      best: loadBest(),
+      ...loadBests(),
       leaderboard: loadLeaderboard(),
       callsign: prefs.callsign || DEFAULT_PREFS.callsign,
       serverAddress: prefs.serverAddress,
       volume: this.audio.volume,
       muted: this.audio.muted,
     });
-    this.homeLink = new HomeLink({ enabled: homeLoop, store: options.homeStore ?? createBrowserHomeStore, host: this.homeHost() });
+    this.homeLink = new HomeLink({ store: options.homeStore ?? createBrowserHomeStore, host: this.homeHost() });
     this.home = this.homeLink.actions;
     this.runHud = new RunHud(() => this.ui.value, (patch) => this.publish(patch), () => this.homeLink.facts());
     this.stage = new RunStage(this.runHud, () => this.renderer);
@@ -238,18 +238,25 @@ export class GameController {
     this.audio.playUi(sound);
   }
 
-  /** A fresh solo run from level 1, or from `fromLevel` with the return kit. */
-  startSolo(fromLevel?: number): void {
-    this.session.startSolo(fromLevel);
+  /** The player's pick on the Play page, remembered for next time. Starting a run does not change it. */
+  chooseStyle(style: GameStyle): void {
+    saveStyle(style);
+    this.publish({ style });
   }
 
-  /** Solo from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
+  /** A fresh solo run in `style`, by default the one the player last chose. */
+  startSolo(style: GameStyle = this.ui.value.style): void {
+    this.session.startSolo(style);
+  }
+
+  /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
   continueSolo(chosen?: number): void {
     this.session.continueSolo(chosen);
   }
 
-  startCoop(): void {
-    this.session.startCoop();
+  /** Co-op. `style`, by default the one the player last chose, goes to an empty room; a room in play keeps its own and the run follows it. */
+  startCoop(style: GameStyle = this.ui.value.style): void {
+    this.session.startCoop(style);
   }
 
   /** A menu is over the game: solo stops, and co-op stands still while the town carries on. */
@@ -307,7 +314,7 @@ export class GameController {
     this.session.playAgain(fromLevel);
   }
 
-  /** After a solo death: back in at the furthest level reached. Co-op restarts stay at level 1. */
+  /** After a solo death in Arcade: back in at the furthest level reached. Co-op restarts stay at level 1. */
   continueAgain(): void {
     this.session.continueAgain();
   }

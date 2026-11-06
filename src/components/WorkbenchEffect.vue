@@ -1,30 +1,36 @@
 <template>
   <section class="bench-effect" :aria-label="`Rounds for ${WEAPONS[weapon].label}`">
-    <p class="bench-effect-now" :class="{ 'is-none': !view.current }">
-      <strong>{{ view.current ? view.current.label : 'Plain rounds' }}</strong>
-      <span v-if="view.current">{{ view.current.note }}</span>
-    </p>
     <ul class="bench-effect-kits">
-      <li v-for="option in view.options" :key="option.effect" class="bench-effect-kit">
-        <SpriteImg :sprite="art.ui.pickupIcons[GUN_EFFECTS[option.effect].kit]" />
-        <span class="bench-effect-name">{{ option.label }}</span>
-        <strong class="bench-effect-count" :class="{ 'is-none': option.count === 0 }">{{ option.count }}</strong>
-        <PixelButton :disabled="!option.fittable" @press="ask(option)">{{ view.current ? 'Replace' : 'Fit' }}</PixelButton>
-      </li>
+      <WorkbenchTile
+        v-for="option in view.options"
+        :key="option.effect"
+        :sprites="[art.ui.pickupIcons[GUN_EFFECTS[option.effect].kit]]"
+        :label="option.label"
+        :aria="`${view.current ? 'Replace with' : 'Fit'} ${option.label}, ${option.count} carried: ${option.note}`"
+        :count="option.count"
+        :disabled="!option.fittable"
+        :fitted="view.current?.effect === option.effect"
+        :moves="view.current?.effect === option.effect ? view.moves : []"
+        :weapon-icons="art.ui.weaponIcons"
+        @fit="ask(option)"
+        @move="move"
+      />
     </ul>
-    <div v-if="pending" class="bench-effect-confirm" role="alertdialog" aria-live="assertive">
+    <div v-if="pending" ref="confirmBox" class="bench-effect-confirm" role="alertdialog" aria-live="assertive">
       <p>{{ replaceQuestion(pending) }}</p>
       <PixelButton primary @press="confirm">Replace</PixelButton>
       <PixelButton @press="pending = null">Keep {{ pending.replaces }}</PixelButton>
     </div>
-    <PixelButton v-for="target in view.moves" :key="target" class="bench-effect-move" @press="move(target)">
-      Move {{ view.current?.label }} to {{ WEAPONS[target].label }}
-    </PixelButton>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+/**
+ * The round kits for the gun in focus, one framed tile each with the count carried; the kit on the gun is
+ * framed amber and carries the toolkit moves. Fitting over an effect already on the gun asks first, in a box
+ * laid over the tiles so the screen never moves.
+ */
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { WEAPONS } from '../../shared/constants.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
@@ -33,8 +39,8 @@ import type { ArtBook } from '../art/types.ts';
 import { effectView, needsConfirm, replaceQuestion } from '../game/bench-effects.ts';
 import type { EffectOption } from '../game/bench-effects.ts';
 import PixelButton from './PixelButton.vue';
-import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
+import WorkbenchTile from './WorkbenchTile.vue';
 
 interface EffectProps {
   weapon: WeaponId;
@@ -45,6 +51,7 @@ interface EffectProps {
 
 const { weapon, owned, gear } = defineProps<EffectProps>();
 const game = useGame();
+const confirmBox = useTemplateRef<HTMLElement>('confirmBox');
 
 const view = computed(() => effectView(weapon, owned, gear));
 const pending = ref<EffectOption | null>(null);
@@ -59,9 +66,11 @@ function fit(option: EffectOption): void {
   game.bench.send({ kind: 'fit_effect', weapon, effect: option.effect });
 }
 
+/** The question lies over the tiles, so the keyboard goes to its first answer. */
 function ask(option: EffectOption): void {
-  if (needsConfirm(option)) pending.value = option;
-  else fit(option);
+  if (!needsConfirm(option)) return fit(option);
+  pending.value = option;
+  void nextTick(() => confirmBox.value?.querySelector('button')?.focus());
 }
 
 function confirm(): void {
@@ -76,60 +85,51 @@ function move(to: WeaponId): void {
 
 <style scoped>
 .bench-effect {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 2);
-  padding-top: calc(var(--u) * 2);
-  border-top: var(--u) solid var(--ink-line);
-}
-
-.bench-effect-now {
-  display: flex;
-  flex-direction: column;
-  gap: var(--u);
-  color: var(--bone-dim);
-}
-
-.bench-effect-now strong {
-  color: var(--amber);
-}
-
-.bench-effect-now.is-none strong {
-  color: var(--bone-dim);
+  position: relative;
 }
 
 .bench-effect-kits {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 2);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(var(--u) * 3);
+  margin: 0;
+  padding: var(--u);
   list-style: none;
 }
 
-.bench-effect-kit {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  align-items: center;
-  gap: calc(var(--u) * 2);
-}
-
-.bench-effect-count {
-  color: var(--amber);
-}
-
-.bench-effect-count.is-none {
-  opacity: 0.4;
-}
-
+/* Over the kit tiles and their frames, never beside them: asking moves nothing. */
 .bench-effect-confirm {
+  position: absolute;
+  inset: calc(var(--u) * -1);
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 2);
+  align-items: center;
+  gap: calc(var(--u) * 3);
   padding: calc(var(--u) * 3);
   border: var(--u) solid var(--sick);
+  background: var(--ink);
   color: var(--sick);
 }
 
-.bench-effect-move {
-  padding: var(--u) calc(var(--u) * 3);
+.bench-effect-confirm p {
+  flex: 1;
+  margin: 0;
+  font-size: calc(var(--u) * 6);
+}
+
+.bench-effect-confirm .px-button {
+  width: auto;
+}
+
+/* A phone fits two kits to a row, and the question stacks its answers. */
+@container select (max-width: 420px) {
+  .bench-effect-kits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bench-effect-confirm {
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 </style>

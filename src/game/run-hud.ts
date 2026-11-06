@@ -126,7 +126,7 @@ export class RunHud {
 
   /** Notes the Radio, and hands out the next track of this level that has not been found, if any is left. */
   private giveUpTrack(): string | null {
-    const [next = null] = lockedTracksOf(this.level, foundTracks());
+    const [next = null] = lockedTracksOf(this.level, foundTracks(), this.ui().runStyle ?? undefined);
     recordRadioFound(undefined, next);
     return next;
   }

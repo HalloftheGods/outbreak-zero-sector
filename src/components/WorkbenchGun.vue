@@ -1,59 +1,49 @@
 <template>
-  <article class="px-frame bench-gun">
-    <header class="bench-gun-head">
-      <SpriteImg :sprite="art.ui.weaponIcons[weapon]" />
-      <strong>{{ WEAPONS[weapon].label }}</strong>
-      <span class="bench-gun-slots">{{ slotsUsed(fit) }}/{{ GUN_SLOTS[weapon] }}</span>
-    </header>
-    <p v-if="quirk" class="bench-gun-quirk">{{ quirk.label }}: {{ quirk.note }}</p>
-    <ul class="bench-gun-stats">
-      <li v-for="line in stats" :key="line">{{ line }}</li>
-    </ul>
-    <ul class="bench-rows">
-      <li v-for="row in rows" :key="row.upgrade" class="bench-row">
-        <span class="bench-row-name">{{ row.label }}</span>
-        <span class="bench-row-rank">{{ row.rank }}/{{ row.maxRank }}</span>
-        <PixelButton class="bench-fit" :disabled="!row.fittable" @press="install(row.upgrade)">
-          <SpriteImg v-for="part in row.cost" :key="part" :sprite="art.ui.pickupIcons[part]" />
-        </PixelButton>
-        <PixelButton v-for="target in row.moves" :key="target" class="bench-move" @press="move(row.upgrade, target)">
-          Move to {{ WEAPONS[target].label }}
-        </PixelButton>
-      </li>
-    </ul>
-    <WorkbenchEffect :weapon :owned :gear :art />
-  </article>
+  <ul class="bench-work" :aria-label="`Upgrades for ${WEAPONS[weapon].label}`">
+    <WorkbenchTile
+      v-for="row in rows"
+      :key="row.upgrade"
+      :sprites="row.cost.map((part) => art.ui.pickupIcons[part])"
+      :label="row.label"
+      :aria="`Fit ${row.label}, rank ${row.rank} of ${row.maxRank}, takes ${row.cost.map((part) => PART_LABELS[part]).join(' and ')}`"
+      :pips="{ on: row.rank, of: row.maxRank }"
+      :disabled="!row.fittable"
+      :fitted="row.rank > 0"
+      :moves="row.moves"
+      :weapon-icons="art.ui.weaponIcons"
+      @fit="install(row.upgrade)"
+      @move="(to) => move(row.upgrade, to)"
+    />
+  </ul>
 </template>
 
 <script setup lang="ts">
+/**
+ * The upgrades for the gun in focus, one framed tile each: the parts it takes, its ranks and the guns a
+ * toolkit could carry a rank to. Pressing a tile fits a rank; what the gun's slots hold shows in the column.
+ */
 import { computed } from 'vue';
 import { WEAPONS } from '../../shared/constants.ts';
-import { GUN_QUIRKS, GUN_SLOTS } from '../../shared/gun-upgrade-data.ts';
+import { PART_LABELS } from '../../shared/gun-upgrade-data.ts';
 import type { GunUpgrade } from '../../shared/gun-upgrade-data.ts';
-import { slotsUsed } from '../../shared/gun-upgrades.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
 import type { ArtBook } from '../art/types.ts';
-import { benchRows, statLines } from '../game/bench-view.ts';
-import PixelButton from './PixelButton.vue';
-import SpriteImg from './SpriteImg.vue';
+import { benchRows } from '../game/bench-view.ts';
 import { useGame } from './use-game.ts';
-import WorkbenchEffect from './WorkbenchEffect.vue';
+import WorkbenchTile from './WorkbenchTile.vue';
 
-interface GunCardProps {
+interface GunWorkProps {
   weapon: WeaponId;
   owned: readonly WeaponId[];
   gear: PlayerGear;
   art: ArtBook;
 }
 
-const { weapon, owned, gear } = defineProps<GunCardProps>();
+const { weapon, owned, gear } = defineProps<GunWorkProps>();
 const game = useGame();
 
-const fit = computed(() => gear.fits[weapon]);
-const quirk = computed(() => (fit.value?.quirk ? GUN_QUIRKS[fit.value.quirk] : null));
 const rows = computed(() => benchRows(weapon, owned, gear));
-const stats = computed(() => statLines(weapon, fit.value));
 
 function install(upgrade: GunUpgrade): void {
   game.bench.send({ kind: 'fit', weapon, upgrade });
@@ -65,67 +55,19 @@ function move(upgrade: GunUpgrade, to: WeaponId): void {
 </script>
 
 <style scoped>
-.bench-gun {
-  --edge: var(--ink-line);
-  flex: 1 1 calc(var(--u) * 170);
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 3);
-  padding: calc(var(--u) * 4);
-  background: var(--ink-raised);
-}
-
-.bench-gun-head {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 3);
-}
-
-.bench-gun-slots {
-  margin-left: auto;
-  color: var(--amber);
-}
-
-.bench-gun-quirk {
-  color: var(--sick);
-}
-
-.bench-gun-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--u) calc(var(--u) * 4);
-  list-style: none;
-  color: var(--bone-dim);
-}
-
-.bench-rows {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 2);
-  list-style: none;
-}
-
-.bench-row {
+.bench-work {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: var(--u) calc(var(--u) * 3);
-}
-
-.bench-row-rank {
-  color: var(--bone-dim);
-}
-
-.bench-fit {
-  display: flex;
-  justify-content: center;
-  gap: var(--u);
-  width: calc(var(--u) * 40);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(var(--u) * 3);
+  margin: 0;
   padding: var(--u);
+  list-style: none;
 }
 
-.bench-move {
-  grid-column: 1 / -1;
-  padding: var(--u) calc(var(--u) * 3);
+/* A phone fits three tiles to a row and wraps the rest under them. */
+@container select (max-width: 420px) {
+  .bench-work {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

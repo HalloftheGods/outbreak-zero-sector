@@ -464,7 +464,8 @@ describe('game server', () => {
     client.send({ type: 'input', input: input({ seq: 1 }) });
     client.send({ type: 'restart' });
     await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(client.received).toEqual([]);
+    await client.until(() => client.received.length > 0);
+    expect(client.received).toEqual([{ type: 'room', style: null }]);
     expect(client.closeCode).toBeNull();
   });
 });

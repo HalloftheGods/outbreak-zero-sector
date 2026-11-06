@@ -24,3 +24,28 @@ export const uiResume: Recipe = (v) => {
   tone(v, { type: 'triangle', f0: 440, decay: 0.08, gain: 0.25 });
   tone(v, { at: 0.09, type: 'triangle', f0: 660, decay: 0.14, gain: 0.25 });
 };
+
+/** The van pulling out of the bunker: a low engine climbing through a gear change. */
+export const vanDepart: Recipe = (v) => {
+  const trem = { rate: 18, depth: 0.5 };
+  tone(v, { type: 'sawtooth', f0: 42, path: [[0.6, 56], [0.9, 47], [1.8, 72]], attack: 0.08, hold: 1.3, decay: 0.5, gain: 0.35, lp: 320, trem });
+  tone(v, { type: 'square', f0: 84, path: [[0.6, 112], [0.9, 94], [1.8, 144]], attack: 0.08, hold: 1.3, decay: 0.5, gain: 0.12, lp: 500, trem });
+  noise(v, { filter: 'lowpass', freq: 260, freq1: 600, attack: 0.1, hold: 1.2, decay: 0.6, gain: 0.25 });
+};
+
+/** The van coming home: the engine winding down and a dry brake as it stops. */
+export const vanArrive: Recipe = (v) => {
+  const trem = { rate: 16, depth: 0.5 };
+  tone(v, { type: 'sawtooth', f0: 70, path: [[0.8, 52], [1.5, 38]], attack: 0.05, hold: 1.2, decay: 0.4, gain: 0.35, lp: 320, trem });
+  tone(v, { type: 'square', f0: 140, path: [[0.8, 104], [1.5, 76]], attack: 0.05, hold: 1.2, decay: 0.4, gain: 0.12, lp: 500, trem });
+  noise(v, { filter: 'lowpass', freq: 600, freq1: 220, attack: 0.05, hold: 1.0, decay: 0.5, gain: 0.25 });
+  tone(v, { at: 1.1, type: 'triangle', f0: 1800, f1: 1500, attack: 0.05, decay: 0.3, gain: 0.04, lp: 3000 });
+};
+
+/** The sliding door run along its rail and shut with a thunk. */
+export const vanDoor: Recipe = (v) => {
+  noise(v, { filter: 'bandpass', freq: 900, freq1: 500, q: 1.5, attack: 0.02, hold: 0.12, decay: 0.08, gain: 0.25 });
+  tone(v, { at: 0.2, type: 'sine', f0: 110, f1: 55, decay: 0.18, gain: 0.6 });
+  noise(v, { at: 0.2, filter: 'lowpass', freq: 400, decay: 0.12, gain: 0.5 });
+  tone(v, { at: 0.2, type: 'square', f0: 220, f1: 140, decay: 0.05, gain: 0.12, lp: 900 });
+};

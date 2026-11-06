@@ -1,6 +1,10 @@
 // The two halves of what a player owns, locker and hands, and moving gear between them.
 
+import { WEAPONS } from '../../../shared/constants.ts';
 import type { Loadout } from '../../../shared/home-protocol.ts';
+import { modsOn } from '../../../shared/loadout.ts';
+import { WEAPON_ORDER } from '../../../shared/protocol.ts';
+import type { WeaponId } from '../../../shared/protocol.ts';
 import type { HomeSave } from './home-store.ts';
 
 type Counts<K extends string> = Record<K, number>;
@@ -34,6 +38,24 @@ function taken(pool: Loadout, gear: Loadout): Loadout {
     knife: pool.knife && !gear.knife,
     bottles: Math.max(0, pool.bottles - gear.bottles),
   };
+}
+
+/** A gun with rounds before one without, then the most mods, then the later gun. */
+function bestGun(locker: Loadout): WeaponId | null {
+  const owned = WEAPON_ORDER.filter((weapon) => locker.guns[weapon]);
+  const loaded = owned.filter((weapon) => locker.ammoBag[weapon] > 0);
+  const choices = loaded.length > 0 ? loaded : owned;
+  const mods = (weapon: WeaponId): number => modsOn(locker.guns[weapon]?.fit);
+  return choices.reduce<WeaponId | null>((best, weapon) => (best === null || mods(weapon) >= mods(best) ? weapon : best), null);
+}
+
+/** What the van hands someone boarding with no gun in hand: the locker's best and its rounds. Null if there is nothing to hand over. */
+export function armedHands({ locker, hands }: HomeSave): Loadout | null {
+  const handsHoldAGun = Object.keys(hands.guns).length > 0;
+  const weapon = handsHoldAGun ? null : bestGun(locker);
+  if (weapon === null) return null;
+  const rounds = Math.min(WEAPONS[weapon].reserveCap, hands.ammoBag[weapon] + locker.ammoBag[weapon]);
+  return { ...hands, guns: { [weapon]: locker.guns[weapon] }, ammoBag: { ...hands.ammoBag, [weapon]: rounds } };
 }
 
 /** The server's word on what is in hand. Only that comes out of the locker, so anything it refused is still there. */

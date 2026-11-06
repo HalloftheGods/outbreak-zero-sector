@@ -1,6 +1,7 @@
 // The Solo / Multiplayer step's plain parts: what each card says, and the facts listed beside it, read from the game's rules.
 
 import { MAX_PLAYERS } from '../../shared/constants.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { PlayMode } from './play-flow.ts';
 
 export interface ModeCard {
@@ -29,15 +30,17 @@ export const PLAYER_SLOTS = MAX_PLAYERS;
 
 /**
  * Players: the room cap (server/room.ts). Difficulty: in co-op the first player into the room sets it (shared/difficulty.ts).
- * Continue and the server field: only solo offers Continue from level; only co-op needs a server (PlaySetup.vue).
+ * Continue and the server field: only solo Arcade offers Continue from level; only co-op needs a server (PlaySetup.vue).
+ * Campaign picks up from its bunker save with no Continue button. No style (an invite, where the room decides) says only that Continue is Arcade's.
  */
-export function modeFacts(mode: PlayMode): readonly ModeFact[] {
+export function modeFacts(mode: PlayMode, style: GameStyle | null = 'arcade'): readonly ModeFact[] {
   const solo = mode === 'solo';
   const players = solo ? 1 : MAX_PLAYERS;
+  const resume = style === 'arcade' ? 'Yes' : 'Arcade only';
   return [
     { key: 'players', label: 'Players', value: String(players), filled: players },
     { key: 'difficulty', label: 'Difficulty', value: solo ? 'Yours' : 'First in' },
-    { key: 'continue', label: 'Continue', value: solo ? 'Yes' : 'No' },
+    { key: 'continue', label: 'Continue', value: solo ? resume : 'No' },
     { key: 'server', label: 'Server', value: solo ? 'None' : 'Needed' },
   ];
 }

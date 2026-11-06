@@ -1,16 +1,18 @@
 <template>
-  <section class="px-screen town" aria-label="Town map">
+  <section class="px-screen town" :aria-label="key.title">
     <canvas ref="canvasRef" class="town-canvas px-frame" :style="{ '--side': canvasSide }" />
     <aside class="town-key">
-      <h2 class="town-title">Town map</h2>
+      <h2 class="town-title">{{ key.title }}</h2>
       <ul class="town-legend">
-        <li v-for="[color, label] in TOWN_LEGEND" :key="label">
+        <li v-for="[color, label] in key.legend" :key="label">
           <span class="town-swatch" :style="{ '--swatch': color }" />{{ label }}
         </li>
-        <li class="town-tick">Check: been inside</li>
-        <li class="town-cross">X: cleared & searched</li>
+        <template v-if="key.marks">
+          <li class="town-tick">Check: been inside</li>
+          <li class="town-cross">X: cleared & searched</li>
+        </template>
       </ul>
-      <p class="px-note">{{ mode === 'solo' ? 'Paused.' : 'The town does not wait.' }} <span class="keys-only">Tab to close</span></p>
+      <p class="px-note">{{ key.waitNote(mode) }} <span class="keys-only">Tab to close</span></p>
       <MenuLink class="touch-only town-close" @press="game.toggleMap()">Close</MenuLink>
     </aside>
   </section>
@@ -18,7 +20,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
-import { TOWN_LEGEND } from '../game/town-map.ts';
+import { mapKey } from '../game/map-key.ts';
 import type { TransportKind } from '../network/transport.ts';
 import MenuLink from './MenuLink.vue';
 import { useGame } from './use-game.ts';
@@ -26,9 +28,10 @@ import { useGame } from './use-game.ts';
 const SCREEN_MARGIN = 24;
 const KEY_WIDTH = 260;
 
-defineProps<{ mode: TransportKind }>();
+const { inBunker } = defineProps<{ mode: TransportKind; inBunker: boolean }>();
 
 const game = useGame();
+const key = computed(() => mapKey(inBunker));
 const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
 const mapPixels = ref(1);
 const fit = ref(Math.min(window.innerWidth - KEY_WIDTH, window.innerHeight) - SCREEN_MARGIN);

@@ -212,9 +212,9 @@ describe('levels in a run', () => {
 
   function joinRoom(): FakeSocket {
     vi.stubGlobal('WebSocket', FakeSocket);
-    game.startCoop();
+    game.startCoop('arcade');
     const socket = FakeSocket.latest;
-    socket.onopen?.();
+    socket.receive({ type: 'room', style: null });
     socket.receive({ type: 'welcome', yourId: 'me', tickRate: 30, mapSeed: TOWN_A });
     return socket;
   }
@@ -238,7 +238,7 @@ describe('levels in a run', () => {
   it('rebuilds the town when the sim moves on, and puts up the next level', () => {
     const setMap = vi.spyOn(WorldRenderer.prototype, 'setMap');
     const setTheme = vi.spyOn(WorldRenderer.prototype, 'setTheme');
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     expect(game.ui.value.levelCard?.title).toBe(levelDef(1).title);
 
@@ -260,7 +260,7 @@ describe('levels in a run', () => {
   });
 
   it('takes the card down in its own time', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     expect(game.ui.value.levelCard).not.toBeNull();
     pump(4500);

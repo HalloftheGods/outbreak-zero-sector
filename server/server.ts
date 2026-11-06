@@ -2,7 +2,6 @@ import { randomInt } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { DEFAULT_SERVER_PORT } from '../shared/constants.ts';
-import { HOME_LOOP_LIVE } from '../shared/home-protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import {
   HEARTBEAT_MS,
@@ -36,7 +35,8 @@ export interface RunningGameServer {
 }
 
 export function startGameServer(options: GameServerOptions): Promise<RunningGameServer> {
-  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff), workbench: 'timed', home: HOME_LOOP_LIVE });
+  // Arcade until the first player into the room says otherwise.
+  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff), workbench: 'timed' });
   const joinDeadlineMs = options.joinDeadlineMs ?? JOIN_DEADLINE_MS;
   const room = createRoom(sim, options.restartVoteMs ?? RESTART_VOTE_MS);
   const clients = room.clients;
@@ -63,6 +63,7 @@ export function startGameServer(options: GameServerOptions): Promise<RunningGame
       joinDeadline: setTimeout(() => socket.close(JOIN_TIMEOUT_CODE, 'no join'), joinDeadlineMs),
     };
     clients.add(client);
+    room.greet(client);
 
     socket.on('message', (data, isBinary) => {
       // On a slow link the pong queues behind the frames, but its input still arrives.

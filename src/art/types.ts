@@ -1,4 +1,5 @@
 import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { BuildingKind, PickupType, PropKind, TileKind, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import type { ContainerArt, ContainerLook } from './containers.ts';
@@ -114,6 +115,21 @@ export interface FxArt {
   readonly shotgunShell: PixelSprite;
 }
 
+/** The van from the side, for the drive between the bunker and a town (fx/van-side.ts). */
+export interface VanSideArt {
+  /** Nose right, wheels left off: they turn on their own. */
+  readonly body: PixelSprite;
+  /** Two frames of a turning wheel. */
+  readonly wheel: readonly [PixelSprite, PixelSprite];
+  /** Top-left of each wheel, in body pixels. */
+  readonly wheelAt: readonly { readonly x: number; readonly y: number }[];
+  /** The headlamp's front edge and the exhaust's tip, in body pixels. */
+  readonly lamp: { readonly x: number; readonly y: number };
+  readonly exhaust: { readonly x: number; readonly y: number };
+  /** Dead town against the night, tiling end to end. */
+  readonly skyline: PixelSprite;
+}
+
 export interface UiArt {
   readonly crosshair: PixelSprite;
   /** The crosshair over a zombie's head. */
@@ -130,8 +146,13 @@ export interface UiArt {
   readonly difficulty: Record<DifficultyId, PixelSprite>;
   /** The Play page's card picture for Solo and Multiplayer (mode-cards.ts). */
   readonly mode: Record<'solo' | 'multi', PixelSprite>;
+  /** The Play page's card picture for Campaign and Arcade (style-cards.ts). */
+  readonly style: Record<GameStyle, PixelSprite>;
   /** The Levels page's hand-drawn scene for each level, index 0 being level 1 (level-cards.ts). */
   readonly levelScenes: readonly PixelSprite[];
+  /** The home station screens' scene picture for each station (station-cards.ts). */
+  readonly stations: Record<'locker' | 'forge' | 'jukebox' | 'bench', PixelSprite>;
+  readonly vanSide: VanSideArt;
 }
 
 export interface ArtBook {

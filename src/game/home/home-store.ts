@@ -3,6 +3,8 @@
 import type { DifficultyId } from '../../../shared/difficulty.ts';
 import type { Jewels, Loadout } from '../../../shared/home-protocol.ts';
 import { emptyLoadout } from '../../../shared/loadout.ts';
+import { QUEST_SALT, starterQuests } from './quest-state.ts';
+import type { QuestState } from './quest-state.ts';
 import { emptyShop } from './shop.ts';
 import type { ShopState } from './shop.ts';
 
@@ -26,6 +28,7 @@ export interface HomeSave {
   appliedReceipts: readonly string[];
   ledger: readonly TripRecord[];
   shop: ShopState;
+  quests: QuestState;
 }
 
 /** Written before a player counts as ready. Still here on load, it is a trip that never came home. */
@@ -59,5 +62,6 @@ export function emptySave(shopSeed: number): HomeSave {
     appliedReceipts: [],
     ledger: [],
     shop: emptyShop(shopSeed),
+    quests: starterQuests(shopSeed ^ QUEST_SALT),
   };
 }

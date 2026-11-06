@@ -1,4 +1,4 @@
-// Underground Bunker: the power is out. A survivor, back to us, raises a flashlight down a concrete
+// Blackout: the power is out. A survivor, back to us, raises a flashlight down a concrete
 // corridor toward a steel blast door left open a crack; the beam lands on the door wheel and the
 // hazard-striped sill, and catches a grey face with yellow eyes squeezing through the black gap.
 // Caged emergency bulbs stain the walls red, pipes run overhead, dust turns in the beam.

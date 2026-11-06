@@ -5,6 +5,7 @@ import { isBunkerMap } from '../../shared/home-protocol.ts';
 import type { StationId } from '../../shared/home-protocol.ts';
 import { stepMovement } from '../../shared/movement.ts';
 import { playerSpeed } from '../../shared/players.ts';
+import { effectiveStance } from '../../shared/stamina.ts';
 import { stationInReach } from '../../shared/stations.ts';
 import { groundSpeedScale } from '../../shared/town-rules.ts';
 import type { EntityId, PlayerEntity, SnapshotPacket, Stance, WorldMap } from '../../shared/protocol.ts';
@@ -35,6 +36,8 @@ export class ClientWorld {
   private level = 1;
   /** From the keys held right now, ahead of the sim hearing about them. */
   private stance: Stance = 'walk';
+  /** The sim says the local player is out of breath, so a held sprint key moves them at a walk. */
+  private winded = false;
 
   constructor(map: WorldMap, localId: EntityId) {
     this.localId = localId;
@@ -73,6 +76,7 @@ export class ClientWorld {
     this.latestArrival = nowMs;
     const local = this.localPlayer;
     if (local) this.skin = local.skin;
+    this.winded = local?.winded === true;
     this.refreshSpeed();
     if (local?.status === 'alive' && this.predicting) {
       this.predictor.reconcile(local.x, local.y, local.lastInputSeq);
@@ -89,7 +93,7 @@ export class ClientWorld {
 
   private refreshSpeed(): void {
     const known = this.skin !== null;
-    if (known) this.speed = playerSpeed(this.skin as number, this.stance);
+    if (known) this.speed = playerSpeed(this.skin as number, effectiveStance(this.stance, this.winded));
   }
 
   /** The player the camera should sit on: yourself, or a teammate once you are dead. */

@@ -4,7 +4,7 @@ import type { TrackGroup, TrackInfo } from '../audio/playlists.ts';
 import { foundTracks } from './sound-unlock.ts';
 import { SFX_NAMES } from '../audio/sfx-registry.ts';
 import type { SfxName } from '../audio/sfx-registry.ts';
-import { HOME_LOOP_LIVE } from '../../shared/home-protocol.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import { isLevelUnlocked } from './level-progress.ts';
 import type { LevelProgress } from './level-progress.ts';
 
@@ -86,8 +86,8 @@ function entryOf(base: Omit<EntryBase, 'label'>): EntryBase {
 
 
 /** Every recorded track, named once the level it plays in has been reached, and for a find once a Radio gave it up. */
-export function musicEntries(progress: LevelProgress, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
-  return allTracks(homeLoop).map((info) => {
+export function musicEntries(progress: LevelProgress, style: GameStyle = 'arcade', found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
+  return allTracks(style).map((info) => {
     const { file, group, level } = info;
     const where = group === 'level' ? `LEVEL ${String(level).padStart(2, '0')}` : GROUP_WHERE[group];
     const unlocked = trackUnlocked(info, progress, found);
@@ -96,8 +96,8 @@ export function musicEntries(progress: LevelProgress, homeLoop = HOME_LOOP_LIVE,
 }
 
 /** What the bunker's jukebox can play: only the tracks already heard or found, none of the ??? the Sound Test keeps. */
-export function jukeboxEntries(progress: LevelProgress, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
-  return musicEntries(progress, homeLoop, found).filter((entry) => entry.unlocked);
+export function jukeboxEntries(progress: LevelProgress, found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
+  return musicEntries(progress, 'campaign', found).filter((entry) => entry.unlocked);
 }
 
 /** How many of the radio finds are in hand, for the page to say what is still missing. */

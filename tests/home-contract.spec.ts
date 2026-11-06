@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUNKER_LEVEL, BUNKER_SEED, HOME_LOOP_LIVE, isBunkerMap, isBunkerSeed, MERCHANT_IDS, STATION_IDS } from '../shared/home-protocol.ts';
+import { BUNKER_LEVEL, BUNKER_SEED, isBunkerMap, isBunkerSeed, MERCHANT_IDS, STATION_IDS } from '../shared/home-protocol.ts';
 import type { HomeView } from '../shared/home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL, levelSeed } from '../shared/levels.ts';
 import { emptyLoadout, loadoutOfEntity, mergeHome } from '../shared/loadout.ts';
@@ -27,12 +27,8 @@ function played(sim: GameSimulation): SnapshotPacket[] {
   return frames;
 }
 
-describe('the home switch', () => {
-  it('is off', () => {
-    expect(HOME_LOOP_LIVE).toBe(false);
-  });
-
-  it('changes nothing when home is off', () => {
+describe('home off', () => {
+  it('changes nothing', () => {
     const plain = played(new GameSimulation({ seed: SEED }));
     const off = played(new GameSimulation({ seed: SEED, home: false }));
     expect(off).toEqual(plain);
@@ -139,7 +135,7 @@ describe('the client seams', () => {
     const session = new LocalSession();
     const frames: SnapshotPacket[] = [];
     session.onSnapshot = (frame) => frames.push(frame);
-    session.connect({ name: 'ANA', homeLoop: true });
+    session.connect({ name: 'ANA', style: 'campaign' });
     session.sendHome({ kind: 'leave_station' });
     session.disconnect();
     vi.useRealTimers();

@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { noParts } from '../shared/gun-upgrades.ts';
 import type { PlayerGear } from '../shared/gun-upgrades.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { BenchLink } from '../src/game/bench-link.ts';
-import { benchHud, benchRows, statLines } from '../src/game/bench-view.ts';
+import { benchHud, benchNote, benchRows, statLines } from '../src/game/bench-view.ts';
 import type { GameTransport } from '../src/network/transport.ts';
 
 const BENCH = { level: 3, secondsLeft: 12, riders: ['a', 'b'], ready: ['b'] };
@@ -56,6 +57,18 @@ describe('the bench as a player reads it', () => {
     expect(hud).toMatchObject({ level: 3, nextTitle: 'Abyssal Depths', youReady: false, waitingFor: 1, secondsLeft: 12 });
     expect(benchHud(frame(true), { id: 'b' } as PlayerEntity)?.youReady).toBe(true);
     expect(benchHud(frame(false), { id: 'a' } as PlayerEntity)).toBeNull();
+  });
+
+  it('the bench between towns names the road, and the walk-up bench closes instead of readying', () => {
+    const between = benchHud(frame(true), { id: 'a' } as PlayerEntity);
+    const walkUp = benchHud(frame(false), { id: 'a', home: { station: 'bench' } } as PlayerEntity);
+    expect(between?.walkUp).toBe(false);
+    expect(walkUp?.walkUp).toBe(true);
+    expect(benchNote(between!)).toContain('Town 3 is behind you');
+    expect(benchNote(walkUp!)).not.toContain('Town');
+
+    const screen = readFileSync(new URL('../src/components/WorkbenchScreen.vue', import.meta.url), 'utf8');
+    expect(screen).toMatch(/<PixelButton v-if="bench\.walkUp"[^>]*game\.home\.closeStation\(\)[^>]*>Close</);
   });
 
   it('offers only what the parts and slots allow', () => {

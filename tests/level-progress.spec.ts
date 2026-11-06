@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FINAL_LEVEL } from '../shared/levels.ts';
-import { continueLevel, isLevelUnlocked, loadLevelProgress, recordGameFinished, recordLevelCleared, recordLevelReached } from '../src/game/level-progress.ts';
+import { continueLevel, isLevelUnlocked, loadCampaignProgress, loadFurthestProgress, loadLevelProgress, recordCampaignFinished, recordGameFinished, recordLevelCleared, recordLevelReached } from '../src/game/level-progress.ts';
 import { loadBest } from '../src/game/storage.ts';
 
 function memoryStore() {
@@ -25,7 +25,29 @@ describe('level progress', () => {
     const store = memoryStore();
     expect(recordLevelCleared(3, store).highest).toBe(4);
     expect(recordLevelCleared(1, store).highest).toBe(4);
-    expect(loadLevelProgress(store).highest).toBe(4);
+    expect(loadCampaignProgress(store).highest).toBe(4);
+  });
+
+  it('keeps Campaign and Arcade apart: neither moves the other', () => {
+    const store = memoryStore();
+    recordLevelCleared(5, store);
+    recordCampaignFinished(store);
+    expect(loadLevelProgress(store)).toEqual({ highest: 1, finished: false });
+    expect(loadCampaignProgress(store)).toEqual({ highest: FINAL_LEVEL, finished: true });
+
+    const arcade = memoryStore();
+    recordLevelReached(7, arcade);
+    recordGameFinished(arcade);
+    expect(loadCampaignProgress(arcade)).toEqual({ highest: 1, finished: false });
+  });
+
+  it('counts the further of the two for what has been heard', () => {
+    const store = memoryStore();
+    recordLevelReached(4, store);
+    recordLevelCleared(6, store);
+    expect(loadFurthestProgress(store)).toEqual({ highest: 7, finished: false });
+    recordCampaignFinished(store);
+    expect(loadFurthestProgress(store)).toEqual({ highest: FINAL_LEVEL, finished: true });
   });
 
   it('stops at the final level, and does not call that finished', () => {

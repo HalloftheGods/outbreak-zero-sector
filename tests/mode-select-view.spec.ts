@@ -21,4 +21,11 @@ describe('mode select view', () => {
     expect(modeFacts('solo').find((fact) => fact.key === 'continue')?.value).toBe('Yes');
     expect(modeFacts('multi').find((fact) => fact.key === 'server')?.value).toBe('Needed');
   });
+
+  it('makes no claim about a style the room has yet to pick: Continue says only that it is Arcade\'s', () => {
+    const resume = (style: 'campaign' | 'arcade' | null) => modeFacts('solo', style).find((fact) => fact.key === 'continue')?.value;
+    expect(resume('arcade')).toBe('Yes');
+    expect(resume('campaign')).toBe('Arcade only');
+    expect(resume(null)).toBe('Arcade only');
+  });
 });

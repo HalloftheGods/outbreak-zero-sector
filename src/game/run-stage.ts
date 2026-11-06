@@ -5,6 +5,7 @@ import { generateWorldMap } from '../../shared/world-map.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import type { ClientWorld } from './client-world.ts';
 import type { RunHud } from './run-hud.ts';
+import { noteStageCut } from './stage-cut.ts';
 
 /** The town and level this client has built, kept in step with what the sim says it is playing. */
 export class RunStage {
@@ -25,6 +26,7 @@ export class RunStage {
     this.level = null;
     this.hud.setMap(map);
     this.renderer()?.setMap(map);
+    noteStageCut(isBunkerSeed(mapSeed));
     return map;
   }
 

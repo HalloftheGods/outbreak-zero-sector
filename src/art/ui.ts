@@ -5,7 +5,10 @@ import { buildBottle, buildCrosshair, buildCrosshairHead, buildHeart, buildPicku
 import { buildDifficultyCards } from './difficulty-cards.ts';
 import { buildLevelCards } from './level-cards.ts';
 import { buildModeCards } from './mode-cards.ts';
+import { buildStationCards } from './station-cards.ts';
+import { buildStyleCards } from './style-cards.ts';
 import { buildLogo } from './fx/logo.ts';
+import { buildVanSide } from './fx/van-side.ts';
 
 export function buildUi(): UiArt {
   return {
@@ -19,6 +22,9 @@ export function buildUi(): UiArt {
     logo: buildLogo(),
     difficulty: buildDifficultyCards(),
     mode: buildModeCards(),
+    style: buildStyleCards(),
     levelScenes: buildLevelCards(),
+    stations: buildStationCards(),
+    vanSide: buildVanSide(),
   };
 }

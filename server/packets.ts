@@ -1,6 +1,7 @@
 import { isCharacterIndex } from '../shared/characters.ts';
 import { JOIN_TOKEN_MAX_LENGTH } from '../shared/constants.ts';
 import { isDifficultyId } from '../shared/difficulty.ts';
+import { isGameStyle } from '../shared/game-style.ts';
 import { WEAPON_ORDER } from '../shared/protocol.ts';
 import type { ClientInputPacket, ClientPacket, WeaponId } from '../shared/protocol.ts';
 import { isBenchAction } from '../shared/workbench.ts';
@@ -74,13 +75,14 @@ export function parseClientPacket(raw: string): ClientPacket | null {
   if (!isRecord(value)) return null;
 
   if (value.type === 'join') {
-    const { name, token, character, difficulty } = value;
+    const { name, token, character, difficulty, style } = value;
     const validCharacter = character === undefined || isCharacterIndex(character);
     const valid = typeof name === 'string' && isJoinToken(token) && validCharacter;
     // An older client sends none, and an unknown one is not worth turning a player away for.
     const chosen = isDifficultyId(difficulty) ? { difficulty } : {};
+    const styled = isGameStyle(style) ? { style } : {};
     const home = parseJoinHome(value.home);
-    return valid ? { type: 'join', name: sanitiseName(name), token, character, ...chosen, ...(home ? { home } : {}) } : null;
+    return valid ? { type: 'join', name: sanitiseName(name), token, character, ...chosen, ...styled, ...(home ? { home } : {}) } : null;
   }
   if (value.type === 'input') {
     const input = parseInput(value.input);

@@ -18,6 +18,14 @@ export const SNEAK_SIGHT_SCALE = 0.6;
 /** Sprinting footsteps carry this far, once every interval while moving. */
 export const SPRINT_NOISE_RADIUS = 110;
 export const SPRINT_NOISE_INTERVAL_SEC = 0.5;
+/** Seconds a baseline survivor can sprint from a full bar; a faster survivor lasts proportionally longer. */
+export const SPRINT_DRAIN_SEC = 5;
+/** Seconds to refill an empty bar, once the rest below has passed. */
+export const STAMINA_REGEN_SEC = 4;
+/** Seconds after the last sprinting step before the bar starts to refill. */
+export const STAMINA_REGEN_DELAY_SEC = 0.5;
+/** Having run dry, a survivor cannot sprint again until the bar is back to this share. */
+export const SPRINT_REARM_SHARE = 0.25;
 export const PLAYER_MAX_HEALTH = 100;
 /** Distance from the player's centre to the barrel tip, reported on shot events. */
 export const MUZZLE_OFFSET = 11;

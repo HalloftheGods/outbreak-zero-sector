@@ -2,6 +2,57 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-06] - Campaign and Arcade
+
+### Added
+- Two game styles, chosen for each run. Campaign is the bunker, trips, treasure, forge and merchants; Arcade is the game as it was, ten levels in a row with the van workbench. A first-time player gets Campaign and the last choice is remembered. Nothing is switched on for everyone: the player decides, and `HOME_LOOP_LIVE` and the dev-only `?home` are gone.
+- The Play page opens on a Style step (Campaign or Arcade, with card pictures and four facts each) before Solo or Multiplayer, difficulty and survivor. Starting from the Levels page means Arcade and an invite link lets the room decide, so both skip it. The cards are placeholders drawn in `src/art/styles/` until the card painter gets to them.
+- In co-op the first player into an empty room chooses its style and everyone after plays it, even if it differs from their remembered choice. The server tells a connection the room's style before any join. A client from before styles is Arcade and is turned away from a Campaign room with close code 4000. Deploy the server first.
+- How to Play has a chapter on the two styles and six on Campaign: the bunker, trips, treasure, the forge, the merchants and dying. A contents page of more than fourteen chapters shows one line each so they all fit.
+- Records shows Campaign's best trip and Arcade's best run in separate blocks, and each leaderboard row says "Campaign trip" or "Arcade run".
+- The bunker has its own map key: "Bunker map" with a Stations colour, and none of the town's legend or marks.
+
+### Changed
+- Level 6 is called Blackout in both styles. The music title Underground Bunker is a track name and stays.
+- The Levels page says it is Arcade's page, and Continue from level N is Arcade only. Campaign resumes from its bunker save.
+- The controls list and How to Play call the Tab or N key "Map".
+- Campaign keeps its level progress apart from Arcade's, and a returning Arcade player starts Campaign at level 1 with nothing carried over.
+
+### Fixed
+- A Campaign co-op player who left the bunker without being ready for the van is no longer held as a body in the room. Rejoining from the same tab brings the gear and level from the save, so a solo run played in between cannot be undone by the old body, and a banked gun keeps its mods. A body that is ready for the van, out on a trip, or home with a result nobody has credited yet is still kept.
+- Choosing Main menu while standing at the van with the trip boarded calls the trip off. Before, the open trip stayed on file and the next Campaign run counted it as a death, losing the gear in hand.
+- Backing out of an invite link's Play page ends the invite. Play from the menu then starts on Style again, and a level picked on the Levels page starts Arcade there.
+- On an invite link the Play page no longer says which style the room plays: the co-op line reads "The room decides the style." and the Solo card's Continue says "Arcade only". A player who turns to Solo there is told which style they will play.
+- Esc closes the locker the way its Close button does. Before, gear moved between the locker and your hands stayed where it was if you left with Esc.
+- A Campaign save that could not be read no longer stays half open: the Arcade run after it cannot close an open trip or write to the save.
+- An old co-op error no longer shows on a solo setup, where only a Campaign save that could not be read is said.
+- A Records row has a gap between the callsign and the style.
+
+### Analytics
+- No event or parameter was added. A Campaign run reaches the existing ones differently: `run_start` on entering the bunker with `start_level` 0, `level_start` once for each trip, no `level_complete`, and a single `run_start`/`run_end` pair for a whole bunker session whose end only says quit or disconnected. Read from the tracker, not observed. The Privacy page's wording has not been reviewed against this.
+
+## [2026-11-06] - Sharper Sprites and Costumes
+
+### Changed
+- The sound test lays its track tiles out four across instead of five, so titles stop wrapping.
+
+### Added
+- Sprinting now tires you. The Sprint bar drains while you sprint on the move, refills when you do not, and a survivor who runs it dry walks until it is back to a quarter. A survivor's Speed sets how long a bar lasts. How to Play and Options list the sprint and sneak keys.
+- Every survivor has a list of costumes, default first: Night (Starfield, Aurora, Nebula), Bandus (Grizzly, Polar Bear, Honey Bear, Recruit), Queen (Tabby, Black Cat, Siamese, Grey Tabby), Rex (Green Dino, Purple Dino, Red Dino, Triceratops) and Sol (Kid, Plumber, Adventurer, Caped Hero; his glasses stay on in all of them). The art is in `src/art/survivors/costumes/`, the ids and names in `shared/characters.ts`. Only the default can be worn: the bunker locker that unlocks the rest is not built yet.
+- A survivor who fires or reloads on the move keeps walking instead of sliding on standing legs. The frames are drawn the first time they are needed.
+- Going down from standing starts with a kneel, and a downed survivor who bleeds out dies where they lie instead of standing up first.
+- `tools/contact-sheet.ts` takes a ground (`flat` or `asphalt`) as its fifth argument and has a `costumes` sheet with rows like `night/aurora/pistol/idle`.
+
+### Changed
+- Khronus8 is now Bandus and wears a brown grizzly bear suit. His old red-shirt look is the Recruit costume. Saved survivor choices carry over; analytics reports him as `bandus` from now on.
+- Night's hair is a starfield: navy with a violet cloud and stars, in clusters instead of scattered single pixels, on her sprite and on her select screen portrait.
+- The road is one palette step lighter and the outline rule no longer vanishes on the darkest colours, so survivors and zombies keep an edge on the street. Hair, boots and far legs no longer use outline black as a fill.
+- All five survivors are redrawn: arms separate from the body, back views are shaded, Sol's glasses are rims with his eyes showing and his legs show under his gun.
+- All five zombie types are redrawn: the brute in three clear planes with a solid club, the screamer with white hair and dark boots, the bloater's arms darker than its belly, the runner's ribs as arcs. Blood and acid pools lie flat with no outline.
+- Shadows are firmer, drawn before any figure, and sit under zombie feet.
+- The reload has more frames, the working hand shows when reloading sideways, and a dying survivor drops the gun they held.
+- Sprites in the menus and HUD are sized in whole device pixels, so every art pixel is the same width.
+
 ## [2026-11-06] - Radio Finds
 
 ### Added

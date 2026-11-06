@@ -45,6 +45,7 @@ import { difficultyDef } from '../../shared/difficulty.ts';
 import { formatDuration } from '../game/hud-state.ts';
 import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
 import type { RunResult } from '../game/hud-state.ts';
+import { continuesAfterDeath } from '../game/play-flow.ts';
 import PixelButton from './PixelButton.vue';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
@@ -52,8 +53,9 @@ import { useGame } from './use-game.ts';
 const { result } = defineProps<{ result: RunResult; art: ArtBook | null; restarting: boolean }>();
 const game = useGame();
 
-/** Solo only; read once, since the death has already been recorded by the time this screen shows. */
-const resumeAt = game.ui.value.mode === 'solo' ? continueLevel(loadLevelProgress()) : null;
+/** Solo Arcade only; read once, since the death has already been recorded by the time this screen shows. */
+const { mode, runStyle } = game.ui.value;
+const resumeAt = continuesAfterDeath(mode, runStyle) ? continueLevel(loadLevelProgress()) : null;
 const ranked = computed(() => [...result.stats.players].sort((a, b) => b.score - a.score));
 </script>
 

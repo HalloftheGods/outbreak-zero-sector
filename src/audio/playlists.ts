@@ -1,4 +1,5 @@
-import { HOME_LOOP_LIVE } from '../../shared/home-protocol.ts';
+import { playsFromHome } from '../../shared/game-style.ts';
+import type { GameStyle } from '../../shared/game-style.ts';
 import { FINAL_LEVEL, FIRST_LEVEL } from '../../shared/levels.ts';
 import { foundTracks } from '../game/sound-unlock.ts';
 import type { Scene } from './music.ts';
@@ -19,7 +20,7 @@ const VICTORY: Playlist = { files: ['victory-dark-salvation.mp3'], fromTop: true
 const CREDITS: Playlist = { files: ['end-credits-surviving-the-night.mp3'], fromTop: true };
 
 const BUNKER_TRACK = 'level-06-underground-bunker.mp3';
-/** The bunker's own music, once the home loop is live. Level 6 gives the track up to it then. */
+/** The bunker's own music in Campaign, where level 6 gives the track up to it. Arcade's level 6 keeps it. */
 const BUNKER = lull(BUNKER_TRACK);
 const BUNKER_LEVEL_INDEX = 5;
 
@@ -59,16 +60,16 @@ const HOME_LULLS: readonly Playlist[] = LULLS.map((playlist, index) =>
   index === BUNKER_LEVEL_INDEX ? lull(...playlist.files.filter((file) => file !== BUNKER_TRACK)) : playlist,
 );
 
-const lullsFor = (homeLoop: boolean): readonly Playlist[] => (homeLoop ? HOME_LULLS : LULLS);
+const lullsFor = (style: GameStyle): readonly Playlist[] => (playsFromHome(style) ? HOME_LULLS : LULLS);
 
 /** Every recorded track, read from the playlists above so the Sound Test keeps no list of its own. */
-export function allTracks(homeLoop = HOME_LOOP_LIVE): readonly TrackInfo[] {
-  const bunker = homeLoop ? tracksOf(BUNKER, 'bunker', FIRST_LEVEL) : [];
+export function allTracks(style: GameStyle = 'arcade'): readonly TrackInfo[] {
+  const bunker = playsFromHome(style) ? tracksOf(BUNKER, 'bunker', FIRST_LEVEL) : [];
   return [
     ...tracksOf(RUINS, 'title', FIRST_LEVEL),
     ...tracksOf(HORDE, 'horde', FIRST_LEVEL),
     ...bunker,
-    ...lullsFor(homeLoop).flatMap((playlist, index) => tracksOf(playlist, 'level', FIRST_LEVEL + index, true)),
+    ...lullsFor(style).flatMap((playlist, index) => tracksOf(playlist, 'level', FIRST_LEVEL + index, true)),
     ...tracksOf(VICTORY, 'victory', FINAL_LEVEL),
     ...tracksOf(CREDITS, 'credits', FINAL_LEVEL),
   ];
@@ -77,17 +78,17 @@ export function allTracks(homeLoop = HOME_LOOP_LIVE): readonly TrackInfo[] {
 const levelIndex = (level: number): number => Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, Math.floor(level))) - FIRST_LEVEL;
 
 /** The tracks of a level a Radio has not yet given up, in the order they are handed out. */
-export function lockedTracksOf(level: number, found: ReadonlySet<string>, homeLoop = HOME_LOOP_LIVE): readonly string[] {
-  const [, ...finds] = lullsFor(homeLoop)[levelIndex(level)].files;
+export function lockedTracksOf(level: number, found: ReadonlySet<string>, style: GameStyle = 'arcade'): readonly string[] {
+  const [, ...finds] = lullsFor(style)[levelIndex(level)].files;
   return finds.filter((file) => !found.has(file));
 }
 
 /** What a level plays: its own take and the finds so far. Kept by what it holds, so a scene keeps the same list object. */
 const HEARD = new Map<string, Playlist>();
 
-function heardOn(index: number, homeLoop: boolean, found: ReadonlySet<string>): Playlist {
-  const files = lullsFor(homeLoop)[index].files.filter((file, at) => at === 0 || found.has(file));
-  const key = `${homeLoop}:${index}:${files.join()}`;
+function heardOn(index: number, style: GameStyle, found: ReadonlySet<string>): Playlist {
+  const files = lullsFor(style)[index].files.filter((file, at) => at === 0 || found.has(file));
+  const key = `${style}:${index}:${files.join()}`;
   const kept = HEARD.get(key);
   if (kept) return kept;
   const made = lull(...files);
@@ -98,12 +99,12 @@ function heardOn(index: number, homeLoop: boolean, found: ReadonlySet<string>): 
 
 
 /** What plays in a scene on a level. Levels past either end of the run hold to the nearest. */
-export function playlistFor(scene: Scene, level: number, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): Playlist {
+export function playlistFor(scene: Scene, level: number, style: GameStyle = 'arcade', found: ReadonlySet<string> = foundTracks()): Playlist {
   if (scene === 'menu') return RUINS;
-  if (scene === 'bunker' && homeLoop) return BUNKER;
+  if (scene === 'bunker' && playsFromHome(style)) return BUNKER;
   if (scene === 'wave') return HORDE;
   if (scene === 'victory') return VICTORY;
   if (scene === 'credits') return CREDITS;
   if (scene === 'gameover') return QUIET;
-  return heardOn(levelIndex(level), homeLoop, found);
+  return heardOn(levelIndex(level), style, found);
 }

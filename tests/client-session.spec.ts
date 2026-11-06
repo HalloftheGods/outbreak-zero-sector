@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TICK_DT } from '../shared/constants.ts';
+import type { GameStyle } from '../shared/game-style.ts';
 import type { SnapshotPacket, WelcomePacket } from '../shared/protocol.ts';
 import { LocalSession } from '../src/network/local-session.ts';
 import { SocketSession } from '../src/network/socket-session.ts';
@@ -130,7 +131,6 @@ class FakeSocket {
   static last: FakeSocket;
   readyState = 0;
   sent: string[] = [];
-  onopen: (() => void) | null = null;
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
   closed = false;
@@ -147,9 +147,10 @@ class FakeSocket {
     this.closed = true;
   }
 
-  open(): void {
+  /** The server's first word is what the room plays. */
+  open(style: GameStyle | null = null): void {
     this.readyState = FakeSocket.OPEN;
-    this.onopen?.();
+    this.onmessage?.({ data: JSON.stringify({ type: 'room', style }) });
   }
 }
 
@@ -163,14 +164,36 @@ describe('SocketSession', () => {
     const welcomes: WelcomePacket[] = [];
     session.onClosed = (reason) => closed.push(reason);
     session.onWelcome = (packet) => welcomes.push(packet);
+    session.onRoom = (style) => session.join(style ?? 'arcade');
     session.connect({ name: 'ANA' });
     return { session, closed, welcomes, socket: FakeSocket.last };
   }
 
-  it('joins on open', () => {
+  it('joins once the room has said what it plays, naming that style', () => {
     const { socket } = connect();
-    socket.open();
-    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'join', name: 'ANA', token: expect.any(String) });
+    expect(socket.sent).toHaveLength(0);
+    socket.open('campaign');
+    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'join', name: 'ANA', token: expect.any(String), style: 'campaign' });
+  });
+
+  it('hears the room again if it moved on before the join landed, but not after the welcome', () => {
+    const { session, socket } = connect();
+    const heard: (GameStyle | null)[] = [];
+    session.onRoom = (style) => heard.push(style);
+    socket.open(null);
+    socket.onmessage?.({ data: JSON.stringify({ type: 'room', style: 'arcade' }) });
+    socket.onmessage?.({ data: welcome });
+    socket.onmessage?.({ data: JSON.stringify({ type: 'room', style: 'campaign' }) });
+    expect(heard).toEqual([null, 'arcade']);
+  });
+
+  it('takes no notice of a room packet that names no style it knows', () => {
+    const { session, socket } = connect();
+    const heard: unknown[] = [];
+    session.onRoom = (style) => heard.push(style);
+    socket.onmessage?.({ data: JSON.stringify({ type: 'room', style: 'endless' }) });
+    socket.onmessage?.({ data: JSON.stringify({ type: 'room' }) });
+    expect(heard).toEqual([]);
   });
 
   it('gives up with a reason when nothing answers', () => {

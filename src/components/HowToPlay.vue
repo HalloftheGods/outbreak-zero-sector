@@ -23,7 +23,7 @@
 import { provide } from 'vue';
 import { buildArtBook } from '../art/index.ts';
 import { trackTitlePage } from '../game/analytics/index.ts';
-import { isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
+import { isLevelUnlocked, loadFurthestProgress } from '../game/level-progress.ts';
 import { MAGAZINE_LINKS, useMagazineReader } from '../game/magazine-controller.ts';
 import { buildMagazine, CONTENTS_PAGE } from '../game/magazine-pages.ts';
 import MagazineBook from './magazine/MagazineBook.vue';
@@ -40,7 +40,7 @@ import { useGame } from './use-game.ts';
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 trackTitlePage('howto');
-const progress = loadLevelProgress();
+const progress = loadFurthestProgress();
 const magazine = buildMagazine(buildArtBook(), (level) => isLevelUnlocked(level, progress));
 const reader = useMagazineReader(magazine, () => game.playUi('click'), () => emit('close'));
 const view = reader.view;

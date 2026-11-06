@@ -41,7 +41,6 @@ describe('parseHome', () => {
   it('passes every well-formed action', () => {
     expect(parseHome({ kind: 'pick_level', level: 3 })).toEqual({ kind: 'pick_level', level: 3 });
     expect(parseHome({ kind: 'ready', ready: true })).toEqual({ kind: 'ready', ready: true });
-    expect(parseHome({ kind: 'ready', ready: true, ownsGun: true })).toEqual({ kind: 'ready', ready: true, ownsGun: true });
     expect(parseHome({ kind: 'leave_station' })).toEqual({ kind: 'leave_station' });
     expect(parseHome({ kind: 'highest', highest: FINAL_LEVEL })).toEqual({ kind: 'highest', highest: FINAL_LEVEL });
   });
@@ -60,7 +59,6 @@ describe('parseHome', () => {
     ['a level past the last', { kind: 'pick_level', level: FINAL_LEVEL + 1 }],
     ['a fractional level', { kind: 'pick_level', level: 1.5 }],
     ['a ready that is not a flag', { kind: 'ready', ready: 'yes' }],
-    ['an ownsGun that is not a flag', { kind: 'ready', ready: true, ownsGun: 1 }],
     ['a highest past the last', { kind: 'highest', highest: FINAL_LEVEL + 1 }],
   ])('refuses %s', (_name, value) => {
     expect(parseHome(value)).toBeNull();
@@ -149,7 +147,7 @@ describe('solo', () => {
     session.connect({ name: 'a', startLevel: 3 });
     expect(seeds).toEqual([session.sim?.map.seed]);
     session.disconnect();
-    session.connect({ name: 'a', homeLoop: true });
+    session.connect({ name: 'a', style: 'campaign' });
     expect(seeds[1]).toBe(BUNKER_SEED);
     session.disconnect();
   });
@@ -158,7 +156,7 @@ describe('solo', () => {
     const session = new LocalSession();
     const welcomes: number[] = [];
     session.onWelcome = (packet) => welcomes.push(packet.mapSeed);
-    session.connect({ name: 'a', homeLoop: true });
+    session.connect({ name: 'a', style: 'campaign' });
     const sim = session.sim;
     session.requestRestart();
     expect(session.sim).toBe(sim);

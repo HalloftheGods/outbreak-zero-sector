@@ -108,7 +108,7 @@ describe('game flow', () => {
 
   function joinRoom(): FakeSocket {
     vi.stubGlobal('WebSocket', FakeSocket);
-    game.startCoop();
+    game.startCoop('arcade');
     const socket = FakeSocket.latest;
     socket.onopen?.();
     socket.receive({ type: 'welcome', yourId: 'me', tickRate: 30, mapSeed: 4242 });
@@ -121,7 +121,7 @@ describe('game flow', () => {
   });
 
   it('starts solo from the setup page and fills in the HUD', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(500);
     const { screen, hud, mode } = game.ui.value;
     expect(screen).toBe('game');
@@ -132,7 +132,7 @@ describe('game flow', () => {
 
   it('connects from the co-op setup page', () => {
     vi.stubGlobal('WebSocket', FakeSocket);
-    game.startCoop();
+    game.startCoop('arcade');
     expect(game.ui.value).toMatchObject({ mode: 'coop', connecting: true });
     expect(game.sim).toBeNull();
   });
@@ -146,7 +146,7 @@ describe('game flow', () => {
   });
 
   it('pauses solo when the window loses focus', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     browser.dispatch('blur', {});
     expect(game.ui.value.paused).toBe(true);
@@ -156,7 +156,7 @@ describe('game flow', () => {
   });
 
   it('leaves an open map alone when the window loses focus', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     pressKey('Tab');
     browser.dispatch('blur', {});
@@ -172,7 +172,7 @@ describe('game flow', () => {
   });
 
   it('keeps a held Tab in the game with the map open, and Escape still closes it', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     pressKey('Tab');
     const repeat = { code: 'Tab', repeat: true, target: null, preventDefault: vi.fn() };
@@ -184,7 +184,7 @@ describe('game flow', () => {
   });
 
   it('lets Tab move focus around the pause menu', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     browser.dispatch('keydown', { code: 'Escape', repeat: false, target: null, preventDefault() {} });
     const repeat = { code: 'Tab', repeat: true, target: null, preventDefault: vi.fn() };
@@ -193,7 +193,7 @@ describe('game flow', () => {
   });
 
   it('truly stops the sim on pause in solo', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     browser.dispatch('keydown', { code: 'Escape', repeat: false, target: null, preventDefault() {} });
     expect(game.ui.value.paused).toBe(true);
@@ -212,14 +212,14 @@ describe('game flow', () => {
   }
 
   it('starts the run with one magazine, one reload and no medkit', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     expect(game.ui.value.hud).toMatchObject({ ammo: 12, reserve: 12, medkits: 0 });
     expect(game.ui.value.hud?.ammoBag.pistol).toBe(12);
   });
 
   it('fires a shot for a click that ends between ticks', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     browser.dispatch('mousedown', { button: 0, clientX: 0, clientY: 0 });
     browser.dispatch('mouseup', { button: 0 });
@@ -228,7 +228,7 @@ describe('game flow', () => {
   });
 
   it('shows a found gun as loaded while the one in hand is dry', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(200);
     const local = stateOf(game.sim!).players[0];
     local.owned = ['pistol', 'carbine'];
@@ -245,7 +245,7 @@ describe('game flow', () => {
   });
 
   it('walks on after the map closes with the key still down', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     const local = stateOf(game.sim!).players[0];
     browser.dispatch('keydown', { code: 'KeyD', repeat: false, target: null, preventDefault() {} });
@@ -258,7 +258,7 @@ describe('game flow', () => {
   });
 
   it('stops the sim while the town map is open in solo, and carries on after', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     pressKey('Tab');
     expect(game.ui.value.mapOpen).toBe(true);
@@ -273,7 +273,7 @@ describe('game flow', () => {
   });
 
   it('closes the map on Escape instead of pausing on top of it', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     pressKey('Tab');
     browser.dispatch('keydown', { code: 'Escape', repeat: false, target: null, preventDefault() {} });
@@ -284,7 +284,7 @@ describe('game flow', () => {
   it('keeps the map shut behind the pause menu and on the title', () => {
     pressKey('Tab');
     expect(game.ui.value.mapOpen).toBe(false);
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     browser.dispatch('keydown', { code: 'Escape', repeat: false, target: null, preventDefault() {} });
     pressKey('Tab');
@@ -292,7 +292,7 @@ describe('game flow', () => {
   });
 
   it('names a landmark on the way in, once, and not a house', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(200);
     const sim = game.sim!;
     const state = stateOf(sim);
@@ -313,7 +313,7 @@ describe('game flow', () => {
   });
 
   it('paints the town map into the canvas the screen hands over', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(300);
     pressKey('Tab');
     const canvas = fakeCanvas();
@@ -324,7 +324,7 @@ describe('game flow', () => {
   });
 
   it('runs to game over, then back into a new run', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(100);
     const firstSim = game.sim;
     const state = stateOf(firstSim!);
@@ -417,7 +417,7 @@ describe('game flow', () => {
   });
 
   it('returns to the menu and cleans up the session', () => {
-    game.startSolo();
+    game.startSolo('arcade');
     pump(200);
     game.toMenu();
     pump(100);
@@ -436,13 +436,13 @@ describe('game flow', () => {
       }
     }
     vi.stubGlobal('WebSocket', DeadSocket);
-    game.startCoop();
+    game.startCoop('arcade');
     expect(game.ui.value.connecting).toBe(true);
     pump(100);
     expect(game.ui.value.connecting).toBe(false);
     expect(game.ui.value.error).toMatch(/could not reach/i);
     expect(game.ui.value.screen).toBe('title');
-    game.startSolo();
+    game.startSolo('arcade');
     pump(100);
     expect(game.ui.value.screen).toBe('game');
     expect(game.ui.value.error).toBeNull();
@@ -450,7 +450,7 @@ describe('game flow', () => {
 
   it('refuses a nonsense server address without leaving the title', () => {
     game.setServerAddress('not a host');
-    game.startCoop();
+    game.startCoop('arcade');
     expect(game.ui.value.error).toMatch(/address/i);
     expect(game.ui.value.connecting).toBe(false);
   });

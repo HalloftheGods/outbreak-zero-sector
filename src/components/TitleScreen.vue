@@ -1,9 +1,9 @@
 <template>
-  <section v-if="page === null" class="px-screen px-title-scale title">
+  <section v-if="nav.page === null" class="px-screen px-title-scale title">
     <SpriteImg v-if="ui.art" class="title-logo" :sprite="ui.art.ui.logo" />
     <h1 v-else class="px-heading">UNDEAD OF NIGHT: LAST ROUND</h1>
 
-    <TitleMenu v-model="selected" :entries="menu" @open="page = $event" />
+    <TitleMenu v-model="selected" :entries="TITLE_MENU" @open="nav = openPage(nav, $event)" />
     <InstallCartridge />
 
     <footer class="title-foot">
@@ -16,22 +16,22 @@
     <p class="title-version">v{{ APP_VERSION }}</p>
   </section>
 
-  <PlaySetup v-else-if="page === 'play'" :ui :join="invited" :level="startLevel" @close="closePlay" />
-  <LevelsPage v-else-if="page === 'levels'" :art="ui.art" @start="startFromLevel" @close="close" />
-  <HowToPlay v-else-if="page === 'howto'" @close="close" />
-  <RecordsPage v-else-if="page === 'records'" :ui @close="close" />
-  <SoundTestPage v-else-if="page === 'sound'" @close="close" />
+  <PlaySetup v-else-if="nav.page === 'play'" :ui :join="nav.invited" :level="nav.startLevel" @close="nav = closePlay(nav)" />
+  <LevelsPage v-else-if="nav.page === 'levels'" :art="ui.art" @start="nav = pickLevel(nav, $event)" @close="close" />
+  <HowToPlay v-else-if="nav.page === 'howto'" @close="close" />
+  <RecordsPage v-else-if="nav.page === 'records'" :ui @close="close" />
+  <SoundTestPage v-else-if="nav.page === 'sound'" @close="close" />
   <OptionsPage v-else :ui @close="close" />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { openPrivacy, privacyOpen } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { parseJoinParam, withoutJoinParam } from '../game/invite-link.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
-import { titleMenu } from '../game/title-menu.ts';
-import type { TitlePage } from '../game/title-menu.ts';
+import { TITLE_MENU } from '../game/title-menu.ts';
+import { closePage, closePlay, INVITE_LANDING, openPage, pickLevel, TITLE_HOME } from '../game/title-nav.ts';
 import HowToPlay from './HowToPlay.vue';
 import InstallCartridge from './InstallCartridge.vue';
 import LevelsPage from './LevelsPage.vue';
@@ -48,39 +48,22 @@ declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
 const { ui } = defineProps<{ ui: UiState }>();
-const menu = computed(() => titleMenu(ui.homeLoop));
 
 const game = useGame();
-const page = ref<TitlePage | null>(null);
-const invited = ref(false);
+const nav = ref(TITLE_HOME);
 
 /** An invite link (?join=host:port) fills in the server address and opens co-op setup. */
 const joinAddress = parseJoinParam(window.location.search);
 if (joinAddress) {
   game.setServerAddress(joinAddress);
-  invited.value = true;
-  page.value = 'play';
+  nav.value = INVITE_LANDING;
   window.history.replaceState(null, '', withoutJoinParam(window.location.href));
 }
 /** Lives here, so Back returns to the item the player left from. */
 const selected = ref(0);
 
-/** Set when a level was picked on the Levels page, so Play setup starts there and Back returns to the Levels page. */
-const startLevel = ref<number | null>(null);
-
 function close(): void {
-  page.value = null;
-}
-
-function startFromLevel(level: number): void {
-  startLevel.value = level;
-  page.value = 'play';
-}
-
-function closePlay(): void {
-  const cameFromLevels = startLevel.value !== null;
-  startLevel.value = null;
-  page.value = cameFromLevels ? 'levels' : null;
+  nav.value = closePage(nav.value);
 }
 </script>
 
