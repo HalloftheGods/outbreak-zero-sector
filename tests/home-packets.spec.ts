@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseHome, parseJoinHome } from '../server/home-packets.ts';
 import { parseClientPacket } from '../server/packets.ts';
 import { BUNKER_SEED } from '../shared/home-protocol.ts';
-import type { HomeView, TripReceipt } from '../shared/home-protocol.ts';
+import type { HomeView, OverrunReceipt, OverrunView, TripReceipt } from '../shared/home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL } from '../shared/levels.ts';
 import { emptyLoadout } from '../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { LocalSession } from '../src/network/local-session.ts';
-import { isHomeView, isLoadout, isRoomHomeView, isTripReceipt } from '../src/network/home-guards.ts';
+import { isHomeView, isLoadout, isOverrunReceipt, isOverrunView, isRoomHomeView, isTripReceipt } from '../src/network/home-guards.ts';
 import { isPlayerEntity, isSnapshotPacket, isWelcomePacket } from '../src/network/packet-guards.ts';
 
 /** A stand-in for the lane's real check: this spec is about what the parser does with its answer. */
@@ -22,7 +22,14 @@ const receipt: TripReceipt = {
   replay: false, score: 100, kills: 4, hordes: 2, seconds: 90, ending: false, gear: emptyLoadout(),
 };
 
-const view: HomeView = { silver: 5, jewels: { small: 0, large: 1 }, station: 'forge', stationHold: 0.5, ready: false, receipt };
+const overrun: OverrunReceipt = {
+  simId: 'abc-01', serial: 4, outcome: 'held', share: 0, chest: emptyLoadout(), silver: 60, jewels: { small: 1, large: 0 },
+  lost: null, kills: 12, seconds: 240,
+};
+
+const clock: OverrunView = { phase: 'breached', left: 0, slowed: false, hostiles: 18, total: 24 };
+
+const view: HomeView = { silver: 5, jewels: { small: 0, large: 1 }, station: 'forge', stationHold: 0.5, ready: false, receipt, overrun: null };
 
 const player: PlayerEntity = {
   id: 'p1', name: 'ANA', skin: 0, x: 1, y: 2, angle: 0, moving: false, status: 'alive',
@@ -129,6 +136,48 @@ describe('home guards', () => {
   it('reads a room view with or without a pick', () => {
     expect(isRoomHomeView({ pickedLevel: 3, roomHighest: 3 })).toBe(true);
     expect(isRoomHomeView({ pickedLevel: null, roomHighest: 1 })).toBe(true);
+  });
+
+  it('reads an overrun receipt of each outcome, on a view or alone', () => {
+    expect(isHomeView({ ...view, overrun })).toBe(true);
+    expect(isOverrunReceipt({ ...overrun, outcome: 'fled', share: 0.5, chest: null, silver: 0 })).toBe(true);
+    expect(isOverrunReceipt({ ...overrun, outcome: 'died', chest: null, lost: emptyLoadout() })).toBe(true);
+    expect(isPlayerEntity({ ...player, home: { ...view, overrun } })).toBe(true);
+  });
+
+  it.each([
+    ['an unknown outcome', { ...overrun, outcome: 'banked' }],
+    ['a share that is not a number', { ...overrun, share: 'half' }],
+    ['a chest that is not gear', { ...overrun, chest: { guns: 'all' } }],
+    ['lost gear that is not gear', { ...overrun, lost: 'everything' }],
+    ['missing jewels', { ...overrun, jewels: undefined }],
+    ['no sim id', { ...overrun, simId: 7 }],
+  ])('refuses an overrun receipt with %s', (_name, value) => {
+    expect(isOverrunReceipt(value)).toBe(false);
+    expect(isHomeView({ ...view, overrun: value })).toBe(false);
+  });
+
+  it('refuses a view that leaves the overrun receipt off', () => {
+    const { overrun: _left, ...withoutOverrun } = view;
+    expect(isHomeView(withoutOverrun)).toBe(false);
+  });
+
+  it('reads the room\'s clock, and a room view without one', () => {
+    expect(isOverrunView(clock)).toBe(true);
+    expect(isRoomHomeView({ pickedLevel: null, roomHighest: 3, overrun: clock })).toBe(true);
+    expect(isSnapshotPacket({ ...snapshot, home: { pickedLevel: null, roomHighest: 3, overrun: { ...clock, phase: 'counting', left: 212.4, slowed: true } } })).toBe(true);
+    expect(isRoomHomeView({ pickedLevel: null, roomHighest: 3 })).toBe(true);
+  });
+
+  it.each([
+    ['an unknown phase', { ...clock, phase: 'burning' }],
+    ['a clock that is not a number', { ...clock, left: '4:12' }],
+    ['slowed that is not a flag', { ...clock, slowed: 1 }],
+    ['no total', { ...clock, total: undefined }],
+    ['nothing', null],
+  ])('refuses a room clock with %s', (_name, value) => {
+    expect(isOverrunView(value)).toBe(false);
+    expect(isSnapshotPacket({ ...snapshot, home: { pickedLevel: null, roomHighest: 3, overrun: value } })).toBe(false);
   });
 
   it('accepts a welcome with resumed, and refuses one that is not a flag', () => {

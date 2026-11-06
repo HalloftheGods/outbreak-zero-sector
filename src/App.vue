@@ -20,6 +20,7 @@
         <JukeboxScreen v-else-if="ui.home.station === 'jukebox'" :art="ui.art" />
         <MerchantScreen v-else-if="ui.home.shop && ui.art" :home="ui.home" :art="ui.art" />
         <DeathSummary v-if="ui.home.death" :death="ui.home.death" />
+        <OverrunClock :overrun="ui.home.overrun" />
       </template>
       <TownMap v-if="ui.mapOpen" :mode="ui.mode" :in-bunker="ui.home?.inBunker === true" />
       <PauseMenu v-if="ui.paused" :ui :mode="ui.mode" />
@@ -57,6 +58,7 @@ import JukeboxScreen from './components/JukeboxScreen.vue';
 import LevelCard from './components/LevelCard.vue';
 import LockerScreen from './components/LockerScreen.vue';
 import MerchantScreen from './components/MerchantScreen.vue';
+import OverrunClock from './components/OverrunClock.vue';
 import PauseMenu from './components/PauseMenu.vue';
 import PrivacyPage from './components/PrivacyPage.vue';
 import StudioSplash from './components/StudioSplash.vue';

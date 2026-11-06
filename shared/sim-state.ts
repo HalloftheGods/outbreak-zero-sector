@@ -15,7 +15,7 @@ import type {
 } from './protocol.ts';
 import type { ContainerState } from './containers.ts';
 import type { FlowField, Point } from './flow-field.ts';
-import type { HomeView, Jewels, TripReceipt } from './home-protocol.ts';
+import type { HomeView, Jewels, OverrunPhase, TripReceipt } from './home-protocol.ts';
 import { randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import type { SpatialHashGrid } from './spatial-grid.ts';
@@ -201,6 +201,26 @@ export interface HomeRun {
   unclaimed: Map<string, TripReceipt>;
 }
 
+/** The room's horde clock, from an arrival in the bunker to the horde killed or the room fallen. */
+export interface OverrunState {
+  phase: OverrunPhase;
+  /** Seconds on the clock to the breach. */
+  left: number;
+  /** The clock ran at the menu rate on the last tick. */
+  slowed: boolean;
+  /** Warnings given so far, an index into `OVERRUN_WARNINGS`. */
+  warned: number;
+  /** The horde still to come through the door, kept apart from a town's `spawnQueue`. */
+  queue: ZombieType[];
+  spawnTimer: number;
+  /** The breach's roster size, 0 before it. */
+  total: number;
+  /** Horde zombies killed since the breach. */
+  kills: number;
+  /** `sim.tick` at the arrival, for a receipt's seconds. */
+  startTick: number;
+}
+
 export interface SimState {
   /** Every level's town follows from this. */
   readonly runSeed: number;
@@ -253,6 +273,10 @@ export interface SimState {
   bench: BenchState | null;
   /** Null outside home mode. */
   homeRun: HomeRun | null;
+  /** The bunker runs a horde clock. Off unless asked for. */
+  readonly overrunOn: boolean;
+  /** Null with the overrun off, on a first visit, out on a trip, and from its end to the next arrival. */
+  overrun: OverrunState | null;
 }
 
 export function entityId(sim: SimState, prefix: string): EntityId {

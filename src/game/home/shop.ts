@@ -18,6 +18,10 @@ import type { ItemDef, MerchantDef } from './merchant-data.ts';
 export interface MerchantStock {
   /** How many of each item are left, by item id. Items that are always on the shelf are not listed. */
   items: Record<string, number>;
+  /** Banked trips until a stall the overrun emptied opens again with a full roll. Left off for 0, an open stall. */
+  closedTrips?: number;
+  /** Banked trips until a stall the overrun thinned rolls full counts again. Left off for 0. */
+  thinTrips?: number;
 }
 
 export interface ShopState {
@@ -47,6 +51,11 @@ export interface ShopRow {
 }
 
 const ROLL_STRIDE = 0x9e3779b1;
+
+/** The stalls the overrun emptied, which have no merchant at them until they reopen. */
+export function closedStalls(shop: ShopState): MerchantId[] {
+  return MERCHANT_IDS.filter((id) => (shop.merchants[id].closedTrips ?? 0) > 0);
+}
 
 export function emptyShop(seed: number): ShopState {
   const merchants = Object.fromEntries(MERCHANT_IDS.map((id) => [id, { items: {} }])) as Record<MerchantId, MerchantStock>;

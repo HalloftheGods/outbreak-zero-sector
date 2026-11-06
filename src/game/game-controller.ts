@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
 import type { GameStyle } from '../../shared/game-style.ts';
+import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { WorldMap } from '../../shared/protocol.ts';
 import { generateWorldMap } from '../../shared/world-map.ts';
 import { buildArtBook } from '../art/index.ts';
@@ -17,6 +18,7 @@ import type { HomeLinkHost } from './home-link.ts';
 import type { HomeActions } from './home-hud.ts';
 import { createBrowserHomeStore } from './home/browser-home-store.ts';
 import type { HomeStore } from './home/home-store.ts';
+import { closedStalls } from './home/shop.ts';
 import type { UiState } from './hud-state.ts';
 import { InputManager } from './input-manager.ts';
 import { InputSender } from './input-sender.ts';
@@ -438,6 +440,7 @@ export class GameController {
     // A finger picks a spot on the picture, so the picture must not lean toward it and move the spot.
     const scene: SceneView = {
       ...entities,
+      closedStalls: this.closedStalls(),
       pointerX: over || touch ? null : pointerX,
       pointerY: over || touch ? null : pointerY,
       showCrosshair: this.isPlaying() && !menuUp && !this.bench.open,
@@ -461,6 +464,12 @@ export class GameController {
       networked: transport?.kind === 'coop',
       lastSnapshotMs: this.run.lastSnapshotMs,
     });
+  }
+
+  /** The stalls this player's own save has closed. */
+  private closedStalls(): MerchantId[] {
+    const { save } = this.homeLink.facts();
+    return save ? closedStalls(save.shop) : [];
   }
 
   private sendNeutralInput(): void {

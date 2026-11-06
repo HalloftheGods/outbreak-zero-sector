@@ -18,7 +18,7 @@ const MAX_BULLET_LEAD_SEC = 0.1;
 
 export type WorldEntities = Pick<
   SceneView,
-  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'tracks' | 'searchable' | 'station' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
+  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'tracks' | 'searchable' | 'station' | 'overrun' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
 >;
 
 /** What this client currently believes: buffered snapshots plus the predicted local player. */
@@ -130,6 +130,7 @@ export class ClientWorld {
     const viewer = shownLocal ? this.viewer(players, shownLocal) : players[0] ?? null;
     const lead = Math.min(MAX_BULLET_LEAD_SEC, Math.max(0, (nowMs - this.latestArrival) / 1000));
     const station = this.stationBy(shownLocal);
+    const overrun = newest.snapshot.home?.overrun;
     return {
       players,
       zombies: interpolateZombies(sample),
@@ -140,6 +141,7 @@ export class ClientWorld {
       tracks: newest.snapshot.tracks ?? [],
       searchable: this.searchableBy(shownLocal, newest.snapshot.openedContainers),
       ...(station ? { station } : {}),
+      ...(overrun ? { overrun } : {}),
       localId: this.localId,
       viewerId: viewer?.id ?? null,
       focusX: viewer?.x ?? 0,

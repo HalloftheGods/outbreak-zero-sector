@@ -4,6 +4,7 @@ import type { HomeAction, JoinHome } from './home-protocol.ts';
 import { enterBunker, enterTown, placeAtEntry } from './level-change.ts';
 import { FIRST_LEVEL } from './levels.ts';
 import { applyLoadout, emptyLoadout, issueFreePistol, validateLoadout } from './loadout.ts';
+import { startOverrunClock } from './overrun.ts';
 import { announceRunStart, clampLevel } from './sim-factory.ts';
 import type { HomeRun, PlayerHome, PlayerState, SimState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
@@ -34,6 +35,7 @@ export function enterHome(sim: SimState, p: PlayerState, join?: JoinHome): void 
     stationHold: 0,
     ready: false,
     receipt: null,
+    overrun: null,
     highest: clampLevel(join?.highest),
     finished: join?.finished === true,
     lost: { silver: 0, jewels: { small: 0, large: 0 } },
@@ -82,6 +84,7 @@ export function startTrip(sim: SimState, level: number): void {
   run.tripLevel = level;
   run.tripReplay = level < run.roomHighest;
   run.pickedLevel = null;
+  sim.overrun = null;
   sim.runStartTick = sim.tick;
   sim.hordesBehind = 0;
   enterTown(sim, level);
@@ -126,6 +129,7 @@ function endTrip(sim: SimState, banks: (p: PlayerState) => boolean): void {
   enterBunker(sim);
   for (const p of everyBody(sim)) settleInBunker(sim, p);
   syncRoomHighest(sim);
+  startOverrunClock(sim);
 }
 
 /** The party reached the van. Only those on their feet and still connected bank: the downed, the dead and the departed lose it all. */

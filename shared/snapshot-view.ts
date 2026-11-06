@@ -1,11 +1,11 @@
 import { VIEWER_RANGE } from './constants.ts';
 import type { EntityId, PlayerEntity, SnapshotPacket } from './protocol.ts';
 
-/** What came home is nobody else's business, so everyone but the viewer reads as having no receipt. */
+/** What came home, and what an overrun gave or took, is nobody else's business: everyone but the viewer reads as having no receipts. */
 function withOwnReceipt(players: readonly PlayerEntity[], viewerId: EntityId): PlayerEntity[] {
   return players.map((p) => {
-    const hidden = p.id !== viewerId && p.home?.receipt;
-    return hidden ? { ...p, home: { ...p.home!, receipt: null } } : p;
+    const hidden = p.id !== viewerId && (p.home?.receipt || p.home?.overrun);
+    return hidden ? { ...p, home: { ...p.home!, receipt: null, overrun: null } } : p;
   });
 }
 

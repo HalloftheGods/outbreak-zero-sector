@@ -13,6 +13,7 @@ import { hordeStatus } from '../src/game/hud-state.ts';
 import { levelLine } from '../src/game/level-hud.ts';
 import { loadCampaignProgress, loadLevelProgress, recordLevelReached } from '../src/game/level-progress.ts';
 import { loadLeaderboard } from '../src/game/storage.ts';
+import { noteVanCover } from '../src/game/stage-cut.ts';
 import { loadBestTrip } from '../src/game/trip-record.ts';
 import { fakeCanvas, installFakeBrowser } from './client-fake-dom.ts';
 import type { FakeBrowser } from './client-fake-dom.ts';
@@ -254,6 +255,30 @@ describe('the run from the bunker', () => {
       expect(home?.death?.lost.guns.carbine).toBeDefined();
 
       game.home.wake();
+      await pump(100);
+      expect(game.ui.value.home?.death).toBeNull();
+    });
+
+    it('Enter cannot wake past a summary still under the van, or only just shown', async () => {
+      const { sim, state } = await startHome({ hands: gear({ guns: { carbine: {} } }) });
+      driveToTown(sim, state, 1);
+      await pump(400);
+      noteVanCover(true);
+      playerNamed(state, LOCAL).status = 'dead';
+      await pump(2000);
+      expect(game.ui.value.home?.death).not.toBeNull();
+
+      press('Enter');
+      await pump(100);
+      expect(game.ui.value.home?.death).not.toBeNull();
+
+      noteVanCover(false);
+      press('Enter');
+      await pump(100);
+      expect(game.ui.value.home?.death).not.toBeNull();
+
+      await pump(1100);
+      press('Enter');
       await pump(100);
       expect(game.ui.value.home?.death).toBeNull();
     });

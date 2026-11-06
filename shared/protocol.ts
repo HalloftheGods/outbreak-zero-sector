@@ -8,7 +8,7 @@ import type { Point } from './flow-field.ts';
 import type { GameStyle } from './game-style.ts';
 import type { PartId } from './gun-upgrade-data.ts';
 import type { PlayerGear } from './gun-upgrades.ts';
-import type { HomeAction, HomeView, JoinHome, RoomHomeView, Station } from './home-protocol.ts';
+import type { HomeAction, HomeView, JoinHome, OverrunEnd, RoomHomeView, Station } from './home-protocol.ts';
 import type { GunEffect, RoundKitId } from './round-effect-data.ts';
 import type { BenchAction, BenchView } from './workbench.ts';
 import type { Box } from './world-query.ts';
@@ -197,6 +197,10 @@ export type GameEvent =
   | { readonly type: 'level_start'; readonly level: number }
   /** The van left the bunker for a town. `attempt` is the room's trip serial. */
   | { readonly type: 'trip_start'; readonly level: number; readonly attempt: number }
+  /** Something at the blast door: `step` counts the warnings from 0, `left` is the clock's seconds then. */
+  | { readonly type: 'overrun_warning'; readonly step: number; readonly left: number }
+  | { readonly type: 'overrun_breach'; readonly hostiles: number }
+  | { readonly type: 'overrun_end'; readonly outcome: OverrunEnd }
   | { readonly type: 'game_over'; readonly stats: GameOverStats };
 
 /** Compiles only while GAME_EVENT_TYPES lists exactly the names GameEvent declares. */
@@ -369,6 +373,9 @@ export const PROP_DEFS = {
   quartermaster: { w: 12, h: 8 },
   medic: { w: 12, h: 8 },
   powder: { w: 12, h: 8 },
+  /** Set into the hall's west wall, its footprint all rock, so nothing walks differently for it. */
+  blast_door: { w: 16, h: 48 },
+  chest: { w: 16, h: 10 },
 } as const;
 export type PropKind = keyof typeof PROP_DEFS;
 export const PROP_KINDS = Object.keys(PROP_DEFS) as PropKind[];

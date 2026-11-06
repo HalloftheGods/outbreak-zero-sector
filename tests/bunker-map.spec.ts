@@ -41,8 +41,9 @@ describe('the bunker map', () => {
     expect(reached.has(tileOf(map.exit?.x ?? 0, (map.exit?.y ?? 0) + 4))).toBe(true);
   });
 
-  it('has every station once, and spawn on open ground', () => {
-    expect((map.stations ?? []).map((station) => station.id).sort()).toEqual([...STATION_IDS].sort());
+  it('has every station once but the chest, which stands only after a held overrun, and spawn on open ground', () => {
+    const standing = STATION_IDS.filter((id) => id !== 'chest');
+    expect((map.stations ?? []).map((station) => station.id).sort()).toEqual([...standing].sort());
     expect(circleHitsSolid(map, map.spawn.x, map.spawn.y, PLAYER_RADIUS)).toBe(false);
   });
 

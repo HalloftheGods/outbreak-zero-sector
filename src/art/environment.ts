@@ -16,6 +16,7 @@ import { buildGunShop } from './environment/gun-shop.ts';
 import { buildBungalow, buildGableHouse, buildHipHouse } from './environment/house.ts';
 import { buildMerchantProps } from './environment/merchants.ts';
 import { buildBush, buildRubble, buildTree } from './environment/nature.ts';
+import { buildBlastDoor, buildBlastDoorBuckling, buildBlastDoorBurst, buildChest, buildChestOpen } from './environment/overrun-props.ts';
 import { buildPharmacy } from './environment/pharmacy.ts';
 import { buildPolice } from './environment/police.ts';
 import {
@@ -65,7 +66,10 @@ export function buildEnvironment(): EnvironmentArt {
       level_map: buildLevelMap(),
       jukebox: buildJukebox(),
       ...buildMerchantProps(),
+      blast_door: buildBlastDoor(),
+      chest: buildChest(),
     },
+    overrun: { doorBuckling: buildBlastDoorBuckling(), doorBurst: buildBlastDoorBurst(), chestOpen: buildChestOpen() },
     buildings: {
       pharmacy: [buildPharmacy()],
       clinic: [buildClinic()],

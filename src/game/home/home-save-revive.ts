@@ -3,7 +3,7 @@
 import { isDifficultyId } from '../../../shared/difficulty.ts';
 import { MERCHANT_IDS } from '../../../shared/home-protocol.ts';
 import { isJewels, isLoadout } from '../../network/home-guards.ts';
-import type { HomeSave, OpenTrip, TripRecord } from './home-store.ts';
+import type { HomeSave, OpenOverrun, OpenTrip, OverrunRecord, TripRecord } from './home-store.ts';
 import { reviveQuests } from './quest-revive.ts';
 import type { ShopState } from './shop.ts';
 
@@ -32,7 +32,30 @@ function isTripRecord(v: unknown): v is TripRecord {
     && typeof v.replay === 'boolean';
 }
 
-const isStock = (v: unknown): boolean => isFields(v) && isFields(v.items) && Object.values(v.items).every(isNumber);
+function isOpenOverrun(v: unknown): v is OpenOverrun {
+  return isFields(v)
+    && typeof v.simId === 'string'
+    && isNumber(v.startedAt)
+    && (v.mode === 'solo' || v.mode === 'coop');
+}
+
+const MERCHANTS: readonly unknown[] = MERCHANT_IDS;
+const isMerchant = (v: unknown): boolean => MERCHANTS.includes(v);
+
+function isOverrunRecord(v: unknown): v is OverrunRecord {
+  return isFields(v)
+    && (v.outcome === 'held' || v.outcome === 'fled' || v.outcome === 'died')
+    && ['share', 'highest', 'kills', 'silver', 'at'].every((key) => isNumber((v as Fields)[key]))
+    && isDifficultyId(v.difficulty)
+    && Array.isArray(v.merchantsLost)
+    && v.merchantsLost.every(isMerchant);
+}
+
+/** A count the overrun left on a stall: absent on an old save, which is 0. */
+const isTripCount = (v: unknown): boolean => v === undefined || isNumber(v);
+
+const isStock = (v: unknown): boolean =>
+  isFields(v) && isFields(v.items) && Object.values(v.items).every(isNumber) && isTripCount(v.closedTrips) && isTripCount(v.thinTrips);
 
 function isShopState(v: unknown): v is ShopState {
   return isFields(v)
@@ -59,5 +82,7 @@ export function reviveSave(value: unknown, blank: HomeSave): HomeSave | null {
     ledger: listOf(value.ledger, isTripRecord),
     shop: isShopState(value.shop) ? value.shop : blank.shop,
     quests: reviveQuests(value.quests, blank.quests),
+    overruns: listOf(value.overruns, isOverrunRecord),
+    openOverrun: isOpenOverrun(value.openOverrun) ? value.openOverrun : null,
   };
 }

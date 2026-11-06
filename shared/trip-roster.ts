@@ -2,6 +2,7 @@
 
 import { TICK_RATE } from './constants.ts';
 import { FIRST_LEVEL } from './levels.ts';
+import { startOverrunClock } from './overrun.ts';
 import type { HomeRun, PlayerState, SimState } from './sim-state.ts';
 import { dropCarried } from './treasure.ts';
 
@@ -48,6 +49,14 @@ export function arriveInRoom(sim: SimState, p: PlayerState): void {
   home.leftTick = null;
   home.lastActiveTick = sim.tick;
   syncRoomHighest(sim);
+  startFreshRoomClock(sim);
+}
+
+/** The first player into a fresh home room starts its clock. Later arrivals, and rooms already under way, share what stands. */
+function startFreshRoomClock(sim: SimState): void {
+  const firstIntoFreshRoom = sim.tick === 0 && sim.players.length === 1 && sim.homeRun?.tripLevel === null;
+  const clockAlreadyRunning = sim.overrun !== null;
+  if (firstIntoFreshRoom && !clockAlreadyRunning) startOverrunClock(sim);
 }
 
 /**

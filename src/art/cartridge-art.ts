@@ -28,6 +28,12 @@ const SMALL: Readonly<Record<string, Grid>> = {
   T: ['###', '.#.', '.#.', '.#.', '.#.'],
   A: ['###', '#.#', '###', '#.#', '#.#'],
   L: ['#..', '#..', '#..', '#..', '###'],
+  U: ['#.#', '#.#', '#.#', '#.#', '###'],
+  D: ['##.', '#.#', '#.#', '#.#', '##.'],
+  E: ['###', '#..', '###', '#..', '###'],
+  O: ['###', '#.#', '#.#', '#.#', '###'],
+  F: ['###', '#..', '##.', '#..', '#..'],
+  ' ': ['.', '.', '.', '.', '.'],
 };
 
 const TITLE: Readonly<Record<string, Grid>> = {
@@ -35,6 +41,10 @@ const TITLE: Readonly<Record<string, Grid>> = {
   A: ['.###.', '##.##', '##.##', '#####', '##.##', '##.##', '##.##'],
   M: ['##...##', '###.###', '#######', '##.#.##', '##...##', '##...##', '##...##'],
   E: ['####', '##..', '##..', '###.', '##..', '##..', '####'],
+  N: ['##..##', '###.##', '######', '######', '##.###', '##..##', '##..##'],
+  I: ['####', '.##.', '.##.', '.##.', '.##.', '.##.', '####'],
+  H: ['##..##', '##..##', '##..##', '######', '##..##', '##..##', '##..##'],
+  T: ['######', '..##..', '..##..', '..##..', '..##..', '..##..', '..##..'],
 };
 
 function textWidth(text: string, font: Readonly<Record<string, Grid>>): number {
@@ -121,9 +131,24 @@ function beam(c: PixelCanvas, x: number, y: number): void {
   }
 }
 
-/** GAME in bone capitals dipped in blood: the blood line wanders a row, and four drips run off. */
-function title(): PixelCanvas {
-  const word = 'GAME';
+/** GAME's four drips, as column and length, kept as drawn for the Install Game cartridge. */
+const GAME_DRIPS: readonly (readonly [number, number])[] = [[4, 1], [8, 2], [14, 2], [24, 1]];
+
+/** Up to four drips for any other word, off the bottom of its letters and at least five columns apart. */
+function dripsOf(t: PixelCanvas): readonly (readonly [number, number])[] {
+  const found: [number, number][] = [];
+  let last = -9;
+  for (let x = 0; x < t.w; x++) {
+    const hangs = t.get(x, 7) !== null && x - last >= 5;
+    if (!hangs) continue;
+    found.push([x, [1, 2, 2, 1][found.length % 4]]);
+    last = x;
+  }
+  return found.slice(0, 4);
+}
+
+/** A word in bone capitals dipped in blood: the blood line wanders a row, and drips run off. */
+function title(word: string): PixelCanvas {
   const t = new PixelCanvas(textWidth(word, TITLE) + 2, 12);
   stamp(t, 1, 1, word, TITLE, bone[3]);
   for (let y = 0; y < t.h; y++) {
@@ -138,33 +163,42 @@ function title(): PixelCanvas {
       else t.px(x, y, row === 6 ? blood[1] : blood[2]);
     }
   }
-  for (const [x, length] of [[4, 1], [8, 2], [14, 2], [24, 1]]) {
+  for (const [x, length] of word === 'GAME' ? GAME_DRIPS : dripsOf(t)) {
     for (let i = 0; i < length; i++) t.px(x, 8 + i, blood[2]);
     t.px(x, 8 + length, blood[1]);
   }
   return t.outline({ color: ink[0] });
 }
 
-/** The INSTALL banner across the top, its notched tails folded behind. */
-function ribbon(c: PixelCanvas, w: number): void {
-  c.rect(0, 3, 4, 7, blood[1]);
-  c.rect(w - 4, 3, 4, 7, blood[1]);
+/** The banner across the top, its notched tails folded behind. Words too long for the usual face trim the tails to one pixel less. */
+function ribbon(c: PixelCanvas, w: number, text: string): void {
+  const roomy = textWidth(text, SMALL) <= w - 8;
+  const edge = roomy ? 2 : 1;
+  c.rect(0, 3, edge + 2, 7, blood[1]);
+  c.rect(w - edge - 2, 3, edge + 2, 7, blood[1]);
   c.px(0, 6, LABEL_SKY);
   c.px(w - 1, 6, LABEL_SKY);
-  c.rect(2, 1, w - 4, 7, blood[2]);
-  c.rect(2, 1, w - 4, 1, blood[3]);
-  c.rect(2, 7, w - 4, 1, blood[1]);
-  c.px(2, 8, blood[0]);
-  c.px(3, 8, blood[0]);
-  c.px(w - 3, 8, blood[0]);
-  c.px(w - 4, 8, blood[0]);
-  const text = 'INSTALL';
+  c.rect(edge, 1, w - 2 * edge, 7, blood[2]);
+  c.rect(edge, 1, w - 2 * edge, 1, blood[3]);
+  c.rect(edge, 7, w - 2 * edge, 1, blood[1]);
+  c.px(edge, 8, blood[0]);
+  c.px(edge + 1, 8, blood[0]);
+  c.px(w - edge - 1, 8, blood[0]);
+  c.px(w - edge - 2, 8, blood[0]);
   const left = Math.floor((w - textWidth(text, SMALL)) / 2);
   stamp(c, left, 3, text, SMALL, blood[0]);
   stamp(c, left, 2, text, SMALL, bone[3]);
 }
 
-function label(): PixelCanvas {
+/** What the label says: the ribbon's words and the big dripping word under it. The Install Game cartridge says INSTALL and GAME. */
+export interface CartridgeWords {
+  readonly ribbon: string;
+  readonly title: string;
+}
+
+const INSTALL_WORDS: CartridgeWords = { ribbon: 'INSTALL', title: 'GAME' };
+
+function label(words: CartridgeWords): PixelCanvas {
   const { width: w, height: h } = CARTRIDGE_LABEL;
   const c = new PixelCanvas(w, h);
   sky(c, w, h);
@@ -174,8 +208,10 @@ function label(): PixelCanvas {
   c.grid(2, 20, SURVIVOR, { '#': ink[0], '=': metal[3] });
   const zombie = new PixelCanvas(8, 9).grid(1, 1, ZOMBIE, { o: rot[1], O: rot[3] }).outline({ color: ink[0] });
   c.blit(zombie, 18, 19);
-  ribbon(c, w);
-  c.blit(title(), 1, 9);
+  ribbon(c, w, words.ribbon);
+  const big = title(words.title);
+  const installLeft = 1;
+  c.blit(big, words.title === INSTALL_WORDS.title ? installLeft : Math.floor((w - big.w) / 2), 9);
   c.grid(w - 8, h - 8, SEAL, { g: fire[0], G: fire[2], L: fire[3], '*': ink[0] });
   c.frame(0, 0, w, h, bone[2]);
   return c;
@@ -202,9 +238,9 @@ function shell(c: PixelCanvas): void {
   for (const gap of [16, 23, 30]) c.rect(gap, 49, 2, 5, wood[2]);
 }
 
-export function drawCartridge(): PixelCanvas {
+export function drawCartridge(words: CartridgeWords = INSTALL_WORDS): PixelCanvas {
   const c = new PixelCanvas(CARTRIDGE_WIDTH, CARTRIDGE_HEIGHT);
   shell(c);
-  c.blit(label(), CARTRIDGE_LABEL.x, CARTRIDGE_LABEL.y);
+  c.blit(label(words), CARTRIDGE_LABEL.x, CARTRIDGE_LABEL.y);
   return c;
 }

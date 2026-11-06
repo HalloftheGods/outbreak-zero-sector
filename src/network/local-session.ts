@@ -4,6 +4,7 @@ import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import { GameSimulation } from '../../shared/simulation.ts';
+import { overrunOn } from '../game/home-mode.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { TickClock } from './tick-clock.ts';
 import type { ConnectOptions, GameTransport } from './transport.ts';
@@ -75,7 +76,8 @@ export class LocalSession implements GameTransport {
   private beginRun(): void {
     const { name, difficulty, character, startLevel, home } = this.options;
     const seed = Math.floor(Math.random() * 0x7fffffff);
-    const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: this.playsHome });
+    const overrun = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
+    const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: this.playsHome, overrun });
     sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);
     this.sim = sim;
     this.paused = false;

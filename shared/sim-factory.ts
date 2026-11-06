@@ -27,6 +27,8 @@ export interface SimulationOptions {
   readonly startLevel?: number;
   /** Play from the bunker, in trips, instead of one run through the towns. Off unless asked for. */
   readonly home?: boolean;
+  /** Run the overrun's horde clock in the bunker. Off unless asked for, and nothing without `home`. */
+  readonly overrun?: boolean;
 }
 
 /** A level number held to the real range, so a stale or hand-edited save cannot start a town that is not there. */
@@ -80,6 +82,8 @@ export function createSimState(options: SimulationOptions): SimState {
     workbench: options.workbench ?? 'off',
     bench: null,
     homeRun: home ? newHomeRun(options.seed) : null,
+    overrunOn: home && options.overrun === true,
+    overrun: null,
   };
   if (home) {
     parkBunkerVan(sim);

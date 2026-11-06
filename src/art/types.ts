@@ -84,6 +84,12 @@ export interface EnvironmentArt {
   /** Variants per tile kind, each exactly TILE_SIZE square. */
   readonly tiles: Record<TileKind, readonly PixelSprite[]>;
   readonly props: Record<PropKind, PixelSprite>;
+  /** The overrun's other frames: props.blast_door is shut and props.chest is closed. The door frames share its size. */
+  readonly overrun: {
+    readonly doorBuckling: PixelSprite;
+    readonly doorBurst: PixelSprite;
+    readonly chestOpen: PixelSprite;
+  };
   /**
    * Exterior shell per building: roof plus south front wall with the door at doorX, anchored
    * at the bottom-centre of the footprint. The roof fades out when the local player is

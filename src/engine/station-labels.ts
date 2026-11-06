@@ -12,6 +12,7 @@ export const STATION_LABEL: Record<StationId, string> = {
   quartermaster: 'QUARTERMASTER',
   medic: 'MEDIC',
   powder: 'POWDER',
+  chest: 'CHEST',
 };
 
 /** What to show over a head: the key to hold, or the word a finger can press. */

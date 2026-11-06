@@ -7,7 +7,7 @@ import { homeUi } from './home-hud.ts';
 import type { HomeFacts } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
-import { hordeBanner, isLandmark, radioBanner, RunNotices } from './run-notices.ts';
+import { hordeBanner, isLandmark, overrunBanner, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
 import { lockedTracksOf } from '../audio/playlists.ts';
 import { trackName } from './sound-test.ts';
@@ -120,7 +120,7 @@ export class RunHud {
   onEvent(event: GameEvent, now: number): void {
     tapGameEvent(event);
     const track = isRadioFound(event) ? this.giveUpTrack() : null;
-    const banner = hordeBanner(event) ?? radioBanner(event, track === null ? null : trackName(track));
+    const banner = hordeBanner(event) ?? overrunBanner(event) ?? radioBanner(event, track === null ? null : trackName(track));
     if (banner) this.publish({ banner: this.notices.banner(banner, now) });
   }
 

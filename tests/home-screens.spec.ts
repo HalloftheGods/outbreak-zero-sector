@@ -32,6 +32,7 @@ function homeUi(patch: Partial<HomeUi> = {}): HomeUi {
     carried: { silver: 0, jewels: { small: 0, large: 0 } },
     pickedLevel: null,
     roomHighest: 1,
+    overrun: null,
     highest: 1,
     difficulty: BASELINE_DIFFICULTY,
     receipt: null,

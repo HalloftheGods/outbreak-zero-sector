@@ -110,11 +110,13 @@ function zombieRows(book: ArtBook): Row[] {
 }
 
 function environmentRows(book: ArtBook): Row[] {
-  const { tiles, props, buildings, interior, barrelFire } = book.environment;
+  const { tiles, props, buildings, interior, barrelFire, overrun } = book.environment;
   return [
     ...Object.entries(tiles).map(([kind, variants]) => spriteRow(`tile/${kind}`, variants)),
     ...Object.entries(props).map(([kind, sprite]) => spriteRow(`prop/${kind}`, [sprite])),
     ...Object.entries(buildings).map(([kind, variants]) => spriteRow(`building/${kind}`, variants)),
+    spriteRow('overrun/blast_door', [props.blast_door, overrun.doorBuckling, overrun.doorBurst]),
+    spriteRow('overrun/chest', [props.chest, overrun.chestOpen]),
     spriteRow('interior', Object.values(interior)),
     clipRow('barrelFire', barrelFire),
   ];

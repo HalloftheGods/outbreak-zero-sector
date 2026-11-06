@@ -3,7 +3,7 @@
 import { BASELINE_DIFFICULTY } from '../../shared/difficulty.ts';
 import type { DifficultyId } from '../../shared/difficulty.ts';
 import { isBunkerSeed, isMerchantId } from '../../shared/home-protocol.ts';
-import type { Jewels, Loadout, MerchantId, StationId, TripReceipt } from '../../shared/home-protocol.ts';
+import type { Jewels, Loadout, MerchantId, OverrunView, StationId, TripReceipt } from '../../shared/home-protocol.ts';
 import { FIRST_LEVEL } from '../../shared/levels.ts';
 import type { PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { HomeSave } from './home/home-store.ts';
@@ -31,6 +31,8 @@ export interface HomeUi {
   readonly pickedLevel: number | null;
   /** The highest level anyone in the room can pick. */
   readonly roomHighest: number;
+  /** The room's overrun clock, or null while there is none. */
+  readonly overrun: OverrunView | null;
   /** This player's own highest level, which the shop's gates read. */
   readonly highest: number;
   readonly difficulty: DifficultyId;
@@ -106,6 +108,7 @@ export function homeUi(snapshot: SnapshotPacket, local: PlayerEntity, facts: Hom
     carried: { silver: home.silver, jewels: home.jewels },
     pickedLevel: snapshot.home?.pickedLevel ?? null,
     roomHighest: snapshot.home?.roomHighest ?? FIRST_LEVEL,
+    overrun: snapshot.home?.overrun ?? null,
     highest: facts.highest,
     difficulty: facts.difficulty,
     receipt: home.receipt,

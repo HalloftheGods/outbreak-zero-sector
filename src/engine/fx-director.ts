@@ -34,6 +34,8 @@ const MUZZLE_LIGHT: Record<WeaponId, { radius: number; life: number }> = {
 
 const STATUS_LIGHT_RADIUS = 46;
 const STATUS_LIGHT_LIFE = 0.25;
+/** The blast door bursting: the screen-effects scale takes it down for reduced motion. */
+const OVERRUN_BURST_SHAKE = 0.6;
 const SHOT_KICK: Record<WeaponId, number> = { pistol: 0.16, carbine: 0.12, shotgun: 0.42 };
 
 const PICKUP_LABEL: Record<PickupType, string> = {
@@ -140,6 +142,7 @@ export class FxDirector {
       case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
       case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
       case 'zombie_status': this.onZombieStatus(event); break;
+      case 'overrun_breach': this.effects.addShake(OVERRUN_BURST_SHAKE); break;
       default: break;
     }
   }

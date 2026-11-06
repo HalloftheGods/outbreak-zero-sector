@@ -10,6 +10,7 @@ import { FIRST_LEVEL } from './levels.ts';
 import { giveReturnKit, updateDownedPlayers } from './player-health.ts';
 import { reclaimDeparted, reclaimLive, rememberDeparted, createPlayer } from './player-roster.ts';
 import type { Arrival } from './player-roster.ts';
+import { updateOverrun } from './overrun.ts';
 import { updatePickups } from './pickups.ts';
 import { receiveInput, updatePlayer } from './players.ts';
 import type { ClientInputPacket, GamePhase, PlayerEntity, SnapshotPacket, WorldMap } from './protocol.ts';
@@ -39,8 +40,12 @@ export type { SimulationOptions } from './sim-factory.ts';
 export class GameSimulation {
   private sim: SimState;
 
+  /** Kept apart from the sim, which an Arcade room built without home cannot carry it in. */
+  private readonly overrun: boolean;
+
   constructor(options: SimulationOptions) {
     this.sim = createSimState(options);
+    this.overrun = options.overrun === true;
   }
 
   /** The town being played, which changes with the level. */
@@ -85,7 +90,7 @@ export class GameSimulation {
     const roomInUse = players.length > 0;
     const unchanged = (homeRun !== null) === home;
     if (roomInUse || unchanged) return;
-    this.sim = createSimState({ seed: runSeed, random: rng, difficulty, workbench, home });
+    this.sim = createSimState({ seed: runSeed, random: rng, difficulty, workbench, home, overrun: this.overrun });
   }
 
   /** Near a living teammate if there is one, otherwise at the map spawn. */
@@ -196,6 +201,8 @@ export class GameSimulation {
     if (inTown) {
       updateWaves(sim);
       updatePopulation(sim);
+    } else {
+      updateOverrun(sim);
     }
   }
 

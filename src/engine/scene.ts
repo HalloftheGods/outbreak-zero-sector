@@ -9,7 +9,7 @@ import type {
   TrackEntity,
   ZombieEntity,
 } from '../../shared/protocol.ts';
-import type { StationId } from '../../shared/home-protocol.ts';
+import type { MerchantId, OverrunView, StationId } from '../../shared/home-protocol.ts';
 
 export { CHEST_HEIGHT } from '../../shared/constants.ts';
 
@@ -44,6 +44,10 @@ export interface SceneView {
   readonly searchable: Container | null;
   /** The bunker station the local player could open from where they stand. Absent anywhere else. */
   readonly station?: StationId;
+  /** The bunker's horde clock, which the door and the chest are drawn from. Absent when there is none. */
+  readonly overrun?: OverrunView;
+  /** Stalls the overrun emptied, by this player's own save. Their merchants stand down until the stall reopens. */
+  readonly closedStalls?: readonly MerchantId[];
   /** The player at this keyboard, if they exist yet. */
   readonly localId: EntityId | null;
   /** Whose eyes the camera is behind: localId, or a teammate when spectating. */

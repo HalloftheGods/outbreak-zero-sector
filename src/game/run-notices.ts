@@ -1,6 +1,7 @@
 import { MEDKIT_MAX, PICKUP_RADIUS, WEAPONS } from '../../shared/constants.ts';
 import { PART_CARRY_CAP } from '../../shared/gun-upgrade-data.ts';
 import { isPartPickup } from '../../shared/gun-upgrades.ts';
+import type { OverrunEnd } from '../../shared/home-protocol.ts';
 import type {
   BuildingKind,
   EntityId,
@@ -10,6 +11,7 @@ import type {
   PlayerEntity,
   WeaponId,
 } from '../../shared/protocol.ts';
+import { formatDuration } from './hud-state.ts';
 import type { Banner, LevelCard, PlaceBanner, UiState } from './hud-state.ts';
 import { levelTitle } from './level-hud.ts';
 import { isRadioFound } from './sound-unlock.ts';
@@ -80,6 +82,27 @@ export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   const hordeCame = event.type === 'wave_start';
   if (hordeCame) return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
   return SET_BANNERS[event.type] ?? null;
+}
+
+/** What each warning step says, from the first (2:30) to the last (0:30). */
+const OVERRUN_WARNING_TITLES: readonly string[] = ['THE DOOR IS STRAINING', 'THE DOOR IS BUCKLING', 'THE DOOR IS GOING'];
+
+const OVERRUN_ENDINGS: Record<OverrunEnd, Omit<Banner, 'key'>> = {
+  held: { title: 'THE DOOR HELD', subtitle: 'THE BUNKER IS YOURS', tone: 'hope' },
+  lost: { title: 'THE BUNKER FELL', subtitle: 'NOBODY LEFT STANDING', tone: 'danger' },
+};
+
+/** The banner for a warning step, the breach or the end of an overrun, or null for any other event. */
+export function overrunBanner(event: GameEvent): Omit<Banner, 'key'> | null {
+  switch (event.type) {
+    case 'overrun_warning': {
+      const title = OVERRUN_WARNING_TITLES[Math.min(event.step, OVERRUN_WARNING_TITLES.length - 1)];
+      return { title, subtitle: `${formatDuration(event.left)} LEFT`, tone: 'danger' };
+    }
+    case 'overrun_breach': return { title: 'OVERRUN', subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
+    case 'overrun_end': return OVERRUN_ENDINGS[event.outcome];
+    default: return null;
+  }
 }
 
 /** The find banner for a Radio, shown to everyone in the run, or null for anything else. */

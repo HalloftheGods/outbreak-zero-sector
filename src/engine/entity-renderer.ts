@@ -1,5 +1,6 @@
 import { PLAYER_RADIUS, ZOMBIES } from '../../shared/constants.ts';
 import { townContainers } from '../../shared/containers.ts';
+import { CHEST_SPOT } from '../../shared/bunker-map.ts';
 import { PROP_DEFS } from '../../shared/protocol.ts';
 import type {
   EntityId,
@@ -16,6 +17,7 @@ import type { ContainerArt } from '../art/containers.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
 import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
+import { chestPending, doorState } from './overrun-look.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { SceneView } from './scene.ts';
 import { bodyHeight, clipFrame, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
@@ -75,7 +77,8 @@ type DrawItem =
   | { readonly y: number; readonly kind: 'player'; readonly player: PlayerEntity }
   | { readonly y: number; readonly kind: 'zombie'; readonly zombie: ZombieEntity }
   | { readonly y: number; readonly kind: 'pickup'; readonly pickup: PickupEntity }
-  | { readonly y: number; readonly kind: 'exit'; readonly exit: ExitEntity };
+  | { readonly y: number; readonly kind: 'exit'; readonly exit: ExitEntity }
+  | { readonly y: number; readonly kind: 'chest' };
 
 const shadows = new Map<number, HTMLCanvasElement>();
 
@@ -209,9 +212,11 @@ export class EntityRenderer {
     for (const placed of this.props) {
       const onScreen = placed.x1 > left && placed.x0 < right && placed.y1 > top && placed.y0 < bottom;
       const roomClosed = placed.room !== null && placed.room.reveal === 0;
-      const shown = onScreen && !roomClosed;
+      const shown = onScreen && !roomClosed && !this.standsDown(placed, scene);
       if (shown) items.push({ y: placed.prop.y, kind: 'prop', prop: placed });
     }
+    const local = scene.players.find((player) => player.id === scene.localId) ?? null;
+    if (chestPending(scene.overrun, local)) items.push({ y: CHEST_SPOT.y, kind: 'chest' });
     for (const placed of this.buildings.placed) {
       const onScreen = placed.x1 > left && placed.x0 < right && placed.y1 > top && placed.y0 < bottom;
       if (onScreen) items.push({ y: placed.depthY, kind: 'building', building: placed });
@@ -230,6 +235,21 @@ export class EntityRenderer {
     const exitShown = exit !== null && visible(exit.x, exit.y);
     if (exitShown) items.push({ y: exit.y, kind: 'exit', exit });
     return items.sort((a, b) => a.y - b.y);
+  }
+
+  /** A merchant whose stall the overrun emptied is not at it: this player's save says so, and a teammate's may differ. */
+  private standsDown(placed: PlacedProp, scene: SceneView): boolean {
+    const stalls = scene.closedStalls ?? [];
+    return stalls.some((merchant) => merchant === placed.prop.kind);
+  }
+
+  /** The blast door's frame for how far the overrun has come; every other prop keeps its own sprite. */
+  private spriteOf(placed: PlacedProp, scene: SceneView): PixelSprite {
+    const isDoor = placed.prop.kind === 'blast_door';
+    if (!isDoor) return placed.sprite;
+    const { doorBuckling, doorBurst } = this.art.environment.overrun;
+    const frames = { shut: placed.sprite, buckling: doorBuckling, burst: doorBurst };
+    return frames[doorState(scene.overrun)];
   }
 
   /** The part of the scene that the lightmap darkens. */
@@ -257,6 +277,7 @@ export class EntityRenderer {
       else if (item.kind === 'player') this.drawPlayer(ctx, item.player, left, top, time);
       else if (item.kind === 'zombie') this.drawZombie(ctx, item.zombie, left, top, time);
       else if (item.kind === 'exit') drawSprite(ctx, this.art.environment.escapeVan, Math.round(item.exit.x) - left, Math.round(item.exit.y) - top);
+      else if (item.kind === 'chest') drawSprite(ctx, this.art.environment.props.chest, CHEST_SPOT.x - left, CHEST_SPOT.y - top);
       else this.drawPickup(ctx, item.pickup, left, top, time);
     }
   }
@@ -274,7 +295,7 @@ export class EntityRenderer {
     placed.alpha += ((hidesViewer ? FADED_ALPHA : 1) - placed.alpha) * blend;
     const { container } = placed;
     const searched = container !== null && scene.openedContainers.includes(container.id);
-    const sprite = searched ? container.art.opened : placed.sprite;
+    const sprite = searched ? container.art.opened : this.spriteOf(placed, scene);
     ctx.globalAlpha = placed.alpha;
     ctx.drawImage(spriteCanvas(sprite), Math.round(placed.prop.x) - sprite.ax - left, Math.round(placed.prop.y) - sprite.ay - top);
     ctx.globalAlpha = 1;

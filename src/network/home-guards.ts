@@ -2,8 +2,8 @@
 
 import { isDifficultyId } from '../../shared/difficulty.ts';
 import { PART_ORDER } from '../../shared/gun-upgrade-data.ts';
-import { STATION_IDS } from '../../shared/home-protocol.ts';
-import type { HomeView, Jewels, Loadout, RoomHomeView, TripReceipt } from '../../shared/home-protocol.ts';
+import { OVERRUN_PHASES, STATION_IDS } from '../../shared/home-protocol.ts';
+import type { HomeView, Jewels, Loadout, OverrunReceipt, OverrunView, RoomHomeView, TripReceipt } from '../../shared/home-protocol.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
 import { EFFECT_ORDER } from '../../shared/round-effect-data.ts';
@@ -13,6 +13,8 @@ type Fields = Record<string, unknown>;
 
 const STATIONS: readonly unknown[] = STATION_IDS;
 const OUTCOMES: readonly unknown[] = ['banked', 'died'];
+const OVERRUN_OUTCOMES: readonly unknown[] = ['held', 'fled', 'died'];
+const PHASES: readonly unknown[] = OVERRUN_PHASES;
 
 const isFields = (v: unknown): v is Fields => typeof v === 'object' && v !== null;
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -50,15 +52,36 @@ export function isTripReceipt(v: unknown): v is TripReceipt {
     && (v.gear === null || isLoadout(v.gear));
 }
 
+export function isOverrunReceipt(v: unknown): v is OverrunReceipt {
+  return isFields(v)
+    && typeof v.simId === 'string'
+    && OVERRUN_OUTCOMES.includes(v.outcome)
+    && hasNumbers(v, ['serial', 'share', 'silver', 'kills', 'seconds'])
+    && isJewels(v.jewels)
+    && (v.chest === null || isLoadout(v.chest))
+    && (v.lost === null || isLoadout(v.lost));
+}
+
+export function isOverrunView(v: unknown): v is OverrunView {
+  return isFields(v)
+    && PHASES.includes(v.phase)
+    && hasNumbers(v, ['left', 'hostiles', 'total'])
+    && typeof v.slowed === 'boolean';
+}
+
 export function isHomeView(v: unknown): v is HomeView {
   return isFields(v)
     && hasNumbers(v, ['silver', 'stationHold'])
     && isJewels(v.jewels)
     && (v.station === null || STATIONS.includes(v.station))
     && typeof v.ready === 'boolean'
-    && (v.receipt === null || isTripReceipt(v.receipt));
+    && (v.receipt === null || isTripReceipt(v.receipt))
+    && (v.overrun === null || isOverrunReceipt(v.overrun));
 }
 
 export function isRoomHomeView(v: unknown): v is RoomHomeView {
-  return isFields(v) && isNumber(v.roomHighest) && (v.pickedLevel === null || isNumber(v.pickedLevel));
+  return isFields(v)
+    && isNumber(v.roomHighest)
+    && (v.pickedLevel === null || isNumber(v.pickedLevel))
+    && (v.overrun === undefined || isOverrunView(v.overrun));
 }

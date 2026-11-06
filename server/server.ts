@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { DEFAULT_SERVER_PORT } from '../shared/constants.ts';
+import { OVERRUN_LIVE } from '../shared/home-protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import {
   HEARTBEAT_MS,
@@ -35,8 +36,8 @@ export interface RunningGameServer {
 }
 
 export function startGameServer(options: GameServerOptions): Promise<RunningGameServer> {
-  // Arcade until the first player into the room says otherwise.
-  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff), workbench: 'timed' });
+  // Arcade until the first player into the room says otherwise. A Campaign room runs the overrun once it is live.
+  const sim = options.simulation ?? new GameSimulation({ seed: options.seed ?? randomInt(0x7fffffff), workbench: 'timed', overrun: OVERRUN_LIVE });
   const joinDeadlineMs = options.joinDeadlineMs ?? JOIN_DEADLINE_MS;
   const room = createRoom(sim, options.restartVoteMs ?? RESTART_VOTE_MS);
   const clients = room.clients;

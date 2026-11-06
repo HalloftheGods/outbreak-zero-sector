@@ -248,6 +248,8 @@ export class AudioEngine {
       case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
       case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;
       case 'wave_start': mixer.play('wave_start'); break;
+      case 'overrun_warning': this.ambient(e.step === 0 ? 'distant_groan' : 'distant_crash'); break;
+      case 'overrun_breach': mixer.play('wave_start'); break;
       case 'wave_clear': mixer.play('wave_clear'); break;
       case 'game_over': mixer.play('game_over', { local: true }); break;
       case 'wave_intermission': break;

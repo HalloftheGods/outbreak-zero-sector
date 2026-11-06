@@ -1,7 +1,7 @@
 // What a player keeps between trips, and the one way to write it.
 
 import type { DifficultyId } from '../../../shared/difficulty.ts';
-import type { Jewels, Loadout } from '../../../shared/home-protocol.ts';
+import type { Jewels, Loadout, MerchantId } from '../../../shared/home-protocol.ts';
 import { emptyLoadout } from '../../../shared/loadout.ts';
 import { QUEST_SALT, starterQuests } from './quest-state.ts';
 import type { QuestState } from './quest-state.ts';
@@ -29,6 +29,10 @@ export interface HomeSave {
   ledger: readonly TripRecord[];
   shop: ShopState;
   quests: QuestState;
+  /** Every overrun that ended for this player, apart from `ledger` so that stays a list of trips. */
+  overruns: readonly OverrunRecord[];
+  /** Written when a breach is first seen. Still here on load, it is an overrun died in. */
+  openOverrun: OpenOverrun | null;
 }
 
 /** Written before a player counts as ready. Still here on load, it is a trip that never came home. */
@@ -50,6 +54,25 @@ export interface TripRecord {
   at: number;
 }
 
+export interface OverrunRecord {
+  outcome: 'held' | 'fled' | 'died';
+  share: number;
+  /** The room's highest level then, which sized the horde. */
+  highest: number;
+  difficulty: DifficultyId;
+  kills: number;
+  /** The merchants a flight cost. */
+  merchantsLost: readonly MerchantId[];
+  silver: number;
+  at: number;
+}
+
+export interface OpenOverrun {
+  simId: string;
+  mode: 'solo' | 'coop';
+  startedAt: number;
+}
+
 /** A first save with nothing in it, before `rollStock` has filled the shops. */
 export function emptySave(shopSeed: number): HomeSave {
   return {
@@ -63,5 +86,7 @@ export function emptySave(shopSeed: number): HomeSave {
     ledger: [],
     shop: emptyShop(shopSeed),
     quests: starterQuests(shopSeed ^ QUEST_SALT),
+    overruns: [],
+    openOverrun: null,
   };
 }

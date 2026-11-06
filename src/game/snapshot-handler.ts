@@ -15,6 +15,9 @@ const EVENT_MUSIC: Partial<Record<GameEvent['type'], 'wave' | 'intermission'>> =
 
 /** Takes each snapshot into the run: events to the senses, the world's latest, the end of the run. */
 export class SnapshotHandler {
+  /** The bunker's music is the horde's while the blast door is breached. */
+  private breached = false;
+
   constructor(
     private readonly host: RunHost,
     private readonly beginRun: () => void,
@@ -61,8 +64,12 @@ export class SnapshotHandler {
     const bunker = isBunkerSeed(snapshot.mapSeed);
     const moved = state.inBunker !== bunker;
     state.inBunker = bunker;
+    const breached = bunker && snapshot.home?.overrun?.phase === 'breached';
+    const turned = breached !== this.breached;
+    this.breached = breached;
+    const sceneChanged = moved || turned;
     if (bunker) {
-      if (moved) audio.setScene('bunker');
+      if (sceneChanged) audio.setScene(breached ? 'wave' : 'bunker');
       return;
     }
     const settling = firstOfRun || moved;

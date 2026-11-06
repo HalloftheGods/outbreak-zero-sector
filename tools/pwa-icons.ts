@@ -1,87 +1,33 @@
 /**
- * Draws the app icons from the zombie head in public/favicon.svg, one square of the 16 by 16 grid at a time.
+ * Draws the app icons from the game's cartridge (src/art/cartridge-art.ts) with the game's name on its label,
+ * centred on the ink colour at a whole number of pixels per art pixel so the edges stay crisp.
  * Run: node --experimental-strip-types tools/pwa-icons.ts
- * The Hall of the Gods name is not drawn on any of them.
+ * The Hall of the Gods name is not drawn on any of them. The favicon stays the zombie head: a cartridge is
+ * unreadable at 16 pixels.
  */
 import { deflateSync } from 'node:zlib';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { drawCartridge } from '../src/art/cartridge-art.ts';
+import type { CartridgeWords } from '../src/art/cartridge-art.ts';
 
-const GRID = 16;
 const root = fileURLToPath(new URL('../', import.meta.url));
+
+/** The cartridge's label for the app icons. "Last Round" is under the icon in every launcher, so the label keeps the title. */
+export const ICON_WORDS: CartridgeWords = { ribbon: 'UNDEAD OF', title: 'NIGHT' };
 
 export type Rgb = readonly [number, number, number];
 
-interface Edge {
-  readonly x: number;
-  readonly from: number;
-  readonly to: number;
-}
+const INK: Rgb = [11, 12, 16];
 
-function parseHex(hex: string): Rgb {
-  const value = Number.parseInt(hex.slice(1), 16);
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-}
-
-/** Every vertical edge of a path made only of M, H, V and Z (upper case is absolute, lower case relative). */
-function verticalEdges(d: string): Edge[] {
-  const edges: Edge[] = [];
-  let x = 0;
-  let y = 0;
-  let startX = 0;
-  let startY = 0;
-  const close = (): void => {
-    const open = startY !== y;
-    if (open) edges.push({ x: startX, from: Math.min(y, startY), to: Math.max(y, startY) });
-    x = startX;
-    y = startY;
-  };
-  for (const [, command, args] of d.matchAll(/([MmHhVvZz])([^MmHhVvZz]*)/g)) {
-    const numbers = args.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
-    const relative = command === command.toLowerCase();
-    const letter = command.toUpperCase();
-    if (letter === 'Z') close();
-    if (letter === 'M') {
-      x = relative ? x + numbers[0] : numbers[0];
-      y = relative ? y + numbers[1] : numbers[1];
-      startX = x;
-      startY = y;
-    }
-    if (letter === 'H') x = relative ? x + numbers[0] : numbers[0];
-    if (letter === 'V') {
-      const next = relative ? y + numbers[0] : numbers[0];
-      edges.push({ x, from: Math.min(y, next), to: Math.max(y, next) });
-      y = next;
-    }
-  }
-  return edges;
-}
-
-function paint(grid: Rgb[][], x: number, y: number, w: number, h: number, color: Rgb): void {
-  for (let row = y; row < y + h; row += 1) for (let col = x; col < x + w; col += 1) grid[row][col] = color;
-}
-
-/** The favicon is flat rectangles and axis-aligned outlines, so an even-odd scan of the vertical edges fills it. */
-export function readGrid(svg: string): Rgb[][] {
-  const grid: Rgb[][] = Array.from({ length: GRID }, () => Array.from({ length: GRID }, () => [0, 0, 0] as Rgb));
-  for (const [, tag, attrs] of svg.matchAll(/<(rect|path)\b([^>]*)\/>/g)) {
-    const fill = /fill="(#[0-9a-fA-F]{6})"/.exec(attrs)?.[1];
-    if (!fill) continue;
-    const color = parseHex(fill);
-    if (tag === 'rect') {
-      paint(grid, 0, 0, GRID, GRID, color);
-      continue;
-    }
-    const edges = verticalEdges(/\sd="([^"]+)"/.exec(attrs)?.[1] ?? '');
-    for (let row = 0; row < GRID; row += 1) {
-      const crossings = edges
-        .filter((edge) => edge.from <= row && row < edge.to)
-        .map((edge) => edge.x)
-        .sort((a, b) => a - b);
-      for (let i = 0; i + 1 < crossings.length; i += 2) paint(grid, crossings[i], row, crossings[i + 1] - crossings[i], 1, color);
-    }
-  }
-  return grid;
+/** The cartridge's pixels as rows of colours, with the ink colour where it is clear. */
+export function cartridgeGrid(words: CartridgeWords = ICON_WORDS): Rgb[][] {
+  const art = drawCartridge(words);
+  return Array.from({ length: art.h }, (_, y) =>
+    Array.from({ length: art.w }, (_, x): Rgb => {
+      const color = art.get(x, y);
+      return color === null ? INK : [(color >> 16) & 255, (color >> 8) & 255, color & 255];
+    }));
 }
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -119,27 +65,36 @@ function encodePng(size: number, pixel: (x: number, y: number) => Rgb): Buffer {
   return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
 }
 
-/** The head fills `fill` of the width, centred, on the game's ink colour. Maskable icons keep it inside the safe circle. */
+/** The cartridge's height fills about `fill` of the icon, centred, at a whole pixel scale. Maskable icons keep it inside the safe circle. */
 export function drawIcon(grid: Rgb[][], size: number, fill: number): Buffer {
-  const ink: Rgb = [11, 12, 16];
-  const cell = Math.floor((size * fill) / GRID);
-  const offset = Math.floor((size - cell * GRID) / 2);
+  const rows = grid.length;
+  const columns = grid[0].length;
+  const scale = Math.max(1, Math.floor((size * fill) / rows));
+  const left = Math.floor((size - columns * scale) / 2);
+  const top = Math.floor((size - rows * scale) / 2);
   return encodePng(size, (x, y) => {
-    const gx = Math.floor((x - offset) / cell);
-    const gy = Math.floor((y - offset) / cell);
-    const inside = x >= offset && y >= offset && gx < GRID && gy < GRID;
-    return inside ? grid[gy][gx] : ink;
+    const gx = Math.floor((x - left) / scale);
+    const gy = Math.floor((y - top) / scale);
+    const inside = x >= left && y >= top && gx < columns && gy < rows;
+    return inside ? grid[gy][gx] : INK;
   });
 }
 
-function main(): void {
-  const grid = readGrid(readFileSync(`${root}public/favicon.svg`, 'utf8'));
+/** Every icon file and its bytes, by path from the package root. */
+export function iconFiles(): Readonly<Record<string, Buffer>> {
+  const grid = cartridgeGrid();
+  return {
+    'public/icons/icon-192.png': drawIcon(grid, 192, 0.9),
+    'public/icons/icon-512.png': drawIcon(grid, 512, 0.9),
+    'public/icons/icon-maskable-512.png': drawIcon(grid, 512, 0.6),
+    'public/apple-touch-icon.png': drawIcon(grid, 180, 0.95),
+  };
+}
+
+function writeIcons(): void {
   mkdirSync(`${root}public/icons`, { recursive: true });
-  writeFileSync(`${root}public/icons/icon-192.png`, drawIcon(grid, 192, 0.9));
-  writeFileSync(`${root}public/icons/icon-512.png`, drawIcon(grid, 512, 0.9));
-  writeFileSync(`${root}public/icons/icon-maskable-512.png`, drawIcon(grid, 512, 0.7));
-  writeFileSync(`${root}public/apple-touch-icon.png`, drawIcon(grid, 180, 0.82));
+  for (const [file, bytes] of Object.entries(iconFiles())) writeFileSync(`${root}${file}`, bytes);
 }
 
 const ranDirectly = process.argv[1] === fileURLToPath(import.meta.url);
-if (ranDirectly) main();
+if (ranDirectly) writeIcons();

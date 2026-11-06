@@ -35,6 +35,7 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 
 ### Changed
 - The sound test lays its track tiles out four across instead of five, so titles stop wrapping.
+- The app icon is now the game's cartridge with its name on the label (UNDEAD OF / NIGHT), instead of the zombie head. The Install Game cartridge and the browser-tab favicon are unchanged. Reinstall the app to see it: installed shortcuts keep the icon they were made with.
 
 ### Added
 - Sprinting now tires you. The Sprint bar drains while you sprint on the move, refills when you do not, and a survivor who runs it dry walks until it is back to a quarter. A survivor's Speed sets how long a bar lasts. How to Play and Options list the sprint and sneak keys.

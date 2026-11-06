@@ -34,7 +34,7 @@ function allAtTheVan(sim: SimState, spot: Point): boolean {
   return riders.length > 0 && riders.every((p) => atTheVan(p, spot));
 }
 
-const goneQuiet = (sim: SimState, p: PlayerState): boolean => sim.tick - (p.home?.lastActiveTick ?? sim.tick) >= IDLE_TICKS;
+export const goneQuiet = (sim: SimState, p: PlayerState): boolean => sim.tick - (p.home?.lastActiveTick ?? sim.tick) >= IDLE_TICKS;
 
 /** A level is picked, and everyone it waits for is at the van and ready. Anyone else gone quiet rides along. */
 function roomBoarded(sim: SimState, spot: Point): boolean {

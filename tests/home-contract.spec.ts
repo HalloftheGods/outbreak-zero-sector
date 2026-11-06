@@ -1,20 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUNKER_LEVEL, BUNKER_SEED, isBunkerMap, isBunkerSeed, MERCHANT_IDS, STATION_IDS } from '../shared/home-protocol.ts';
-import type { HomeView } from '../shared/home-protocol.ts';
+import { BLAST_DOOR_SPOT, CHEST_SPOT, CHEST_STATION } from '../shared/bunker-map.ts';
+import { PLAYER_RADIUS } from '../shared/constants.ts';
+import { GAME_EVENT_TYPES } from '../shared/events.ts';
+import { BUNKER_LEVEL, BUNKER_SEED, isBunkerMap, isBunkerSeed, MERCHANT_IDS, OVERRUN_LIVE, STATION_IDS } from '../shared/home-protocol.ts';
+import type { HomeView, OverrunReceipt } from '../shared/home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL, levelSeed } from '../shared/levels.ts';
 import { emptyLoadout, loadoutOfEntity, mergeHome } from '../shared/loadout.ts';
+import { OVERRUN_CLOCK_SEC } from '../shared/overrun.ts';
+import { PROP_DEFS, TILE_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
+import { viewFor } from '../shared/snapshot-view.ts';
+import { circleHitsSolid } from '../shared/world-query.ts';
 import { buildArtBook } from '../src/art/index.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import { buy, shopRows } from '../src/game/home/shop.ts';
 import { homeUi, shopContext } from '../src/game/home-hud.ts';
+import { overrunOn } from '../src/game/home-mode.ts';
+import { isRoomHomeView } from '../src/network/home-guards.ts';
 import { LocalSession } from '../src/network/local-session.ts';
 import { homeSim } from './helpers/home-harness.ts';
-import { input, SEED, steps } from './helpers/sim-harness.ts';
+import { input, SEED, stateOf, steps } from './helpers/sim-harness.ts';
 
 const STEPS = 600;
-const QUIET_HOME: HomeView = { silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null };
+const QUIET_HOME: HomeView = { silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null, overrun: null };
 
 function played(sim: GameSimulation): SnapshotPacket[] {
   sim.addPlayer('a', 'a');
@@ -185,8 +194,99 @@ describe('the client seams', () => {
 });
 
 describe('the bunker map', () => {
-  it('has every station in it', () => {
+  it('has every station in it but the chest, which the overrun puts in reach', () => {
     const { sim } = homeSim();
-    expect(sim.map.stations?.map((station) => station.id).sort()).toEqual([...STATION_IDS].sort());
+    const standing = STATION_IDS.filter((id) => id !== 'chest');
+    expect(sim.map.stations?.map((station) => station.id).sort()).toEqual([...standing].sort());
+    expect(sim.map.props.some((prop) => prop.kind === 'chest')).toBe(false);
+  });
+
+  it('keeps the chest\'s circle clear of every other station\'s, on open floor', () => {
+    const { sim } = homeSim();
+    for (const station of sim.map.stations ?? []) {
+      const gap = Math.hypot(station.x - CHEST_STATION.x, station.y - CHEST_STATION.y);
+      expect(gap, station.id).toBeGreaterThan(station.radius + CHEST_STATION.radius);
+    }
+    expect(CHEST_STATION).toMatchObject({ id: 'chest', x: CHEST_SPOT.x });
+    expect(CHEST_STATION.y).toBeGreaterThan(CHEST_SPOT.y);
+    expect(circleHitsSolid(sim.map, CHEST_STATION.x, CHEST_STATION.y, PLAYER_RADIUS)).toBe(false);
+  });
+
+  it('sets the blast door in the hall\'s west wall, and lets the horde in on hall floor', () => {
+    const { map } = homeSim().sim;
+    const tileAt = (x: number, y: number): string => TILE_KINDS[map.tiles[Math.floor(y / TILE_SIZE) * map.cols + Math.floor(x / TILE_SIZE)]];
+    const door = map.props.find((prop) => prop.kind === 'blast_door');
+    expect(door).toBeDefined();
+    const { w, h } = PROP_DEFS.blast_door;
+    for (let y = door!.y - h + 1; y < door!.y; y += TILE_SIZE) {
+      for (let x = door!.x - w / 2 + 1; x < door!.x + w / 2; x += TILE_SIZE) expect(tileAt(x, y)).toBe('bunker_wall');
+    }
+    expect(Math.floor(door!.x / TILE_SIZE)).toBe(0);
+    expect([Math.floor((door!.y - h) / TILE_SIZE), Math.floor((door!.y - 1) / TILE_SIZE)]).toEqual([4, 6]);
+    expect(tileAt(BLAST_DOOR_SPOT.x, BLAST_DOOR_SPOT.y)).toBe('floor_tile');
+    expect(circleHitsSolid(map, BLAST_DOOR_SPOT.x, BLAST_DOOR_SPOT.y, PLAYER_RADIUS)).toBe(false);
+  });
+});
+
+describe('the overrun switch', () => {
+  it('is off, and a dev build turns it on only when asked', () => {
+    expect(OVERRUN_LIVE).toBe(false);
+    expect(overrunOn('', true)).toBe(false);
+    expect(overrunOn('?overrun', true)).toBe(true);
+    expect(overrunOn('?nosplash&overrun', true)).toBe(true);
+    expect(overrunOn('?overrun', false)).toBe(false);
+  });
+
+  it('leaves a home sim without a clock unless asked, and Arcade without one even when asked', () => {
+    expect(stateOf(homeSim().sim)).toMatchObject({ overrunOn: false, overrun: null });
+    expect(stateOf(homeSim({ overrun: true }).sim)).toMatchObject({ overrunOn: true, overrun: null });
+    expect(stateOf(new GameSimulation({ seed: SEED, overrun: true }))).toMatchObject({ overrunOn: false, overrun: null });
+  });
+
+  it('carries the switch into the bunker when a room is made Campaign', () => {
+    const sim = new GameSimulation({ seed: SEED, overrun: true });
+    sim.setHome(true);
+    expect(stateOf(sim).overrunOn).toBe(true);
+    const off = new GameSimulation({ seed: SEED });
+    off.setHome(true);
+    expect(stateOf(off).overrunOn).toBe(false);
+  });
+
+  it('changes nothing in a home room while the clock is a shell', () => {
+    const plain = played(new GameSimulation({ seed: SEED, home: true }));
+    const asked = played(new GameSimulation({ seed: SEED, home: true, overrun: true }));
+    expect(asked).toEqual(plain);
+    expect(plain[0].home).not.toHaveProperty('overrun');
+    expect(plain[0].players[0].home?.overrun).toBeNull();
+  });
+
+  it('names its three events where the guards read them', () => {
+    expect(GAME_EVENT_TYPES).toEqual(expect.arrayContaining(['overrun_warning', 'overrun_breach', 'overrun_end']));
+  });
+});
+
+describe('the overrun on the wire', () => {
+  const receipt: OverrunReceipt = {
+    simId: 'sim', serial: 2, outcome: 'died', share: 0, chest: null, silver: 0, jewels: { small: 0, large: 0 }, lost: emptyLoadout(), kills: 3, seconds: 40,
+  };
+
+  it('shows the room\'s clock while there is one, in a shape the guards take', () => {
+    const { sim, state } = homeSim();
+    state.overrun = { phase: 'counting', left: 212.44, slowed: true, warned: 0, queue: [], spawnTimer: 0, total: 0, kills: 0, startTick: 0 };
+    const clock = sim.snapshot().home?.overrun;
+    expect(clock).toEqual({ phase: 'counting', left: 212.4, slowed: true, hostiles: 0, total: 0 });
+    expect(isRoomHomeView(sim.snapshot().home)).toBe(true);
+    state.overrun = { ...state.overrun, phase: 'breached', left: 0, queue: ['walker', 'walker'], total: 24 };
+    expect(sim.snapshot().home?.overrun).toMatchObject({ phase: 'breached', hostiles: 2, total: 24 });
+    expect(OVERRUN_CLOCK_SEC).toBe(300);
+  });
+
+  it('keeps each player\'s overrun receipt to that player', () => {
+    const { sim, state } = homeSim({ players: ['a', 'b'] });
+    state.players[1].home!.overrun = receipt;
+    const frame = sim.snapshot();
+    expect(viewFor(frame, 'a').players[1].home?.overrun).toBeNull();
+    expect(viewFor(frame, 'b').players[1].home?.overrun).toEqual(receipt);
+    expect(viewFor(frame, 'a').players[0].home).toEqual(QUIET_HOME);
   });
 });

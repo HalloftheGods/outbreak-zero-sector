@@ -12,10 +12,14 @@ export const BUNKER_SEED = -1;
 /** `sim.level` in the bunker, which clamps to level 1's look and triggers no town rule. */
 export const BUNKER_LEVEL = 0;
 
+/** The bunker's horde clock. Off until its soak (#7223); a dev build turns it on with `?overrun`. */
+export const OVERRUN_LIVE = false;
+
 export const MERCHANT_IDS = ['gunsmith', 'quartermaster', 'medic', 'powder'] as const;
 export type MerchantId = (typeof MERCHANT_IDS)[number];
 
-export const STATION_IDS = ['bench', 'forge', 'locker', 'level_map', 'jukebox', ...MERCHANT_IDS] as const;
+/** `chest` stands only while a held overrun's chest is unopened. */
+export const STATION_IDS = ['bench', 'forge', 'locker', 'level_map', 'jukebox', ...MERCHANT_IDS, 'chest'] as const;
 export type StationId = (typeof STATION_IDS)[number];
 
 export interface Station {
@@ -80,6 +84,46 @@ export interface TripReceipt {
   gear: Loadout | null;
 }
 
+/** Counting down to the breach, guns free near the end, the horde in, then the room held or fallen. */
+export const OVERRUN_PHASES = ['counting', 'armed', 'breached', 'held', 'lost'] as const;
+export type OverrunPhase = (typeof OVERRUN_PHASES)[number];
+
+/** How an overrun ended for the room: the horde killed, or nobody standing. A flight is the van leaving, not an end. */
+export type OverrunEnd = Extract<OverrunPhase, 'held' | 'lost'>;
+
+/** The room's overrun as every client draws it, on RoomHomeView. */
+export interface OverrunView {
+  phase: OverrunPhase;
+  /** Seconds on the clock to the breach, which pass at the menu rate while the room is in menus. 0 once breached. */
+  left: number;
+  /** The clock ran at the menu rate on the last tick. */
+  slowed: boolean;
+  /** Horde zombies still to come through the door or standing. 0 before the breach. */
+  hostiles: number;
+  /** The breach's roster size. 0 before the breach. */
+  total: number;
+}
+
+/** How an overrun ended for one player. State, not an event, as a trip receipt is. */
+export interface OverrunReceipt {
+  simId: string;
+  /** From `run.nextReceipt`, so `${simId}:${serial}` never matches a trip receipt's. */
+  serial: number;
+  outcome: 'held' | 'fled' | 'died';
+  /** Fled: the share of the horde still to come or standing when the van left, 0..1. Otherwise 0. */
+  share: number;
+  /** Held: the chest's gear, for the locker. Null otherwise. */
+  chest: Loadout | null;
+  /** Held: the chest's silver, for the bank. */
+  silver: number;
+  /** Held: the chest's jewel, for the bank. */
+  jewels: Jewels;
+  /** Died: the gear in hand that went down with the body. Null otherwise. */
+  lost: Loadout | null;
+  kills: number;
+  seconds: number;
+}
+
 /** One player's side of the bunker and the trip, on PlayerEntity. */
 export interface HomeView {
   /** Carried on this trip. The bank lives in the browser and never goes on the wire. */
@@ -90,12 +134,16 @@ export interface HomeView {
   stationHold: number;
   ready: boolean;
   receipt: TripReceipt | null;
+  /** The last overrun's receipt, until the next arrival in the bunker. */
+  overrun: OverrunReceipt | null;
 }
 
 /** The room's side, on SnapshotPacket. */
 export interface RoomHomeView {
   pickedLevel: number | null;
   roomHighest: number;
+  /** Left off while there is no overrun. */
+  overrun?: OverrunView;
 }
 
 export const isBunkerSeed = (seed: number): boolean => seed === BUNKER_SEED;

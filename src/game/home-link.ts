@@ -14,7 +14,11 @@ import type { HomeStore } from './home/home-store.ts';
 import { HomeSync, joinHomeFor } from './home/home-sync.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
 import { loadCampaignProgress, recordCampaignFinished, recordLevelCleared } from './level-progress.ts';
+import { inSightSince } from './stage-cut.ts';
 import { endingResult, recordTrip } from './trip-record.ts';
+
+/** The death summary stays this long in plain sight before Enter can wake past it, so a mashed key cannot skip what was lost. */
+const SUMMARY_READ_MS = 1000;
 
 const VAN_HINT: Omit<Banner, 'key'> = { title: 'THE VAN IS IN THE GARAGE', subtitle: 'STAND BESIDE IT TO LEAVE. THE MAP PICKS ANOTHER LEVEL', tone: 'hope' };
 
@@ -52,6 +56,7 @@ export class HomeLink {
   /** What the open screen says closing means, if it has anything to settle first. */
   private closer: (() => void) | null = null;
   private death: HomeDeath | null = null;
+  private diedAtMs = 0;
   private ending = false;
   /** The gear this trip took out, which a death takes with it. */
   private takenOut: Loadout = emptyLoadout();
@@ -151,10 +156,10 @@ export class HomeLink {
     return true;
   }
 
-  /** Enter: reads the death summary. True if it did something. */
+  /** Enter: reads the death summary, once it has been seen. True if the press was the summary's. */
   confirm(): boolean {
     if (!this.death) return false;
-    this.wake();
+    if (inSightSince(this.diedAtMs, SUMMARY_READ_MS)) this.wake();
     return true;
   }
 
@@ -215,6 +220,7 @@ export class HomeLink {
 
   private die(receipt: TripReceipt): void {
     this.death = { receipt, lost: this.takenOut };
+    this.diedAtMs = performance.now();
     this.takenOut = emptyLoadout();
     this.host.syncControls();
   }

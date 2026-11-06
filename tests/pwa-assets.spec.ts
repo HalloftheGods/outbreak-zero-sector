@@ -4,6 +4,8 @@ import { CARTRIDGE_HEIGHT, CARTRIDGE_LABEL, CARTRIDGE_PICTURE, CARTRIDGE_WIDTH, 
 import { ALL_COLORS, toHex } from '../src/art/palette.ts';
 import { guideFor } from '../src/game/pwa/ios-guide.ts';
 import { buildIdOf, isShellFile, musicVersionsOf, stampWorker } from '../tools/vite-pwa.ts';
+import { drawCartridge } from '../src/art/cartridge-art.ts';
+import { ICON_WORDS, cartridgeGrid, iconFiles } from '../tools/pwa-icons.ts';
 
 const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url));
 const manifest = JSON.parse(read('public/manifest.webmanifest').toString());
@@ -122,5 +124,32 @@ describe('cartridge art', () => {
     }
     const ios = guideFor('ios').steps.map((step) => step.title);
     expect(ios).toEqual(['Tap Share', 'Add to Home Screen']);
+  });
+});
+
+describe('app icons', () => {
+  it('are the cartridge with the game name on it, as tools/pwa-icons.ts draws them', () => {
+    for (const [file, bytes] of Object.entries(iconFiles())) {
+      expect(read(file).equals(bytes), `${file} is out of date: run node --experimental-strip-types tools/pwa-icons.ts`).toBe(true);
+    }
+  });
+
+  it('keep the Install Game cartridge as it was: the icon label is its own', () => {
+    const install = drawCartridge();
+    const icon = drawCartridge(ICON_WORDS);
+    expect([icon.w, icon.h]).toEqual([install.w, install.h]);
+    expect(icon.data).not.toEqual(install.data);
+    expect(cartridgeGrid()).toHaveLength(CARTRIDGE_HEIGHT);
+  });
+
+  it('draw the icon cartridge only in the master palette', () => {
+    const icon = drawCartridge(ICON_WORDS);
+    for (let y = 0; y < icon.h; y++) {
+      for (let x = 0; x < icon.w; x++) {
+        const color = icon.get(x, y);
+        const painted = color !== null;
+        if (painted) expect(ALL_COLORS.includes(color), `${toHex(color)} at ${x},${y}`).toBe(true);
+      }
+    }
   });
 });

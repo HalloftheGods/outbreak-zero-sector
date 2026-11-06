@@ -13,7 +13,7 @@ export const ME = 'me';
 export const TOWN_SEED = 4242;
 export const VAN = { x: 500, y: 500, progress: 0 };
 
-export const QUIET: HomeView = { silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null };
+export const QUIET: HomeView = { silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null, overrun: null };
 
 export const entity = (patch: Partial<PlayerEntity> = {}): PlayerEntity => ({
   id: ME, name: 'ANA', skin: 0, x: 1, y: 2, angle: 0, moving: false, status: 'alive',

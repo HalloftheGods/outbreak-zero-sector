@@ -2,6 +2,7 @@ import { openedContainers } from './container-search.ts';
 import { SNAPSHOT_RANGE } from './constants.ts';
 import { exitEntity } from './level-exit.ts';
 import { gearField } from './gun-upgrades.ts';
+import { overrunView } from './overrun.ts';
 import { WEAPON_ORDER } from './protocol.ts';
 import type { ExitEntity, GameEvent, PlayerEntity, SnapshotPacket, WeaponId } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
@@ -40,14 +41,17 @@ function tracksField(sim: SimState, inRange: (item: { x: number; y: number }) =>
 function playerHomeField(p: PlayerState): Pick<PlayerEntity, 'home'> {
   const { home } = p;
   if (!home) return {};
-  const { silver, jewels, station, stationHold, ready, receipt } = home;
-  return { home: { silver, jewels: { ...jewels }, station, stationHold: round2(stationHold), ready, receipt } };
+  const { silver, jewels, station, stationHold, ready, receipt, overrun } = home;
+  return { home: { silver, jewels: { ...jewels }, station, stationHold: round2(stationHold), ready, receipt, overrun } };
 }
 
+/** The overrun is left off while there is none, so a room without one sends what it always did. */
 function roomHomeField(sim: SimState): Pick<SnapshotPacket, 'home'> {
   const run = sim.homeRun;
   if (!run) return {};
-  return { home: { pickedLevel: run.pickedLevel, roomHighest: run.roomHighest } };
+  const overrun = overrunView(sim);
+  const room = { pickedLevel: run.pickedLevel, roomHighest: run.roomHighest };
+  return { home: overrun ? { ...room, overrun } : room };
 }
 
 function magazines(p: PlayerState): Record<WeaponId, number> {

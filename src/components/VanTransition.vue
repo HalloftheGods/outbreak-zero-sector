@@ -30,7 +30,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import type { ArtBook } from '../art/types.ts';
 import { clipFrameAt, spriteDataUrl } from '../engine/sprite-cache.ts';
-import { stageCut } from '../game/stage-cut.ts';
+import { noteVanCover, stageCut } from '../game/stage-cut.ts';
 import { nextRun, runOver, skipRun, tripFor, vanCues, vanFrame, vanPixel, vanPuffs, vanTimeline } from '../game/van-transition.ts';
 import type { VanRun, VanTrip } from '../game/van-transition.ts';
 import SpriteImg from './SpriteImg.vue';
@@ -202,6 +202,7 @@ function sight(inBunker: boolean | null): void {
   begin(trip);
 }
 
+watch(() => run.value !== null, noteVanCover);
 watch(() => props.inBunker, sight);
 watch(stageCut, (cut) => {
   const inSession = cut !== null && seen !== null;

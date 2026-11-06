@@ -53,7 +53,15 @@ const STATION_PROPS: Record<StationId, PropKind> = {
   quartermaster: 'quartermaster',
   medic: 'medic',
   powder: 'powder',
+  chest: 'chest',
 };
+
+/** The overrun's door, in the hall's west wall (tile column 0, rows 4 to 6), as far from the garage as the hall goes. */
+const BLAST_DOOR: PropInstance = { kind: 'blast_door', x: TILE_SIZE / 2, y: 7 * TILE_SIZE };
+/** Where the horde comes in: hall floor just inside the blast door. */
+export const BLAST_DOOR_SPOT = { x: 2 * TILE_SIZE, y: 5.5 * TILE_SIZE } as const;
+/** Where a held overrun's chest stands, in the hall's south-west corner, clear of every station's circle. */
+export const CHEST_SPOT = { x: 40, y: 144 } as const;
 
 /** Where each station's prop stands: the bottom centre of its footprint. A merchant stands behind a counter just south of it. */
 const STATION_PLACES: Record<StationId, { x: number; y: number }> = {
@@ -66,6 +74,7 @@ const STATION_PLACES: Record<StationId, { x: number; y: number }> = {
   quartermaster: { x: 176, y: 40 },
   medic: { x: 272, y: 40 },
   powder: { x: 368, y: 40 },
+  chest: CHEST_SPOT,
 };
 
 const COUNTER_Y = 56;
@@ -76,6 +85,10 @@ const WARM_LAMP = '#ffb066';
 const LAMP_RADIUS = 200;
 const EXIT_SPOT = { x: 560, y: 350 };
 const SPAWN_SPOT = { x: 304, y: 280 };
+
+/** The chest stands only while a player's chest is unopened, so the map leaves it out and the overrun puts it in reach. */
+const isStanding = (id: StationId): boolean => id !== 'chest';
+const STANDING_IDS = STATION_IDS.filter(isStanding);
 
 const centreOf = (room: Room): { x: number; y: number } => ({
   x: ((room.col0 + room.col1 + 1) / 2) * TILE_SIZE,
@@ -124,17 +137,20 @@ function stackRuns(runs: readonly Box[]): Box[] {
 }
 
 function propsOf(): PropInstance[] {
-  const props = STATION_IDS.map((id): PropInstance => ({ kind: STATION_PROPS[id], ...STATION_PLACES[id] }));
+  const props = STANDING_IDS.map((id): PropInstance => ({ kind: STATION_PROPS[id], ...STATION_PLACES[id] }));
   const counters = MERCHANT_IDS.map((id): PropInstance => ({ kind: 'counter', x: STATION_PLACES[id].x, y: COUNTER_Y }));
-  return [...props, ...counters];
+  return [...props, ...counters, { ...BLAST_DOOR }];
 }
 
-function stationsOf(): Station[] {
-  return STATION_IDS.map((id) => {
-    const servedFrom = isMerchantId(id) ? COUNTER_Y : STATION_PLACES[id].y;
-    return { id, x: STATION_PLACES[id].x, y: servedFrom + CUSTOMER_GAP, radius: STATION_RADIUS };
-  });
+function stationOf(id: StationId): Station {
+  const servedFrom = isMerchantId(id) ? COUNTER_Y : STATION_PLACES[id].y;
+  return { id, x: STATION_PLACES[id].x, y: servedFrom + CUSTOMER_GAP, radius: STATION_RADIUS };
 }
+
+/** The chest's circle, for the overrun to put in reach while a chest is unopened. */
+export const CHEST_STATION: Station = stationOf('chest');
+
+const stationsOf = (): Station[] => STANDING_IDS.map(stationOf);
 
 export function generateBunkerMap(): WorldMap {
   const tiles = carve();

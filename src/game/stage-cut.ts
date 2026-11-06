@@ -11,6 +11,19 @@ export interface StageCut {
 
 export const stageCut = shallowRef<StageCut | null>(null);
 
+/** When the drive's cover last came off, or null while it is on. */
+let coverOffMs: number | null = Number.NEGATIVE_INFINITY;
+
+export function noteVanCover(covering: boolean): void {
+  coverOffMs = covering ? null : performance.now();
+}
+
+/** Whether what is under the drive has been in plain sight since this time, for this long. */
+export function inSightSince(sinceMs: number, forMs: number): boolean {
+  if (coverOffMs === null) return false;
+  return performance.now() >= Math.max(sinceMs, coverOffMs) + forMs;
+}
+
 export function noteStageCut(inBunker: boolean): void {
   stageCut.value = { inBunker, seq: (stageCut.value?.seq ?? 0) + 1 };
 }
