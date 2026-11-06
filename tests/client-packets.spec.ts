@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SERVER_PORT } from '../shared/constants.ts';
+import { GAME_EVENT_TYPES, PICKUP_TYPES } from '../shared/events.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { isGameEvent, isSnapshotPacket, parseServerPacket } from '../src/network/packet-guards.ts';
 import { resolveServerUrl } from '../src/network/socket-session.ts';
@@ -34,6 +35,17 @@ const snapshot: SnapshotPacket = {
 const withField = (patch: object): unknown => ({ ...snapshot, ...patch });
 
 describe('packet guards', () => {
+  it('accepts every pickup and event type shared declares', () => {
+    for (const type of PICKUP_TYPES) {
+      const packet = { ...snapshot, pickups: [{ id: 'k1', type, x: 0, y: 0 }] };
+      expect(parseServerPacket(JSON.stringify(packet)), type).not.toBeNull();
+    }
+    for (const type of GAME_EVENT_TYPES) {
+      const packet = { ...snapshot, events: [{ type }] };
+      expect(parseServerPacket(JSON.stringify(packet)), type).not.toBeNull();
+    }
+  });
+
   it('accepts a well-formed snapshot', () => {
     expect(isSnapshotPacket(snapshot)).toBe(true);
     expect(parseServerPacket(JSON.stringify(snapshot))).toEqual(snapshot);

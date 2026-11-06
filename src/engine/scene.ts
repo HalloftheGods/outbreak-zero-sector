@@ -9,6 +9,7 @@ import type {
   TrackEntity,
   ZombieEntity,
 } from '../../shared/protocol.ts';
+import type { StationId } from '../../shared/home-protocol.ts';
 
 export { CHEST_HEIGHT } from '../../shared/constants.ts';
 
@@ -41,6 +42,8 @@ export interface SceneView {
   readonly tracks?: readonly TrackEntity[];
   /** What the local player could search from where they stand, if anything. */
   readonly searchable: Container | null;
+  /** The bunker station the local player could open from where they stand. Absent anywhere else. */
+  readonly station?: StationId;
   /** The player at this keyboard, if they exist yet. */
   readonly localId: EntityId | null;
   /** Whose eyes the camera is behind: localId, or a teammate when spectating. */

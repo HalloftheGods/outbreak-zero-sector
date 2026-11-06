@@ -226,11 +226,13 @@ describe('game server', () => {
     const frame = await back.until(() => back.lastSnapshot?.players.find((p) => p.id === id));
     expect(frame).toMatchObject({ health: 37, score: 90 });
     expect(JSON.stringify(back.received)).not.toContain('my-tab');
+    expect(back.received.find((packet) => packet.type === 'welcome')).toMatchObject({ resumed: true });
 
     const stranger = connect();
     const strangerId = await stranger.join('Cy', 'other-tab');
     const fresh = await stranger.until(() => stranger.lastSnapshot?.players.find((p) => p.id === strangerId));
     expect(fresh).toMatchObject({ health: 50, reserve: 0 });
+    expect(stranger.received.find((packet) => packet.type === 'welcome')).not.toHaveProperty('resumed');
   });
 
   it('restarts only once everyone in the room has asked', async () => {

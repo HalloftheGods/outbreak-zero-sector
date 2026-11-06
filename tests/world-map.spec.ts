@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ZOMBIES } from '../shared/constants.ts';
 import { FlowField } from '../shared/flow-field.ts';
+import { BUNKER_SEED } from '../shared/home-protocol.ts';
 import { BUILDING_DEFS, BUILDING_KINDS, DOOR_WIDTH, PROP_DEFS, TILE_KINDS, TILE_SIZE, WALL_THICKNESS } from '../shared/protocol.ts';
 import type { BuildingKind, PropKind, WorldMap } from '../shared/protocol.ts';
 import { createRng } from '../shared/rng.ts';
@@ -59,6 +60,18 @@ describe('generateWorldMap', () => {
     expect(a.props).not.toEqual(other.props);
   });
 
+  it('reserves the bunker seed for a map of its own', () => {
+    const map = generateWorldMap(BUNKER_SEED);
+    expect(map.seed).toBe(BUNKER_SEED);
+    expect(map.buildings).toEqual([]);
+    expect(map.districts.length).toBeGreaterThan(0);
+    expect(map.stations?.length).toBeGreaterThan(0);
+    expect(map.exit).toBeDefined();
+    expect(wallBoxes(map)).toBe(map.walls);
+    expect(map.walls?.length).toBeGreaterThan(0);
+    expect(circleHitsSolid(map, map.spawn.x, map.spawn.y, 8)).toBe(false);
+  });
+
   it('generates fast', () => {
     generateWorldMap(1);
     const times = [2, 3, 4, 5, 6].map((seed) => {
@@ -93,7 +106,8 @@ describe('generateWorldMap', () => {
   it.each(SEEDS)('seed %i: uses every kind of ground and the town fixtures', (seed) => {
     const map = generateWorldMap(seed);
     const used = new Set(Array.from(map.tiles, (index) => TILE_KINDS[index]));
-    expect([...used].sort()).toEqual([...TILE_KINDS].sort());
+    const townKinds = TILE_KINDS.filter((kind) => kind !== 'bunker_wall');
+    expect([...used].sort()).toEqual([...townKinds].sort());
     const kinds = new Set(map.props.map((prop) => prop.kind));
     for (const kind of ['street_lamp', 'fire_barrel', 'tree', 'dumpster', 'sandbags', 'fence_h', 'fence_v', 'gas_pump', ...FURNITURE] as const) {
       expect(kinds).toContain(kind);

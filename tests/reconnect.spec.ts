@@ -31,6 +31,23 @@ function room() {
 
 const statusOf = (sim: GameSimulation, id: string) => sim.snapshot().players.find((p) => p.id === id);
 
+describe('asking if a token has a body', () => {
+  it('finds one in play or left behind, and none for a stranger', () => {
+    const { sim } = room();
+    expect(sim.hasBodyFor(TOKEN)).toBe(true);
+    sim.removePlayer('b');
+    expect(sim.hasBodyFor(TOKEN)).toBe(true);
+    expect(sim.hasBodyFor('tab-of-a-stranger')).toBe(false);
+  });
+
+  it('finds none once a new run has let the body go', () => {
+    const { sim } = room();
+    sim.removePlayer('b');
+    sim.restart();
+    expect(sim.hasBodyFor(TOKEN)).toBe(false);
+  });
+});
+
 describe('coming back to a run', () => {
   it('picks up exactly what was left behind', () => {
     const { sim, state, b } = room();

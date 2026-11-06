@@ -6,6 +6,7 @@ import { BuildingLayer, roomRect } from './building-layer.ts';
 import { Camera } from './camera.ts';
 import { EntityRenderer } from './entity-renderer.ts';
 import { FxDirector } from './fx-director.ts';
+import { GroundMotion } from './ground-motion.ts';
 import type { FxContext } from './fx-director.ts';
 import type { ScreenRect } from './light-field.ts';
 import { lampWorks } from './level-look.ts';
@@ -53,6 +54,7 @@ export class WorldRenderer {
   private readonly buildings: BuildingLayer;
   private readonly lighting = new Lighting();
   private readonly atmosphere: Atmosphere;
+  private readonly groundMotion: GroundMotion;
   private readonly fx: FxDirector;
   private readonly art: ArtBook;
   private viewport: Viewport = computeViewport(480, 270, 1);
@@ -71,6 +73,7 @@ export class WorldRenderer {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.effects = new ScreenEffects(reducedMotion);
     this.atmosphere = new Atmosphere(reducedMotion);
+    this.groundMotion = new GroundMotion(reducedMotion);
     this.buildings = new BuildingLayer(art.environment);
     this.entities = new EntityRenderer(art, this.visuals, this.buildings, reducedMotion);
     this.overlay = new OverlayRenderer(art, this.visuals);
@@ -131,6 +134,7 @@ export class WorldRenderer {
     this.setTheme(theme);
     this.occlusion = new OcclusionGrid(map);
     this.buildings.setMap(map);
+    this.groundMotion.setMap(map);
     this.camera.setWorld(map.width, map.height);
     this.entities.setMap(map, (sprite, x, y, alpha) => this.stamp(sprite, x, y, alpha));
     this.reset();
@@ -138,6 +142,7 @@ export class WorldRenderer {
 
   setTheme(theme: LevelTheme): void {
     this.atmosphere.setTheme(theme);
+    this.groundMotion.setTheme(theme);
     const { ambient, ground } = this.atmosphere.look;
     this.lighting.setAmbient(ambient);
     this.ground?.setTint(ground);
@@ -253,6 +258,7 @@ export class WorldRenderer {
     ctx.fillStyle = '#07080c';
     ctx.fillRect(0, 0, viewW, viewH);
     ground.draw(ctx, left, top, viewW, viewH);
+    this.groundMotion.draw(ctx, left, top, viewW, viewH, time);
     paintPrints(ctx, scene.tracks ?? [], left, top, viewW, viewH);
     this.entities.drawWorld(ctx, scene, left, top, viewW, viewH, time, dt);
     this.fx.particles.drawLit(ctx, left, top);
@@ -263,6 +269,7 @@ export class WorldRenderer {
     const isKilled = (id: EntityId) => this.entities.isKilled(id);
     const outdoors = 1 - (this.buildings.openRoom()?.reveal ?? 0);
     this.atmosphere.drawWash(ctx, viewW, viewH, time, outdoors);
+    if (outdoors > 0) this.groundMotion.draw(ctx, left, top, viewW, viewH, time, 'lit');
 
     this.entities.drawEmissive(ctx, scene, left, top, viewW, viewH, time);
     paintTrackingMarks(ctx, scene.zombies, left, top, viewW, viewH, time, this.reducedMotion);

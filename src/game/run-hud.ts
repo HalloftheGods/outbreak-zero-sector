@@ -3,6 +3,7 @@ import type { GameEvent, GameOverStats, PlayerEntity, PlayerStatus, WorldMap } f
 import type { SceneView } from '../engine/scene.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import type { ClientWorld } from './client-world.ts';
+import { homeUi } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
 import type { RunResult, UiState } from './hud-state.ts';
 import { hordeBanner, isLandmark, radioBanner, RunNotices } from './run-notices.ts';
@@ -22,6 +23,7 @@ export const NO_RUN_UI = {
   banner: null,
   place: null,
   levelCard: null,
+  home: null,
   result: null,
   restarting: false,
 } as const satisfies Partial<UiState>;
@@ -150,6 +152,7 @@ export class RunHud {
     const viewer = scene.viewerId === local.id ? null : scene.players.find((player) => player.id === scene.viewerId);
     this.publish({
       hud: buildHud(snapshot, local, viewer?.name ?? null),
+      home: homeUi(snapshot, local),
       signalWeak: frame.networked && ms - frame.lastSnapshotMs > SIGNAL_WEAK_MS,
       ...this.notices.expired(this.ui(), ms),
     });

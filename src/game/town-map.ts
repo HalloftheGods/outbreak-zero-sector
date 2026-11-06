@@ -31,6 +31,7 @@ const TILE_RGB: Record<TileKind, readonly [number, number, number]> = {
   floor_tile: PAVEMENT,
   floor_concrete: PAVEMENT,
   floor_carpet: PAVEMENT,
+  bunker_wall: [26, 26, 32],
 };
 
 const MEDICAL = '#b04a42';

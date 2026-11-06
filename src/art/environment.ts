@@ -13,6 +13,7 @@ import { buildGarage } from './environment/garage.ts';
 import { buildGrocery } from './environment/grocery.ts';
 import { buildGunShop } from './environment/gun-shop.ts';
 import { buildBungalow, buildGableHouse, buildHipHouse } from './environment/house.ts';
+import { buildMerchantProps } from './environment/merchants.ts';
 import { buildBush, buildRubble, buildTree } from './environment/nature.ts';
 import { buildPharmacy } from './environment/pharmacy.ts';
 import { buildPolice } from './environment/police.ts';
@@ -59,6 +60,10 @@ export function buildEnvironment(): EnvironmentArt {
       locker: buildLocker(),
       fridge: buildFridge(),
       workbench: buildWorkbench(),
+      // Stand-ins of the same footprint until the bunker's own props are drawn.
+      forge: buildWorkbench(),
+      level_map: buildTable(),
+      ...buildMerchantProps(),
     },
     buildings: {
       pharmacy: [buildPharmacy()],

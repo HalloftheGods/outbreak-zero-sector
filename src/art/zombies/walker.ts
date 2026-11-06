@@ -5,7 +5,7 @@ import { ZOMBIES } from '../../../shared/constants.ts';
 import { dirClips, makeClip } from '../kit.ts';
 import type { DrawnDir, Legend } from '../kit.ts';
 import type { Clip, PixelSprite, ZombieArt } from '../types.ts';
-import { drawBody } from './body.ts';
+import { drawBody, steadyClip } from './body.ts';
 import type { BodyPlan, Pose } from './body.ts';
 import { add, flatFrame } from './rig.ts';
 import type { Vec } from './rig.ts';
@@ -41,17 +41,31 @@ const PLAN: BodyPlan = {
   facings: WALKER_FACINGS,
 };
 
+const WALK_FPS = 8;
+/**
+ * Ground the walker covers in one walk frame. A planted foot slides back this far a frame, so
+ * at the walker's own speed it keeps its spot on the street (the screamer, a little faster,
+ * slips by under a quarter of a pixel a frame). Facings that foreshorten the ground are not
+ * corrected for.
+ */
+const STEP = ZOMBIES.walker.speed / WALK_FPS;
+
 // Body-left is the good leg and the reaching arm; body-right the bad leg and the dragged arm.
 const reach = (f: number, u: number): Vec => [f, 0, u];
 const limp = (f: number, u: number): Vec => [f, 1, u];
+// Feet are placed in steps forward of the hip. Each is planted for three frames, from one step
+// ahead to one behind; then the good foot swings through the air and the bad one scrapes
+// forward along the ground. One step either side stays inside the leg's reach.
+const good = (steps: number, u: number): Vec => [steps * STEP, -3, u];
+const bad = (steps: number): Vec => [steps * STEP, 3, 0];
 
 const WALK: readonly Pose[] = [
-  { feet: [[4, -3, 0], [-5, 3, 0]], hands: [reach(8, -6), limp(-2, -8)], body: [0, -1, -1], lean: 2, head: [1, 0, 0] },
-  { feet: [[2, -3, 0], [-3, 3, 0]], hands: [reach(8, -5), limp(-3, -8)], body: [0, -1, 0], lean: 2, head: [1, -1, 0] },
-  { feet: [[0, -3, 0], [-1, 3, 0]], hands: [reach(8, -5), limp(-2, -8)], body: [0, 0, 0], lean: 2, head: [1, -1, 0] },
-  { feet: [[-2, -3, 0], [2, 3, 1]], hands: [reach(8, -6), limp(0, -8)], body: [0, 1, 0], lean: 2, head: [0, 0, 0] },
-  { feet: [[-4, -3, 1], [4, 3, 0]], hands: [reach(8, -7), limp(2, -7)], body: [0, 1, -1], lean: 3, head: [1, 1, -1] },
-  { feet: [[-1, -3, 2], [2, 3, 0]], hands: [reach(8, -7), limp(0, -8)], body: [0, 0, -1], lean: 3, head: [1, 1, 0] },
+  { feet: [good(1, 0), bad(-1)], hands: [reach(8, -6), limp(-2, -8)], body: [0, -1, -1], lean: 2, head: [1, 0, 0] },
+  { feet: [good(0, 0), bad(-0.8)], hands: [reach(8, -5), limp(-3, -8)], body: [0, -1, 0], lean: 2, head: [1, -1, 0] },
+  { feet: [good(-1, 0), bad(-0.25)], hands: [reach(8, -5), limp(-2, -8)], body: [0, 0, 0], lean: 2, head: [1, -1, 0] },
+  { feet: [good(-0.6, 1), bad(0.4)], hands: [reach(8, -6), limp(0, -8)], body: [0, 1, 0], lean: 2, head: [0, 0, 0] },
+  { feet: [good(0, 2), bad(1)], hands: [reach(8, -7), limp(2, -7)], body: [0, 1, -1], lean: 3, head: [1, 1, -1] },
+  { feet: [good(0.6, 1), bad(0)], hands: [reach(8, -7), limp(0, -8)], body: [0, 0, -1], lean: 3, head: [1, 1, 0] },
 ];
 
 const STAND: Pose = { feet: [[0, -3, 0], [0, 3, 0]], hands: [reach(8, -5), limp(0, -8)], body: [0, 0, 0], lean: 1, head: [0, 0, 0] };
@@ -63,6 +77,8 @@ const ATTACK: readonly Pose[] = [
   { feet: [[5, -3, 0], [-4, 3, 0]], hands: [[10, 2, -1], [9, -2, 0]], body: [2, 0, -1], lean: 3, head: [1, 0, -1] },
   { feet: [[5, -3, 0], [-3, 3, 0]], hands: [[7, 4, -8], [7, -4, -8]], body: [2, 0, -1], lean: 4, head: [1, 0, 0] },
 ];
+/** The attack's strike frames start here; the frames before are the wind-up. */
+const STRIKE = 2;
 
 const DEATH: readonly Pose[] = [
   { feet: [[1, -3, 0], [-1, 3, 0]], hands: [[-3, -4, 3], [-2, 4, 2]], body: [-2, 0, 0], lean: -2, head: [-1, 0, 1] },
@@ -72,23 +88,42 @@ const DEATH: readonly Pose[] = [
 /** Three frames fill the wind-up, so the last, the follow-through, lands with the hit. */
 const ATTACK_FPS = 3 / ZOMBIES.walker.windupSec;
 
+/** A frame drawn by hand. The pool lies under it as a decal: no outline of its own, the body's over it. */
 function flat(legend: Legend, rows: readonly string[], pool: readonly string[] = []): PixelSprite {
-  return flatFrame(CELL, OX, OY, legend, [[4, 34 - pool.length, pool], [2, 3, rows]]);
+  return flatFrame(CELL, OX, OY, legend, [[2, 3, rows]], [[4, 34 - pool.length, pool]]);
 }
 
 /** Facing the camera, a reaching arm foreshortens: it stays high and comes straight out. */
-function draw(plan: BodyPlan, dir: DrawnDir, pose: Pose): PixelSprite {
+function facing(dir: DrawnDir, pose: Pose): Pose {
   const sideOn = dir !== 2;
-  if (sideOn) return drawBody(plan, dir, pose);
-  return drawBody(plan, dir, { ...pose, hands: [add(pose.hands[0], [-1, -1, 3]), pose.hands[1]] });
+  if (sideOn) return pose;
+  return { ...pose, hands: [add(pose.hands[0], [-1, -1, 3]), pose.hands[1]] };
+}
+
+/** The walk in one facing, each claw and limb held to one drawing across the loop where it can be. */
+function walk(plan: BodyPlan, dir: DrawnDir): Clip {
+  const poses = steadyClip(plan, dir, WALK.map((pose) => facing(dir, pose)));
+  return makeClip(poses.map((pose) => drawBody(plan, dir, pose)), WALK_FPS);
+}
+
+/**
+ * Seen from straight behind, the claws of a strike sit hidden by the back. In the strike frames
+ * they swing out past the shoulders instead, so the rake reads, high then low. The other
+ * facings keep the pose as it is. Art only: the hit itself is the sim's.
+ */
+function strikeFrom(dir: DrawnDir, pose: Pose, frame: number): Pose {
+  const hidden = dir === 6 && frame >= STRIKE;
+  if (!hidden) return pose;
+  const out = ([f, , u]: Vec, side: number): Vec => [f, 7 * side, u];
+  return { ...pose, hands: [out(pose.hands[0], -1), out(pose.hands[1], 1)] };
 }
 
 /** The walker's body and moves. Another legend recolours it into a cousin, as the screamer is. */
 export function buildWalker(legend: Legend = WALKER_LEGEND): ZombieArt {
   const plan: BodyPlan = { ...PLAN, legend };
   return {
-    walk: dirClips((dir) => makeClip(WALK.map((pose) => draw(plan, dir, pose)), 8)),
-    attack: dirClips((dir) => makeClip(ATTACK.map((pose) => drawBody(plan, dir, pose)), ATTACK_FPS, false)),
+    walk: dirClips((dir) => walk(plan, dir)),
+    attack: dirClips((dir) => makeClip(ATTACK.map((pose, frame) => drawBody(plan, dir, strikeFrom(dir, pose, frame))), ATTACK_FPS, false)),
     death: makeClip([
       ...DEATH.map((pose) => drawBody(plan, 2, pose)),
       flat(legend, WALKER_FALL),
@@ -100,5 +135,5 @@ export function buildWalker(legend: Legend = WALKER_LEGEND): ZombieArt {
 }
 
 export function referenceWalker(): { idle: PixelSprite; walk: Clip } {
-  return { idle: draw(PLAN, 2, STAND), walk: makeClip(WALK.map((pose) => draw(PLAN, 2, pose)), 8) };
+  return { idle: drawBody(PLAN, 2, facing(2, STAND)), walk: walk(PLAN, 2) };
 }

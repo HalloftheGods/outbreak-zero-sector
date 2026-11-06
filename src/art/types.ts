@@ -1,3 +1,4 @@
+import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { BuildingKind, PickupType, PropKind, TileKind, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import type { ContainerArt, ContainerLook } from './containers.ts';
 
@@ -52,6 +53,13 @@ export interface ZombieArt {
   readonly attack: DirClips;
   /** Plays once. The last frame stays on the ground as the corpse. */
   readonly death: Clip;
+}
+
+export interface MerchantArt {
+  /** Stands behind the stall. The same sprite as the merchant's prop. */
+  readonly figure: PixelSprite;
+  /** Shown beside their shop. */
+  readonly portrait: PixelSprite;
 }
 
 export interface EnvironmentArt {
@@ -112,6 +120,7 @@ export interface ArtBook {
   readonly pickups: Record<PickupType, Clip>;
   /** Searchable furniture and vehicles, shut and searched, each drawn in place of its prop. */
   readonly containers: Record<ContainerLook, ContainerArt>;
+  readonly merchants: Record<MerchantId, MerchantArt>;
   readonly fx: FxArt;
   readonly ui: UiArt;
 }

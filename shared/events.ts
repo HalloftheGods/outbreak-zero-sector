@@ -1,0 +1,22 @@
+// The names that cross the sim/client boundary, declared once. `protocol.ts` derives its
+// types from these and the packet guards check against them, so a name added here is
+// accepted everywhere without a second hand list.
+
+import { PART_ORDER } from './gun-upgrade-data.ts';
+import { KIT_ORDER } from './round-effect-data.ts';
+
+export const GAME_PHASES = ['intermission', 'wave', 'gameover'] as const;
+
+export const TREASURE_TYPES = ['silver', 'jewel_small', 'jewel_large'] as const;
+
+export const PICKUP_TYPES = [
+  'bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', 'radio',
+  ...PART_ORDER, ...KIT_ORDER, ...TREASURE_TYPES,
+] as const;
+
+export const GAME_EVENT_TYPES = [
+  'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'zombie_track', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
+  'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
+  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
+  'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over', 'trip_start',
+] as const;

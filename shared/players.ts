@@ -15,6 +15,7 @@ import { useMedkit } from './player-health.ts';
 import { updateThrow } from './bottles.ts';
 import type { ClientInputPacket, Stance } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
+import { updateStations } from './stations.ts';
 import { updateWeapons } from './weapons.ts';
 import { buildingAt } from './world-query.ts';
 import { leaveFootprint } from './snow-tracks.ts';
@@ -110,4 +111,5 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   useMedkit(sim, p);
   updateThrow(sim, p);
   updateSearch(sim, p);
+  updateStations(sim, p);
 }

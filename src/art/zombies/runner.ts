@@ -3,7 +3,7 @@
 
 import { ZOMBIES } from '../../../shared/constants.ts';
 import { dirClips, makeClip } from '../kit.ts';
-import type { DrawnDir, PixelCanvas } from '../kit.ts';
+import type { DrawnDir } from '../kit.ts';
 import type { PixelSprite, ZombieArt } from '../types.ts';
 import { drawBody, posed } from './body.ts';
 import type { BodyPlan, Pose } from './body.ts';
@@ -73,7 +73,16 @@ function headOn(pose: Pose): Pose {
   };
 }
 
-const facing = (dir: DrawnDir, pose: Pose): Pose => (dir === 2 || dir === 6 ? headOn(pose) : pose);
+// From behind the head sits under the hunched back, so the back views lift it clear of the hump.
+const raiseHead = (pose: Pose): Pose => ({ ...pose, head: add(pose.head, [0, 0, 1]) });
+
+const FACING_POSE: Partial<Record<DrawnDir, (pose: Pose) => Pose>> = {
+  2: headOn,
+  6: (pose) => raiseHead(headOn(pose)),
+  7: raiseHead,
+};
+
+const facing = (dir: DrawnDir, pose: Pose): Pose => (FACING_POSE[dir] ?? ((p: Pose) => p))(pose);
 
 const ATTACK: readonly Pose[] = [
   { feet: [[1, -3, 0], [-1, 3, 0]], hands: [[0, -1, -6], [-2, 1, -6]], body: [-2, 0, -1], lean: 5, head: [0, 0, 1] },
@@ -98,7 +107,7 @@ const DEAD_PLAN: BodyPlan = { ...PLAN, legend: { ...RUNNER_LEGEND, u: RUNNER_LEG
 
 function corpse(pool?: readonly string[]): PixelSprite {
   const { figure } = posed(DEAD_PLAN, 0, CORPSE);
-  if (pool) figure.layer(-100, (c: PixelCanvas) => c.grid(3, 35 - pool.length, pool, RUNNER_LEGEND), false);
+  if (pool) figure.decal(3, 35 - pool.length, pool, RUNNER_LEGEND);
   return figure.bake();
 }
 

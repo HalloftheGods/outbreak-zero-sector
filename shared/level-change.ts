@@ -7,12 +7,13 @@ import { giveReturnKit } from './player-health.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit, openGroundNear } from './sim-state.ts';
 import { seedPopulation } from './town-population.ts';
+import { placeTownTreasure } from './treasure.ts';
 import { hordesSurvivedHere } from './waves.ts';
 import { generateWorldMap } from './world-map.ts';
 
 /** Empties the world and raises a level's town, stocked and populated, ready for its lead-in. */
 export function enterTown(sim: SimState, level: number): void {
-  const seed = levelSeed(sim.runSeed, level);
+  const seed = levelSeed(sim.runSeed, level, sim.homeRun?.attempt);
   const newTown = seed !== sim.map.seed;
   if (newTown) {
     sim.map = generateWorldMap(seed);
@@ -40,6 +41,7 @@ export function enterTown(sim: SimState, level: number): void {
   sim.noiseFlow.invalidate();
   placeTownLoot(sim);
   seedPopulation(sim);
+  placeTownTreasure(sim);
 }
 
 /** Puts someone down beside the town's entry. */

@@ -15,6 +15,7 @@ import type { ArtBook } from '../art/types.ts';
 import type { TransportKind } from '../network/transport.ts';
 import { benchHud } from './bench-view.ts';
 import type { BenchHud } from './bench-view.ts';
+import type { HomeUi } from './home-hud.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 export type Screen = 'title' | 'game' | 'gameover' | 'lost';
@@ -118,6 +119,10 @@ export interface UiState {
   readonly banner: Banner | null;
   readonly place: PlaceBanner | null;
   readonly levelCard: LevelCard | null;
+  /** The bunker and the trip, on a run in home mode. */
+  readonly home: HomeUi | null;
+  /** The game is played from the bunker. Known before any run, which `home` is not. */
+  readonly homeLoop: boolean;
   readonly result: RunResult | null;
   readonly restarting: boolean;
   readonly lostReason: string;

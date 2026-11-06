@@ -256,11 +256,11 @@ describe('outline ink in survivor legends', () => {
    * this as they land; nothing may be added.
    */
   const KNOWN_INK_FILLS: Readonly<Record<string, { readonly legend: string; readonly far: string }>> = {
-    night: { legend: 'N', far: 'NpP' },
-    khronus8: { legend: 'we', far: 'wpPef' },
+    night: { legend: 'N', far: 'N' },
+    khronus8: { legend: '', far: '' },
     satori: { legend: '', far: '' },
-    rex: { legend: '', far: 'pPf' },
-    sol: { legend: 'hi', far: 'hi' },
+    rex: { legend: '', far: '' },
+    sol: { legend: '', far: '' },
   };
 
   it('maps no new letter to outline ink', () => {

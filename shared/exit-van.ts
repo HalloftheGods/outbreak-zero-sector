@@ -67,7 +67,7 @@ export function vanBoxAt(spot: Point): Box {
  * settles the exit spot and hands back the van's body, or null when the town has nowhere to park it.
  */
 export function settleVan(map: WorldMap): Box | null {
-  const spot = pickExitSpot(map);
+  const spot = map.exit ?? pickExitSpot(map);
   spots.set(map, spot ?? map.spawn);
   return spot ? vanBoxAt(spot) : null;
 }

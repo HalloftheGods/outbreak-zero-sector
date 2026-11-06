@@ -10,7 +10,8 @@ export type LevelTheme =
   | 'emergency'
   | 'snow'
   | 'infested'
-  | 'burning';
+  | 'burning'
+  | 'bunker';
 
 /** Shares of a crowd added to what level 1 already has, for roamers and hordes alike. */
 export interface ZombieMix {
@@ -49,6 +50,8 @@ export const FINAL_LEVEL = LEVELS.length;
 
 /** Odd and large, so neighbouring levels land far apart in seed space. */
 const LEVEL_SEED_STEP = 0x9e3779b1;
+/** The same again for a level's later attempts, with a step of its own. */
+const ATTEMPT_SEED_STEP = 0x85ebca6b;
 
 /** The row for a level number, with anything out of range held to the ends of the run. */
 export function levelDef(level: number): LevelDef {
@@ -56,10 +59,11 @@ export function levelDef(level: number): LevelDef {
   return LEVELS[index];
 }
 
-/** Level 1 is the run seed itself; the rest follow from it, so server and clients agree on every town. */
-export function levelSeed(runSeed: number, level: number): number {
+/** Level 1 is the run seed itself; the rest follow from it, so server and clients agree on every town. Each later attempt is a fresh one. */
+export function levelSeed(runSeed: number, level: number, attempt = 0): number {
   const stepsIn = level - FIRST_LEVEL;
-  return stepsIn === 0 ? runSeed : (runSeed ^ Math.imul(stepsIn, LEVEL_SEED_STEP)) >>> 0;
+  const town = stepsIn === 0 ? runSeed : (runSeed ^ Math.imul(stepsIn, LEVEL_SEED_STEP)) >>> 0;
+  return attempt === 0 ? town : (town ^ Math.imul(attempt, ATTEMPT_SEED_STEP)) >>> 0;
 }
 
 /** Roaming zombies a level's town holds. */

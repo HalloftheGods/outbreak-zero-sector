@@ -3,18 +3,24 @@
 
 import { CHARACTERS } from './characters.ts';
 import type { DifficultyId } from './difficulty.ts';
+import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from './events.ts';
+import type { Point } from './flow-field.ts';
 import type { PartId } from './gun-upgrade-data.ts';
 import type { PlayerGear } from './gun-upgrades.ts';
+import type { HomeAction, HomeView, JoinHome, RoomHomeView, Station } from './home-protocol.ts';
 import type { GunEffect, RoundKitId } from './round-effect-data.ts';
 import type { BenchAction, BenchView } from './workbench.ts';
+import type { Box } from './world-query.ts';
+
+export { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES };
 
 export type EntityId = string;
 
 export type WeaponId = 'pistol' | 'carbine' | 'shotgun';
 export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute' | 'screamer';
-export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun' | 'knife' | 'radio' | PartId | RoundKitId;
+export type PickupType = (typeof PICKUP_TYPES)[number];
 export type PlayerStatus = 'alive' | 'downed' | 'dead';
-export type GamePhase = 'intermission' | 'wave' | 'gameover';
+export type GamePhase = (typeof GAME_PHASES)[number];
 /** How a survivor is moving: sneaking is slow and hard to spot, sprinting is fast and loud. */
 export type Stance = 'walk' | 'sneak' | 'sprint';
 
@@ -67,6 +73,8 @@ export interface PlayerEntity {
   lastInputSeq: number;
   /** Parts carried and work done on guns, left off for someone with neither. */
   gear?: PlayerGear;
+  /** Treasure carried, station and trip result. Left off outside home mode. */
+  home?: HomeView;
 }
 
 export interface ZombieEntity {
@@ -182,7 +190,14 @@ export type GameEvent =
   | { readonly type: 'exit_open'; readonly level: number; readonly x: number; readonly y: number }
   | { readonly type: 'level_complete'; readonly level: number }
   | { readonly type: 'level_start'; readonly level: number }
+  /** The van left the bunker for a town. `attempt` is the room's trip serial. */
+  | { readonly type: 'trip_start'; readonly level: number; readonly attempt: number }
   | { readonly type: 'game_over'; readonly stats: GameOverStats };
+
+/** Compiles only while GAME_EVENT_TYPES lists exactly the names GameEvent declares. */
+export const EVENT_TYPES_MATCH: [GameEvent['type']] extends [(typeof GAME_EVENT_TYPES)[number]]
+  ? [(typeof GAME_EVENT_TYPES)[number]] extends [GameEvent['type']] ? true : never
+  : never = true;
 
 export interface ClientInputPacket {
   readonly seq: number;
@@ -244,6 +259,8 @@ export interface SnapshotPacket {
   readonly gameOver: GameOverStats | null;
   /** Present while the run is held at the workbench between towns. */
   readonly bench?: BenchView;
+  /** The room's level pick and reach. Left off outside home mode. */
+  readonly home?: RoomHomeView;
 }
 
 export interface WelcomePacket {
@@ -254,6 +271,8 @@ export interface WelcomePacket {
   readonly mapSeed: number;
   /** What the room is played on: a guest plays the first player's choice, not their own. */
   readonly difficulty?: DifficultyId;
+  /** This join took back a body the room was still holding. Left off for a new one. */
+  readonly resumed?: boolean;
 }
 
 export type ServerPacket =
@@ -263,9 +282,10 @@ export type ServerPacket =
 
 export type ClientPacket =
   /** The difficulty is read from the first player into an empty room and ignored from everyone after. */
-  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number }
+  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number; readonly home?: JoinHome }
   | { readonly type: 'input'; readonly input: ClientInputPacket }
   | { readonly type: 'bench'; readonly action: BenchAction }
+  | { readonly type: 'home'; readonly action: HomeAction }
   | { readonly type: 'restart' };
 
 // --- World map -------------------------------------------------------------
@@ -291,6 +311,7 @@ export const TILE_KINDS = [
   'floor_tile',
   'floor_concrete',
   'floor_carpet',
+  'bunker_wall',
 ] as const;
 export type TileKind = (typeof TILE_KINDS)[number];
 
@@ -326,6 +347,12 @@ export const PROP_DEFS = {
   locker: { w: 16, h: 8 },
   fridge: { w: 16, h: 8 },
   workbench: { w: 40, h: 12 },
+  forge: { w: 40, h: 12 },
+  level_map: { w: 24, h: 14 },
+  gunsmith: { w: 12, h: 8 },
+  quartermaster: { w: 12, h: 8 },
+  medic: { w: 12, h: 8 },
+  powder: { w: 12, h: 8 },
 } as const;
 export type PropKind = keyof typeof PROP_DEFS;
 export const PROP_KINDS = Object.keys(PROP_DEFS) as PropKind[];
@@ -399,4 +426,10 @@ export interface WorldMap {
   readonly lights: readonly MapLight[];
   /** Open ground for players to start on. */
   readonly spawn: { readonly x: number; readonly y: number };
+  /** Solids that are not buildings. Set, these are every wall there is. */
+  readonly walls?: readonly Box[];
+  /** Where the van stands, when the map says so rather than the town's walk. */
+  readonly exit?: Point;
+  /** What can be walked up to and opened. */
+  readonly stations?: readonly Station[];
 }

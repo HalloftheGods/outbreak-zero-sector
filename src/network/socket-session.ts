@@ -1,11 +1,11 @@
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
-import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { HomeAction } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, ClientPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { tapRoomDifficulty } from '../game/analytics/event-tap.ts';
 import { parseServerPacket } from './packet-guards.ts';
 import { tabToken } from './tab-token.ts';
-import type { GameTransport } from './transport.ts';
+import type { ConnectOptions, GameTransport } from './transport.ts';
 
 const CONNECT_TIMEOUT_MS = 6000;
 const ROOM_FULL_CLOSE_CODE = 4000;
@@ -57,7 +57,7 @@ export class SocketSession implements GameTransport {
     this.url = url;
   }
 
-  connect(name: string, difficulty?: DifficultyId, character?: number): void {
+  connect({ name, difficulty, character, home }: ConnectOptions): void {
     let socket: WebSocket;
     try {
       socket = new WebSocket(this.url);
@@ -70,7 +70,7 @@ export class SocketSession implements GameTransport {
       this.finish(`No answer from ${this.url}. Is the server running?`);
     }, CONNECT_TIMEOUT_MS);
 
-    socket.onopen = () => this.send({ type: 'join', name, token: tabToken(), difficulty, character });
+    socket.onopen = () => this.send({ type: 'join', name, token: tabToken(), difficulty, character, home });
     socket.onmessage = (event) => this.receive(event.data);
     socket.onclose = (event) => this.finish(this.closeReason(event.code));
   }
@@ -81,6 +81,10 @@ export class SocketSession implements GameTransport {
 
   sendBench(action: BenchAction): void {
     if (this.welcomed) this.send({ type: 'bench', action });
+  }
+
+  sendHome(action: HomeAction): void {
+    if (this.welcomed) this.send({ type: 'home', action });
   }
 
   requestRestart(): void {

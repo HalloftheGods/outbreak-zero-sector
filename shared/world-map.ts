@@ -1,3 +1,5 @@
+import { generateBunkerMap } from './bunker-map.ts';
+import { isBunkerSeed } from './home-protocol.ts';
 import { TILE_KINDS, TILE_SIZE } from './protocol.ts';
 import type { MapLight, PropInstance, WorldMap } from './protocol.ts';
 import { MapBuilder } from './map-builder.ts';
@@ -103,6 +105,7 @@ function lightsFor(props: readonly PropInstance[], rng: Rng): MapLight[] {
 
 /** Deterministic: the same seed yields the same map on the server and every client. */
 export function generateWorldMap(seed: number): WorldMap {
+  if (isBunkerSeed(seed)) return generateBunkerMap();
   const rng = createRng(seed);
   const size = MAP_TILES * TILE_SIZE;
   const plan = planTown(rng);

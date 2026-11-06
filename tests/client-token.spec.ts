@@ -49,7 +49,7 @@ describe('being turned away', () => {
     const session = new SocketSession('ws://host:8097');
     const reasons: string[] = [];
     session.onClosed = (reason) => reasons.push(reason);
-    session.connect('ANA');
+    session.connect({ name: 'ANA' });
     ClosingSocket.last.onclose?.({ code: 4001 });
     expect(reasons).toEqual(['That server is busy. Try again in a moment.']);
   });

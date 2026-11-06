@@ -5,7 +5,7 @@ import { ZOMBIES } from '../../../shared/constants.ts';
 import { dirClips, makeClip } from '../kit.ts';
 import type { DrawnDir, PixelCanvas } from '../kit.ts';
 import type { PixelSprite, ZombieArt } from '../types.ts';
-import { posed } from './body.ts';
+import { posed, steadyClip } from './body.ts';
 import type { BodyPlan, Pose } from './body.ts';
 import { flatFrame, stamp } from './rig.ts';
 import type { Stamp } from './rig.ts';
@@ -32,18 +32,40 @@ const PLAN: BodyPlan = {
     { upper: ['eddcb'], lower: ['ddccb'] },
   ],
   arms: [
-    { upper: ['fed'], lower: ['edc'] },
-    { upper: ['fed'], lower: ['edc'] },
+    { upper: ['dcb'], lower: ['dcb'] },
+    { upper: ['dcb'], lower: ['dcb'] },
   ],
   hands: [BLOATER_HAND, BLOATER_HAND],
   facings: BLOATER_FACINGS,
   headOnTop: true,
 };
 
+/** The row and column swell() grows or shrinks a belly through. */
+function swellAt(art: Stamp): { rowAt: number; colAt: number } {
+  return { rowAt: Math.floor(art.rows.length * 0.55), colAt: Math.floor(art.rows[0].length * 0.5) };
+}
+
+/** Where one belly row or column (a) ends up after swell() inserts d copies of line `at`, or removes -d lines from it. */
+function swellAxis(a: number, at: number, d: number): number[] {
+  const before = a < at;
+  const grows = d >= 0;
+  const insertedAt = grows && a === at;
+  const removed = !grows && !before && a < at - d;
+  if (before) return [a];
+  if (insertedAt) return Array.from({ length: d + 1 }, (_, i) => at + i);
+  if (removed) return [];
+  return [a + d];
+}
+
+/** Where a single point (a pustule's corner) lands: the last line its source maps to, or `at` if it was removed. */
+function swellPoint(a: number, at: number, d: number): number {
+  const lands = swellAxis(a, at, d);
+  return lands.length > 0 ? lands[lands.length - 1] : at;
+}
+
 /** Grows or shrinks a belly through its plain middle row and column, so its outline stays clean. */
 function swell(art: Stamp, dw: number, dh: number): Stamp {
-  const rowAt = Math.floor(art.rows.length * 0.55);
-  const colAt = Math.floor(art.rows[0].length * 0.5);
+  const { rowAt, colAt } = swellAt(art);
   const rows = [...art.rows];
   if (dh > 0) rows.splice(rowAt, 0, ...Array<string>(dh).fill(rows[rowAt]));
   if (dh < 0) rows.splice(rowAt, -dh);
@@ -67,11 +89,25 @@ function drawBloater(dir: DrawnDir, pose: Pose, belly: Belly): PixelSprite {
   const { figure, torso } = posed(PLAN, dir, { ...pose, morph: () => shaped });
   const left = Math.round(torso.x) - shaped.px;
   const top = Math.round(torso.y) - shaped.py;
+  const { rowAt, colAt } = swellAt(BLOATER_FACINGS[dir].torso);
   figure.layer(0.1, (c: PixelCanvas) => {
-    for (const [x, y, rows] of BLOATER_MARKS[dir]) c.grid(left + x, top + y, rows, BLOATER_LEGEND);
+    // Marks stretch with the skin under them: each pixel goes where swell() puts its row and column.
+    for (const [mx, my, rows] of BLOATER_MARKS[dir]) {
+      rows.forEach((row, r) => {
+        for (let k = 0; k < row.length; k++) {
+          const color = BLOATER_LEGEND[row[k]] ?? null;
+          const isGap = color === null;
+          if (isGap) continue;
+          for (const ny of swellAxis(my + r, rowAt, belly.dh)) {
+            for (const nx of swellAxis(mx + k, colAt, belly.dw)) c.px(left + nx, top + ny, color);
+          }
+        }
+      });
+    }
+    // Pustules ride the same mapping, so they stay on the skin they were drawn on.
     for (const [x, y, size] of PUSTULE_SPOTS[dir]) {
       const ripe = Math.max(0, Math.min(PUSTULES.length - 1, size + belly.ripe));
-      c.grid(left + x + Math.round((belly.dw * x) / 26), top + y + Math.round((belly.dh * y) / 23), PUSTULES[ripe], BLOATER_LEGEND);
+      c.grid(left + swellPoint(x, colAt, belly.dw), top + swellPoint(y, rowAt, belly.dh), PUSTULES[ripe], BLOATER_LEGEND);
     }
   }, false);
   return figure.bake();
@@ -96,8 +132,12 @@ const ATTACK: readonly (readonly [Pose, Belly])[] = [
 const STAND: Pose = { feet: [[0, -6, 0], [0, 6, 0]], hands: [[0, -3, -4], [0, 3, -4]], body: [0, 0, 0], lean: 0, head: [0, 0, 0] };
 const SHUDDER: Pose = { ...STAND, hands: [[1, -5, 1], [1, 5, 1]], head: [0, 0, 1] };
 
-function aftermath(parts: readonly (readonly [number, number, readonly string[]])[]): PixelSprite {
-  return flatFrame(PLAN.cell, PLAN.ox, PLAN.oy, BLOATER_LEGEND, parts.map(([x, y, rows]) => [x + 2, y, rows]));
+type Grids = readonly (readonly [number, number, readonly string[]])[];
+
+/** Parts are outlined with the figure; decals (drops, the pool) are painted flat after, only into empty pixels. */
+function aftermath(parts: Grids, decals: Grids = []): PixelSprite {
+  const shift = (list: Grids): Grids => list.map(([x, y, rows]) => [x + 2, y, rows]);
+  return flatFrame(PLAN.cell, PLAN.ox, PLAN.oy, BLOATER_LEGEND, shift(parts), shift(decals));
 }
 
 /** Swells past what skin can hold, splits, and leaves a sack in a pool. */
@@ -109,16 +149,16 @@ function rupture(): PixelSprite[] {
     drawBloater(2, STAND, { dw: 2, dh: 2, ripe: 1 }),
     drawBloater(2, SHUDDER, { dw: 4, dh: 3, ripe: 2 }),
     burst.bake(),
-    aftermath([...DROPS, [9, 21, SLUMP]]),
+    aftermath([[9, 21, SLUMP]], DROPS),
     aftermath([[5, 23, SACK]]),
-    aftermath([[5, 30, small], [5, 23, SACK]]),
-    aftermath([[3, 30, wide], [5, 23, SACK]]),
+    aftermath([[5, 23, SACK]], [[5, 30, small]]),
+    aftermath([[5, 23, SACK]], [[3, 30, wide]]),
   ];
 }
 
 export function buildBloater(): ZombieArt {
   return {
-    walk: dirClips((dir) => makeClip(WALK.map(([pose, belly]) => drawBloater(dir, pose, belly)), 7)),
+    walk: dirClips((dir) => makeClip(steadyClip(PLAN, dir, WALK.map(([pose]) => pose)).map((pose, i) => drawBloater(dir, pose, WALK[i][1])), 7)),
     attack: dirClips((dir) => makeClip(ATTACK.map(([pose, belly]) => drawBloater(dir, pose, belly)), 3 / ZOMBIES.bloater.windupSec, false)),
     death: makeClip(rupture(), 9, false),
   };

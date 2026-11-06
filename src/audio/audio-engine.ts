@@ -28,6 +28,7 @@ const PICKUP: Record<PickupType, SfxName> = {
   knife: 'pickup_weapon', radio: 'pickup_radio',
   barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
   incendiary_kit: 'pickup_weapon', acid_kit: 'pickup_weapon', piercing_kit: 'pickup_weapon', tranq_kit: 'pickup_weapon',
+  silver: 'pickup_ammo', jewel_small: 'pickup_bandage', jewel_large: 'pickup_bandage',
 };
 const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrode', piercing: 'pierce', tranq: 'tranq_dart' };
 /** A can on the end of a gun: still a shot, but a dull one. */

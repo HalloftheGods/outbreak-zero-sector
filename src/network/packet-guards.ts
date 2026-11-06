@@ -1,7 +1,7 @@
 import { isDifficultyId } from '../../shared/difficulty.ts';
-import { PART_ORDER } from '../../shared/gun-upgrade-data.ts';
+import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from '../../shared/events.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
-import { EFFECT_ORDER, KIT_ORDER } from '../../shared/round-effect-data.ts';
+import { EFFECT_ORDER } from '../../shared/round-effect-data.ts';
 import type {
   BulletEntity,
   ExitEntity,
@@ -20,18 +20,13 @@ import { isBenchView, isPlayerGear } from './bench-guards.ts';
 type Fields = Record<string, unknown>;
 
 const STATUSES: readonly unknown[] = ['alive', 'downed', 'dead'];
-const PHASES: readonly unknown[] = ['intermission', 'wave', 'gameover'];
+const PHASES: readonly unknown[] = GAME_PHASES;
 const OUTCOMES: readonly unknown[] = ['defeat', 'victory'];
 const ZOMBIE_TYPES: readonly unknown[] = ['walker', 'runner', 'bloater', 'brute', 'screamer'];
-const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', 'radio', ...PART_ORDER, ...KIT_ORDER];
+const PICKUPS: readonly unknown[] = PICKUP_TYPES;
 const WEAPONS: readonly unknown[] = WEAPON_ORDER;
 const EFFECTS: readonly unknown[] = EFFECT_ORDER;
-const EVENT_TYPES: ReadonlySet<unknown> = new Set([
-  'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'zombie_track', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
-  'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
-  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
-  'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over',
-]);
+const EVENT_TYPES: ReadonlySet<unknown> = new Set(GAME_EVENT_TYPES);
 
 const isFields = (v: unknown): v is Fields => typeof v === 'object' && v !== null;
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -92,7 +87,7 @@ export function isBulletEntity(v: unknown): v is BulletEntity {
 export function isPickupEntity(v: unknown): v is PickupEntity {
   return isFields(v)
     && isString(v.id)
-    && PICKUP_TYPES.includes(v.type)
+    && PICKUPS.includes(v.type)
     && hasNumbers(v, ['x', 'y']);
 }
 

@@ -55,8 +55,9 @@ function wallsOf(building: BuildingInstance): Box[] {
   ];
 }
 
-/** Every wall of every building, with the door gaps left out. Shared, do not write to it. */
-export function wallBoxes(map: Pick<WorldMap, 'buildings'>): readonly Box[] {
+/** Every wall of every building, with the door gaps left out, or the map's own walls if it has them. Shared, do not write to it. */
+export function wallBoxes(map: Pick<WorldMap, 'buildings' | 'walls'>): readonly Box[] {
+  if (map.walls) return map.walls;
   const cached = walls.get(map.buildings);
   if (cached) return cached;
   const boxes = map.buildings.flatMap(wallsOf);

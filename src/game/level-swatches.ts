@@ -11,4 +11,5 @@ export const LEVEL_SWATCH: Readonly<Record<LevelTheme, string>> = {
   snow: '#c9d8e6',
   infested: '#5a2f55',
   burning: '#e0661a',
+  bunker: '#4a3a2c',
 };

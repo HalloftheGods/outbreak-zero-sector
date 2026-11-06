@@ -150,6 +150,30 @@ const RADIO: Grid = [
   'aaaaaaaaaaaaaaaa',
 ];
 
+/** Stand-ins for the treasure art: a short stack of coins, and two cut stones. */
+export const SILVER: Grid = [
+  '.oppo.',
+  'oppppo',
+  'noooon',
+  '.nnnn.',
+];
+
+export const JEWEL_SMALL: Grid = [
+  '.uut.',
+  'uuuts',
+  '.tts.',
+  '..s..',
+];
+
+export const JEWEL_LARGE: Grid = [
+  '..uuut..',
+  '.uuuuts.',
+  'uuuuttts',
+  '.ttttss.',
+  '..ttss..',
+  '...ss...',
+];
+
 interface ItemSpec {
   readonly rows: Grid;
   /** Where the glint sits, relative to the item. */
@@ -168,6 +192,9 @@ const ITEMS: Record<PickupType, ItemSpec> = {
   radio: { rows: RADIO, glint: [2, 3] },
   ...PART_ART,
   ...KIT_ART,
+  silver: { rows: SILVER, glint: [2, 1] },
+  jewel_small: { rows: JEWEL_SMALL, glint: [1, 1] },
+  jewel_large: { rows: JEWEL_LARGE, glint: [3, 1] },
 };
 
 function frame({ rows, glint }: ItemSpec, index: number): PixelCanvas {

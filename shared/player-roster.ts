@@ -77,6 +77,7 @@ export function createPlayer(arrival: Arrival, spot: { x: number; y: number }): 
     parts: noParts(),
     kits: noKits(),
     benchReady: false,
+    home: null,
   };
   giveStartingLoadout(player);
   return player;

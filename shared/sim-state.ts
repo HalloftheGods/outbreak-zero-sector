@@ -15,6 +15,7 @@ import type {
 } from './protocol.ts';
 import type { ContainerState } from './containers.ts';
 import type { FlowField, Point } from './flow-field.ts';
+import type { HomeView, Jewels } from './home-protocol.ts';
 import { randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import type { SpatialHashGrid } from './spatial-grid.ts';
@@ -33,9 +34,21 @@ export interface GunState {
   fit?: GunFit;
 }
 
+/** What the sim holds for one player in a home room: what they see, and what stays on this side of the wire. */
+export interface PlayerHome extends HomeView {
+  /** The furthest level they have reached, as they said when they joined. */
+  highest: number;
+  /** What `dropCarried` took off them on this trip, for a died receipt, since their carried treasure is gone by then. */
+  lost: { silver: number; jewels: Jewels };
+  /** When they last pressed a key or had a station open. */
+  lastActiveTick: number;
+}
+
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'home'> {
   bottles: number;
+  /** Null outside home mode. */
+  home: PlayerHome | null;
   /** A throw asked for and not yet made. */
   throwQueued: boolean;
   throwCooldown: number;
@@ -156,6 +169,22 @@ export interface ExitState {
   hold: number;
 }
 
+/** The room's side of a home run. */
+export interface HomeRun {
+  /** Unique to this sim, not just its seed, so a save can tell its receipts from any other sim's. */
+  simId: string;
+  /** The level the room is out on, or null in the bunker. */
+  tripLevel: number | null;
+  pickedLevel: number | null;
+  /** The room's trip serial, which makes each trip's town a fresh one. */
+  attempt: number;
+  roomHighest: number;
+  /** Treasure's own id counter, kept off `entityId()`. */
+  nextTreasure: number;
+  /** The serial the next receipt takes, from 1, for the whole room. No reset or restart puts it back, so `${simId}:${serial}` never repeats. */
+  nextReceipt: number;
+}
+
 export interface SimState {
   /** Every level's town follows from this. */
   readonly runSeed: number;
@@ -206,6 +235,8 @@ export interface SimState {
   readonly workbench: WorkbenchMode;
   /** Set while the run is held at the workbench. */
   bench: BenchState | null;
+  /** Null outside home mode. */
+  homeRun: HomeRun | null;
 }
 
 export function entityId(sim: SimState, prefix: string): EntityId {

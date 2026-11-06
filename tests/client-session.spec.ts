@@ -71,7 +71,7 @@ describe('LocalSession', () => {
     const welcomes: WelcomePacket[] = [];
     session.onWelcome = (packet) => welcomes.push(packet);
     session.onSnapshot = (packet) => snapshots.push(packet);
-    session.connect('ANA');
+    session.connect({ name: 'ANA' });
     return { session, snapshots, welcomes };
   }
 
@@ -163,7 +163,7 @@ describe('SocketSession', () => {
     const welcomes: WelcomePacket[] = [];
     session.onClosed = (reason) => closed.push(reason);
     session.onWelcome = (packet) => welcomes.push(packet);
-    session.connect('ANA');
+    session.connect({ name: 'ANA' });
     return { session, closed, welcomes, socket: FakeSocket.last };
   }
 

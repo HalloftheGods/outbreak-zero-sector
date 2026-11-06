@@ -10,7 +10,7 @@ import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
 import { gridSprite } from './shared.ts';
 import type { Grid } from './shared.ts';
-import { BANDAGE, CARBINE_AMMO, PISTOL_AMMO, SHELLS } from './pickups.ts';
+import { BANDAGE, CARBINE_AMMO, JEWEL_LARGE, JEWEL_SMALL, PISTOL_AMMO, SHELLS, SILVER } from './pickups.ts';
 
 const { blood, bone, fire, ink, metal, olive, wood } = RAMPS;
 
@@ -240,6 +240,9 @@ export function buildPickupIcons(): Record<PickupType, PixelSprite> {
     acid_kit: outlined(KIT_ART.acid_kit.rows, 15, 15),
     piercing_kit: outlined(KIT_ART.piercing_kit.rows, 15, 15),
     tranq_kit: outlined(KIT_ART.tranq_kit.rows, 15, 15),
+    silver: outlined(SILVER, 15, 15),
+    jewel_small: outlined(JEWEL_SMALL, 15, 15),
+    jewel_large: outlined(JEWEL_LARGE, 15, 15),
   };
 }
 

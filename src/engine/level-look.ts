@@ -44,6 +44,7 @@ const NIGHT: LevelLook = {
 
 export const LEVEL_LOOKS: Record<LevelTheme, LevelLook> = {
   night: NIGHT,
+  bunker: { ...NIGHT, ambient: [96, 78, 62] },
   'industrial-dusk': {
     ...NIGHT,
     ambient: [92, 62, 58],

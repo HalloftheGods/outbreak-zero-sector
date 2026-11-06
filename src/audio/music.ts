@@ -1,6 +1,6 @@
 import { makeVoice, noise, noiseBuffer, tone, type Voice } from './voice-kit.ts';
 
-export type Scene = 'menu' | 'intermission' | 'wave' | 'gameover' | 'victory' | 'credits';
+export type Scene = 'menu' | 'intermission' | 'wave' | 'gameover' | 'victory' | 'credits' | 'bunker';
 
 const BPM = 84;
 const STEP = 60 / BPM / 4;
@@ -26,6 +26,7 @@ const LEVELS: Record<Scene, Levels> = {
   gameover: { drone: 0, pad: 0, wind: 0.025 },
   victory: { drone: 0, pad: 0, wind: 0 },
   credits: { drone: 0, pad: 0, wind: 0 },
+  bunker: { drone: 0, pad: 0.06, wind: 0 },
 };
 
 /**

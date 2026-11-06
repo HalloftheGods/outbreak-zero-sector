@@ -13,6 +13,7 @@
       </p>
       <MenuLink v-if="!privacyOpen" class="title-privacy" @press="openPrivacy()">Privacy</MenuLink>
     </footer>
+    <p class="title-version">v{{ APP_VERSION }}</p>
   </section>
 
   <PlaySetup v-else-if="page === 'play'" :ui :join="invited" :level="startLevel" @close="closePlay" />
@@ -41,6 +42,9 @@ import SoundTestPage from './SoundTestPage.vue';
 import SpriteImg from './SpriteImg.vue';
 import TitleMenu from './TitleMenu.vue';
 import { useGame } from './use-game.ts';
+
+declare const __APP_VERSION__: string;
+const APP_VERSION = __APP_VERSION__;
 
 defineProps<{ ui: UiState }>();
 
@@ -101,6 +105,14 @@ function closePlay(): void {
   justify-content: center;
   column-gap: calc(var(--u) * 4);
   max-width: 100%;
+  color: var(--bone-dim);
+}
+
+.title-version {
+  position: absolute;
+  bottom: calc(var(--u) * 2);
+  left: calc(var(--u) * 3);
+  margin: 0;
   color: var(--bone-dim);
 }
 

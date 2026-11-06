@@ -1,10 +1,10 @@
 import { TICK_DT, TICK_RATE } from '../../shared/constants.ts';
-import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { HomeAction } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import { GameSimulation } from '../../shared/simulation.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { TickClock } from './tick-clock.ts';
-import type { GameTransport } from './transport.ts';
+import type { ConnectOptions, GameTransport } from './transport.ts';
 
 const LOCAL_PLAYER_ID = 'local';
 
@@ -21,18 +21,12 @@ export class LocalSession implements GameTransport {
   /** Exposed for the dev handle. */
   sim: GameSimulation | null = null;
 
-  private name = '';
-  private difficulty: DifficultyId | undefined;
-  private character: number | undefined;
-  private startLevel: number | undefined;
+  private options: ConnectOptions = { name: '' };
   private paused = false;
   private readonly clock = new TickClock(1000 / TICK_RATE, () => this.tick());
 
-  connect(name: string, difficulty?: DifficultyId, character?: number, startLevel?: number): void {
-    this.name = name;
-    this.difficulty = difficulty;
-    this.character = character;
-    this.startLevel = startLevel;
+  connect(options: ConnectOptions): void {
+    this.options = options;
     this.beginRun();
   }
 
@@ -44,9 +38,13 @@ export class LocalSession implements GameTransport {
     this.sim?.benchCommand(LOCAL_PLAYER_ID, action);
   }
 
+  sendHome(action: HomeAction): void {
+    this.sim?.homeCommand(LOCAL_PLAYER_ID, action);
+  }
+
   /** Every run in solo gets a fresh city. Plain Play again goes back to level 1; Continue passes its level. */
   requestRestart(fromLevel?: number): void {
-    this.startLevel = fromLevel;
+    this.options = { ...this.options, startLevel: fromLevel };
     this.clock.stop();
     this.beginRun();
   }
@@ -64,9 +62,10 @@ export class LocalSession implements GameTransport {
   }
 
   private beginRun(): void {
+    const { name, difficulty, character, startLevel, home, homeLoop } = this.options;
     const seed = Math.floor(Math.random() * 0x7fffffff);
-    const sim = new GameSimulation({ seed, difficulty: this.difficulty, workbench: 'hold', startLevel: this.startLevel });
-    sim.addPlayer(LOCAL_PLAYER_ID, this.name, null, this.character);
+    const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: homeLoop });
+    sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);
     this.sim = sim;
     this.paused = false;
     this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: seed });

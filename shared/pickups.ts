@@ -17,6 +17,7 @@ import type { PickupType, WeaponId } from './protocol.ts';
 import { isKitPickup, takeKit } from './round-effects.ts';
 import type { PickupState, PlayerState, SimState } from './sim-state.ts';
 import { emit, entityId } from './sim-state.ts';
+import { isTreasurePickup, takeTreasure } from './treasure.ts';
 import { syncGun } from './weapons.ts';
 
 /** Share of kill drops that are a bandage rather than a few rounds. */
@@ -90,6 +91,7 @@ function applyPickup(p: PlayerState, item: PickupState): boolean {
   if (type === 'radio') return true;
   if (isPartPickup(type)) return takePart(p, type);
   if (isKitPickup(type)) return takeKit(p, type);
+  if (isTreasurePickup(type)) return takeTreasure(p, item);
   const used = isAmmoPickup(type) ? takeAmmo(p, item, type) : takeGun(p, item, type);
   if (used) syncGun(p);
   return used;

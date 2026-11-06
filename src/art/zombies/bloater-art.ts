@@ -334,8 +334,10 @@ export const SLUMP = [
 
 /** Flung drops around the slump, placed by hand at x, y in the cell. */
 export const DROPS: readonly (readonly [number, number, readonly string[]])[] = [
-  [3, 8, ['Qq', 'qp']], [33, 6, ['qQ', 'pq']], [19, 2, ['Q', 'q']], [1, 21, ['Qq']], [36, 20, ['qQ']],
-  [10, 3, ['q']], [28, 2, ['Q']], [6, 14, ['q']], [33, 13, ['Q']], [3, 29, ['q']], [35, 28, ['Qq']],
+  // Three clusters on the ground ellipse (squashed by the 0.5 ground tilt), each with a streak flung outward.
+  [1, 21, ['Qqp']], [4, 24, ['qQ']], [1, 26, ['q']], [7, 27, ['Q']],
+  [34, 20, ['pqQ']], [37, 23, ['q']], [32, 25, ['Qq']], [36, 27, ['Q']],
+  [12, 15, ['q']], [16, 14, ['Qq']], [21, 15, ['Q']], [25, 16, ['pqQ']], [29, 17, ['q']],
 ];
 
 /** All that is left: the empty skin, the head on top of it, a stub of arm. */

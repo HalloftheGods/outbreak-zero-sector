@@ -126,6 +126,11 @@ function curb(side: CurbSide, slab: Slab, damage: CurbDamage): PixelCanvas {
   return canvas;
 }
 
+/** A stand-in for the bunker's walls: poured concrete with one seam. */
+function bunkerWall(seam: number): PixelCanvas {
+  return new PixelCanvas(S, S).fill(concrete[0]).rect(0, seam, S, 1, asphalt[2]);
+}
+
 export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
   const bases = [ASPHALT[0], ASPHALT[1], ASPHALT[2]];
   const lanes = LANE_WEAR.map((wear, i) => laneDash(wear, bases[i]));
@@ -150,6 +155,7 @@ export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
     grass: GRASS.map((rows) => tile(olive[0], rows, LAWN)),
     dirt: DIRT.map((rows) => tile(olive[0], rows, EARTH)),
     ...buildFloors(),
+    bunker_wall: [bunkerWall(5), bunkerWall(11)],
   };
   return Object.fromEntries(
     TILE_KINDS.map((kind) => [kind, canvases[kind].map((canvas) => canvas.toSprite(S, S, 0, S))]),

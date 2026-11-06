@@ -14,6 +14,7 @@ import { noKits } from './round-effects.ts';
 import { START_BOTTLES } from './bottles.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { alivePlayers, emit, openGroundNear } from './sim-state.ts';
+import { dropCarried } from './treasure.ts';
 
 /** Everything carried goes; what is left is a loaded pistol and these spare rounds. */
 function resetKit(p: PlayerState, spareRounds: number): void {
@@ -66,6 +67,7 @@ function kill(sim: SimState, p: PlayerState): void {
   p.revive = 0;
   p.reload = 0;
   p.reloadLeft = 0;
+  dropCarried(sim, p);
   emit(sim, { type: 'player_dead', playerId: p.id, x: p.x, y: p.y });
 }
 
