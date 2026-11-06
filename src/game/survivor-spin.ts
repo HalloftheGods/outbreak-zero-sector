@@ -18,6 +18,11 @@ const BROWSER_TIMERS: SpinTimers = {
   clear: (handle) => clearInterval(handle),
 };
 
+/** Reduced motion stills only a touch screen's turn, which nobody asked for. Pointing at a survivor asks to see it turn. */
+export function holdsStill(touchOnly: boolean, wantsCalm: boolean): boolean {
+  return touchOnly && wantsCalm;
+}
+
 export interface Spinner {
   /** Begin turning from the front. Calling again restarts from the front. */
   start(): void;

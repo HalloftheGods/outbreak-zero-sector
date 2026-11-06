@@ -30,7 +30,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { characterOf, CHARACTERS } from '../../shared/characters.ts';
 import type { ArtBook, SurvivorArt } from '../art/types.ts';
 import { loadCharacter, saveCharacter } from '../game/character-pref.ts';
-import { createSpinner, FRONT_FACING } from '../game/survivor-spin.ts';
+import { createSpinner, FRONT_FACING, holdsStill } from '../game/survivor-spin.ts';
 import { isTouchDevice } from '../game/touch-input.ts';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
@@ -48,15 +48,16 @@ const spinner = createSpinner((next) => {
 });
 const wantsCalm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const touchOnly = isTouchDevice();
+const stayStill = holdsStill(touchOnly, wantsCalm);
 
 function shownFor(survivor: SurvivorArt, index: number) {
   const turning = index === spinning.value;
   return turning ? survivor.portraits[facing.value] : survivor.portrait;
 }
 
-/** Turns one survivor in place. Reduced motion keeps the front view. */
+/** Turns one survivor in place. Reduced motion only stops a turn nobody pointed at. */
 function spinOn(index: number): void {
-  if (wantsCalm) return;
+  if (stayStill) return;
   spinning.value = index;
   spinner.start();
 }

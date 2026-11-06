@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildSurvivors } from '../src/art/survivors.ts';
-import { createSpinner, FRONT_FACING, SPIN_ORDER, SPIN_STEP_MS } from '../src/game/survivor-spin.ts';
+import { createSpinner, FRONT_FACING, holdsStill, SPIN_ORDER, SPIN_STEP_MS } from '../src/game/survivor-spin.ts';
 import type { SpinTimers } from '../src/game/survivor-spin.ts';
 
 function fakeTimers() {
@@ -20,6 +20,12 @@ function fakeTimers() {
 }
 
 describe('survivor spin', () => {
+  it('still turns for a mouse under reduced motion, and holds a touch screen still', () => {
+    expect(holdsStill(false, true)).toBe(false);
+    expect(holdsStill(true, true)).toBe(true);
+    expect(holdsStill(true, false)).toBe(false);
+  });
+
   it('turns through all eight facings in order, one step each, and loops', () => {
     const shown: number[] = [];
     const clock = fakeTimers();
