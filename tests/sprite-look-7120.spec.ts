@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSurvivors } from '../src/art/survivors.ts';
 import { idleClips } from '../src/art/survivors/clips.ts';
 import { standingFrame } from '../src/art/survivors/fallen.ts';
-import { KHRONUS8 } from '../src/art/survivors/khronus8.ts';
+import { BANDUS } from '../src/art/survivors/bandus.ts';
 import { NIGHT } from '../src/art/survivors/night.ts';
 import { PORTRAIT_FRAME } from '../src/art/survivors/portrait.ts';
 import { REX } from '../src/art/survivors/rex.ts';
@@ -10,7 +10,7 @@ import { SATORI } from '../src/art/survivors/satori.ts';
 import { SOL } from '../src/art/survivors/sol.ts';
 import type { PixelSprite } from '../src/art/types.ts';
 
-const CAST = [NIGHT, KHRONUS8, SATORI, REX, SOL];
+const CAST = [NIGHT, BANDUS, SATORI, REX, SOL];
 
 function opaque(sprite: PixelSprite, x: number, y: number): boolean {
   return sprite.rgba[(y * sprite.w + x) * 4 + 3] !== 0;

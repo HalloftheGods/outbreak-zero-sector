@@ -10,7 +10,8 @@ import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
 import { gridSprite } from './shared.ts';
 import type { Grid } from './shared.ts';
-import { BANDAGE, CARBINE_AMMO, JEWEL_LARGE, JEWEL_SMALL, PISTOL_AMMO, SHELLS, SILVER } from './pickups.ts';
+import { BANDAGE, CARBINE_AMMO, PISTOL_AMMO, SHELLS } from './pickups.ts';
+import { JEWEL_LARGE, JEWEL_SMALL, SILVER, TREASURE_LEGEND } from './treasure.ts';
 
 const { blood, bone, fire, ink, metal, olive, wood } = RAMPS;
 
@@ -22,6 +23,7 @@ const ICON: Legend = {
   a: olive[0], b: olive[1], c: olive[2],
   w: wood[0], x: wood[1], y: wood[2], z: wood[3],
   Y: fire[3], B: fire[2], C: fire[1], D: fire[0],
+  ...TREASURE_LEGEND,
 };
 
 const CROSSHAIR: Grid = [

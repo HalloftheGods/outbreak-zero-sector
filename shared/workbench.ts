@@ -91,9 +91,10 @@ export function updateBench(sim: SimState): boolean {
   return timeUp || alivePlayers(sim).every((p) => p.benchReady);
 }
 
-/** The left behind cannot use it: they lose their kit in the next town either way. */
+/** The left behind cannot use it: they lose their kit in the next town either way. In a home room the bench is a station, for whoever has it open. */
 export function benchCommand(sim: SimState, p: PlayerState, action: BenchAction): void {
-  const usable = sim.bench !== null && p.status === 'alive';
+  const atBench = sim.bench !== null || p.home?.station === 'bench';
+  const usable = atBench && p.status === 'alive';
   if (!usable) return;
   if (action.kind === 'ready') p.benchReady = action.ready;
   else if (action.kind === 'fit') fitUpgrade(p, action.weapon, action.upgrade);

@@ -7,19 +7,34 @@ import type { SimState } from './sim-state.ts';
 import { emit, standingPlayers } from './sim-state.ts';
 import { announceRunStart, clampLevel } from './sim-factory.ts';
 import { round2 } from './snapshot-build.ts';
+import { resetHomeRoom, vanLeaves, wipeToBunker } from './trip.ts';
 import { hordesSurvivedHere } from './waves.ts';
 import { openBench } from './workbench.ts';
 
+/** The one way out of `exitBoarded`. In a home room the van runs between the bunker and a town, so no run ends here. */
 export function leaveTown(sim: SimState): void {
+  if (sim.homeRun) {
+    vanLeaves(sim);
+    return;
+  }
   const lastTown = sim.level >= FINAL_LEVEL;
   if (lastTown) endRun(sim, 'victory');
   else if (!openBench(sim)) moveToNextTown(sim);
 }
 
+/** In a home room a body on its feet inside its grace period is a refresh that may come back, so it still counts. A downed one has no one to lift it. */
+function anyoneCouldStillStand(sim: SimState): boolean {
+  if (standingPlayers(sim).length > 0) return true;
+  if (!sim.homeRun) return false;
+  return [...sim.departed.values()].some((p) => p.home?.leftTick != null && p.status === 'alive');
+}
+
 export function checkGameOver(sim: SimState): void {
   const runActive = sim.phase !== 'gameover' && sim.players.length > 0;
-  const everyoneGone = runActive && standingPlayers(sim).length === 0;
-  if (everyoneGone) endRun(sim, 'defeat');
+  const everyoneGone = runActive && !anyoneCouldStillStand(sim);
+  if (!everyoneGone) return;
+  if (sim.homeRun) wipeToBunker(sim);
+  else endRun(sim, 'defeat');
 }
 
 export function endRun(sim: SimState, outcome: RunOutcome): void {
@@ -42,8 +57,13 @@ export function endRun(sim: SimState, outcome: RunOutcome): void {
 /**
  * Starts a new run with everyone still connected, from level 1 unless told otherwise.
  * Ticks keep counting up. Starting past level 1 hands out the return kit, as for anyone arriving mid-run.
+ * A home room has no run to restart, and goes back to the bunker.
  */
 export function restartRun(sim: SimState, fromLevel?: number): void {
+  if (sim.homeRun) {
+    resetHomeRoom(sim);
+    return;
+  }
   const level = clampLevel(fromLevel);
   sim.runStartTick = sim.tick;
   sim.hordesBehind = 0;

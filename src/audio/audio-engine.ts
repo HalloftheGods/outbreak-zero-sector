@@ -22,13 +22,13 @@ const VOICE: Record<ZombieType, SfxName> = {
 const ALERT: Record<ZombieType, SfxName> = {
   walker: 'alert_walker', runner: 'alert_runner', bloater: 'alert_bloater', brute: 'alert_brute', screamer: 'scream',
 };
-const PICKUP: Record<PickupType, SfxName> = {
+export const PICKUP_SFX: Record<PickupType, SfxName> = {
   bandage: 'pickup_bandage', medkit: 'pickup_medkit', pistol_ammo: 'pickup_pistol_ammo',
   carbine_ammo: 'pickup_carbine_ammo', shells: 'pickup_shells', carbine: 'pickup_weapon', shotgun: 'pickup_weapon',
   knife: 'pickup_weapon', radio: 'pickup_radio',
   barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
   incendiary_kit: 'pickup_weapon', acid_kit: 'pickup_weapon', piercing_kit: 'pickup_weapon', tranq_kit: 'pickup_weapon',
-  silver: 'pickup_ammo', jewel_small: 'pickup_bandage', jewel_large: 'pickup_bandage',
+  silver: 'pickup_silver', jewel_small: 'pickup_jewel', jewel_large: 'pickup_jewel_large',
 };
 const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrode', piercing: 'pierce', tranq: 'tranq_dart' };
 /** A can on the end of a gun: still a shot, but a dull one. */
@@ -229,7 +229,7 @@ export class AudioEngine {
       case 'player_downed': mixer.play('player_downed', at(e.x, e.y, e.playerId)); break;
       case 'player_dead': mixer.play('player_downed', { ...at(e.x, e.y, e.playerId), pitch: 0.75 }); break;
       case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
-      case 'pickup': mixer.play(PICKUP[e.pickup], at(e.x, e.y, e.playerId)); break;
+      case 'pickup': mixer.play(PICKUP_SFX[e.pickup], at(e.x, e.y, e.playerId)); break;
       case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
       case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
       case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;

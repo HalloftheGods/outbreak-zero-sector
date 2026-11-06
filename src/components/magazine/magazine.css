@@ -1,5 +1,5 @@
 /* How to Play's printed magazine: the frame, the paper, the page turn and the nav. Blocks and layouts have their own files. */
-/* Paper and ink colours live in paper-palette.css, which the Install Game cartridge shares. */
+/* Paper and ink colours live in paper-palette.css. */
 @import '../paper-palette.css';
 
 /* Registered so a page works out its size once and hands it down as a length. */

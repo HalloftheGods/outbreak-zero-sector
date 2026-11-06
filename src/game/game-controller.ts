@@ -11,8 +11,12 @@ import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { BenchLink } from './bench-link.ts';
 import type { ClientWorld } from './client-world.ts';
-import { NO_HOME_ACTIONS } from './home-hud.ts';
+import { HomeLink } from './home-link.ts';
+import type { HomeLinkHost } from './home-link.ts';
+import { homeLoopOn } from './home-mode.ts';
 import type { HomeActions } from './home-hud.ts';
+import { createBrowserHomeStore } from './home/browser-home-store.ts';
+import type { HomeStore } from './home/home-store.ts';
 import type { UiState } from './hud-state.ts';
 import { InputManager } from './input-manager.ts';
 import { InputSender } from './input-sender.ts';
@@ -36,13 +40,20 @@ const ART_DELAY_MS = 40;
 
 type UiSound = 'click' | 'hover' | 'start' | 'pause' | 'resume';
 
+export interface GameControllerOptions {
+  /** Plays from the bunker. By default the page decides: once the switch is flipped, or in a dev build with `?home`. */
+  readonly homeLoop?: boolean;
+  /** Where the home save lives. */
+  readonly homeStore?: () => HomeStore;
+}
+
 /** Owns a run from menu to game over. Vue only sees the small state in `ui`. */
 export class GameController {
   readonly ui: ShallowRef<UiState>;
   /** The workbench screen's way to the run. */
   readonly bench: BenchLink;
   /** The home screens' way to the save and the run. */
-  readonly home: HomeActions = NO_HOME_ACTIONS;
+  readonly home: HomeActions;
 
   /** The touch buttons press through this. */
   readonly input: InputManager;
@@ -53,6 +64,7 @@ export class GameController {
   private readonly run: RunState = newRunState();
   private readonly session: RunSession;
   private readonly snapshots: SnapshotHandler;
+  private readonly homeLink: HomeLink;
   private renderer: WorldRenderer | null = null;
   private titleMap: WorldMap | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -64,8 +76,9 @@ export class GameController {
   private aim = 0;
   private titleTime = 0;
 
-  constructor() {
+  constructor(options: GameControllerOptions = {}) {
     const prefs = loadPrefs();
+    const homeLoop = options.homeLoop ?? homeLoopOn(window.location.search ?? '', import.meta.env.DEV);
     this.ui = shallowRef<UiState>({
       touch: isTouchDevice(),
       screen: 'title',
@@ -73,7 +86,7 @@ export class GameController {
       mode: 'solo',
       connecting: false,
       error: null,
-      homeLoop: false,
+      homeLoop,
       ...NO_RUN_UI,
       lostReason: '',
       signalWeak: false,
@@ -84,7 +97,9 @@ export class GameController {
       volume: this.audio.volume,
       muted: this.audio.muted,
     });
-    this.runHud = new RunHud(() => this.ui.value, (patch) => this.publish(patch));
+    this.homeLink = new HomeLink({ enabled: homeLoop, store: options.homeStore ?? createBrowserHomeStore, host: this.homeHost() });
+    this.home = this.homeLink.actions;
+    this.runHud = new RunHud(() => this.ui.value, (patch) => this.publish(patch), () => this.homeLink.facts());
     this.stage = new RunStage(this.runHud, () => this.renderer);
     this.input = new InputManager({
       onGesture: () => this.audio.unlock(),
@@ -99,7 +114,7 @@ export class GameController {
     this.bench = new BenchLink({
       transport: () => this.run.transport,
       menuUp: () => this.isMenuUp(),
-      setInputEnabled: (enabled) => this.input.setEnabled(enabled),
+      setInputEnabled: (enabled) => this.input.setEnabled(enabled && !this.homeLink.holdsControls),
       settle: () => this.sendNeutralInput(),
     });
     const host = this.runHost();
@@ -140,6 +155,7 @@ export class GameController {
     window.removeEventListener('blur', this.onAway);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.input.dispose();
+    this.homeLink.close();
     this.run.transport?.disconnect();
     this.run.transport = null;
     this.audio.dispose();
@@ -179,7 +195,7 @@ export class GameController {
   private readonly onAway = (): void => {
     this.input.clearHeld();
     const shouldPause = this.run.transport?.kind === 'solo' && this.isPlaying() && !this.isMenuUp();
-    if (shouldPause) this.togglePause();
+    if (shouldPause) this.flipPause();
     else this.sendNeutralInput();
   };
 
@@ -239,12 +255,31 @@ export class GameController {
   /** A menu is over the game: solo stops, and co-op stands still while the town carries on. */
   private holdRun(held: boolean): void {
     this.run.transport?.setPaused(held);
-    this.input.setEnabled(!held && !this.bench.open);
+    this.input.setEnabled(this.controlsFree(held));
     this.audio.playUi(held ? 'pause' : 'resume');
     if (held) this.sendNeutralInput();
   }
 
+  /** The keys are the player's unless a menu, the bench, or a station, summary or ending at home has them. */
+  private controlsFree(menuUp: boolean): boolean {
+    return !menuUp && !this.bench.open && !this.homeLink.holdsControls;
+  }
+
+  /** A station opening or closing takes the keys without pausing the run. */
+  private syncControls(): void {
+    const free = this.controlsFree(this.isMenuUp());
+    this.input.setEnabled(free);
+    if (!free) this.sendNeutralInput();
+  }
+
+  /** Esc puts an open station away before it asks for the pause menu. */
   togglePause(): void {
+    const stationOpen = !this.ui.value.paused && this.homeLink.closeOpenStation();
+    if (stationOpen) return;
+    this.flipPause();
+  }
+
+  private flipPause(): void {
     if (!this.isPlaying()) return;
     if (this.ui.value.mapOpen) {
       this.toggleMap();
@@ -256,7 +291,7 @@ export class GameController {
   }
 
   private canUseMap(): boolean {
-    return this.isPlaying() && !this.ui.value.paused;
+    return this.isPlaying() && !this.ui.value.paused && !this.homeLink.holdsControls;
   }
 
   /** True if the key did something, which it does not behind the pause menu or off a run. */
@@ -282,12 +317,16 @@ export class GameController {
     this.audio.setScene(scene);
   }
 
+  /** At home the credits end in the bunker, in the same session. */
   toMenu(): void {
-    this.session.toMenu();
+    if (this.homeLink.endingShowing) this.homeLink.actions.continueFromEnding();
+    else this.session.toMenu();
   }
 
   /** The title has no say here: its menu answers Enter, and only Start or Join begins a run. */
   private confirm(): void {
+    const answered = this.homeLink.confirm();
+    if (answered) return;
     const { screen } = this.ui.value;
     if (screen === 'gameover') this.playAgain();
     else if (screen === 'lost') this.toMenu();
@@ -306,10 +345,31 @@ export class GameController {
       runHud: this.runHud,
       stage: this.stage,
       bench: this.bench,
+      home: this.homeLink,
       get renderer() { return controller.renderer; },
       get titleMap() { return controller.titleMap; },
       publish: (patch) => this.publish(patch),
       onResize: () => this.onResize(),
+    };
+  }
+
+  /** The parts of this controller a home session reaches into. */
+  private homeHost(): HomeLinkHost {
+    return {
+      transport: () => this.run.transport,
+      ui: () => this.ui.value,
+      localPlayer: () => this.run.world?.localPlayer ?? null,
+      refresh: () => this.runHud.refreshHome(this.run.world),
+      syncControls: () => this.syncControls(),
+      say: (banner, nowMs) => this.runHud.say(banner, nowMs),
+      showEnding: (result) => {
+        this.audio.setScene('victory');
+        this.publish({ screen: 'gameover', result, banner: null, place: null });
+      },
+      hideEnding: () => {
+        this.audio.setScene('bunker');
+        this.publish({ screen: 'game', result: null });
+      },
     };
   }
 

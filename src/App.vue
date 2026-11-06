@@ -6,13 +6,21 @@
 
     <template v-else-if="ui.screen === 'game'">
       <template v-if="ui.hud && ui.art">
-        <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" />
+        <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" :home="ui.home" />
         <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
         <TouchControls v-if="ui.touch" />
       </template>
       <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
       <WorkbenchScreen v-if="ui.hud?.bench && ui.art" :hud="ui.hud" :bench="ui.hud.bench" :art="ui.art" />
+      <template v-if="ui.home">
+        <LockerScreen v-if="ui.home.station === 'locker'" :home="ui.home" />
+        <ForgeScreen v-else-if="ui.home.station === 'forge'" :home="ui.home" />
+        <GarageMap v-else-if="ui.home.station === 'level_map'" :home="ui.home" />
+        <JukeboxScreen v-else-if="ui.home.station === 'jukebox'" />
+        <MerchantScreen v-else-if="ui.home.shop && ui.art" :home="ui.home" :art="ui.art" />
+        <DeathSummary v-if="ui.home.death" :death="ui.home.death" />
+      </template>
       <TownMap v-if="ui.mapOpen" :mode="ui.mode" />
       <PauseMenu v-if="ui.paused" :ui :mode="ui.mode" />
     </template>
@@ -37,11 +45,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, provide, ref, useTemplateRef } from 'vue';
 import ConnectionLost from './components/ConnectionLost.vue';
+import DeathSummary from './components/DeathSummary.vue';
 import DownedOverlay from './components/DownedOverlay.vue';
 import EndingFlow from './components/EndingFlow.vue';
+import ForgeScreen from './components/ForgeScreen.vue';
 import GameOverScreen from './components/GameOverScreen.vue';
+import GarageMap from './components/GarageMap.vue';
 import HudOverlay from './components/HudOverlay.vue';
+import JukeboxScreen from './components/JukeboxScreen.vue';
 import LevelCard from './components/LevelCard.vue';
+import LockerScreen from './components/LockerScreen.vue';
+import MerchantScreen from './components/MerchantScreen.vue';
 import PauseMenu from './components/PauseMenu.vue';
 import PrivacyPage from './components/PrivacyPage.vue';
 import StudioSplash from './components/StudioSplash.vue';
@@ -53,13 +67,16 @@ import WaveBanner from './components/WaveBanner.vue';
 import WorkbenchScreen from './components/WorkbenchScreen.vue';
 import { privacyOpen, startAnalytics } from './game/analytics/index.ts';
 import { GameController } from './game/game-controller.ts';
+import { aimsCursor } from './game/home-screens.ts';
 import { shouldShowSplash } from './game/studio-splash.ts';
 
 const game = new GameController();
 const ui = game.ui;
 const splashing = ref(shouldShowSplash(window.location.search));
 const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
-const aiming = computed(() => ui.value.screen === 'game' && !ui.value.paused && !ui.value.mapOpen && !ui.value.hud?.bench);
+const aiming = computed(() =>
+  aimsCursor({ screen: ui.value.screen, paused: ui.value.paused, mapOpen: ui.value.mapOpen, bench: !!ui.value.hud?.bench, home: ui.value.home })
+);
 
 provide(GAME_KEY, game);
 

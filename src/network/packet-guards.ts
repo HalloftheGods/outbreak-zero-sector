@@ -16,6 +16,7 @@ import type {
   ZombieEntity,
 } from '../../shared/protocol.ts';
 import { isBenchView, isPlayerGear } from './bench-guards.ts';
+import { isHomeView, isRoomHomeView } from './home-guards.ts';
 
 type Fields = Record<string, unknown>;
 
@@ -54,6 +55,7 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && (v.indoors === null || isString(v.indoors))
     && (v.gear === undefined || isPlayerGear(v.gear))
     && (v.bottles === undefined || isNumber(v.bottles))
+    && (v.home === undefined || isHomeView(v.home))
     && hasNumbers(v, [
       'skin', 'x', 'y', 'angle', 'health', 'maxHealth', 'ammo', 'magSize', 'reserve', 'medkits',
       'reload', 'search', 'bleedout', 'revive', 'score', 'kills', 'lastInputSeq',
@@ -118,7 +120,8 @@ export function isWelcomePacket(v: unknown): v is WelcomePacket {
     && v.type === 'welcome'
     && isString(v.yourId)
     && hasNumbers(v, ['tickRate', 'mapSeed'])
-    && (v.difficulty === undefined || isDifficultyId(v.difficulty));
+    && (v.difficulty === undefined || isDifficultyId(v.difficulty))
+    && isFlag(v.resumed);
 }
 
 export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
@@ -136,7 +139,8 @@ export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
     && (v.tracks === undefined || (Array.isArray(v.tracks) && v.tracks.every(isTrackEntity)))
     && Array.isArray(v.events) && v.events.every(isGameEvent)
     && (v.gameOver === null || isGameOverStats(v.gameOver))
-    && (v.bench === undefined || isBenchView(v.bench));
+    && (v.bench === undefined || isBenchView(v.bench))
+    && (v.home === undefined || isRoomHomeView(v.home));
 }
 
 /** Returns null for anything that is not a well-formed server packet. */

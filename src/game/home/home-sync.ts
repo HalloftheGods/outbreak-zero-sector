@@ -1,0 +1,346 @@
+// Watches snapshots and turns what happens to this player into saves. Every write to the store is made here.
+
+import { EXIT_RADIUS, TICK_RATE } from '../../../shared/constants.ts';
+import { BASELINE_DIFFICULTY } from '../../../shared/difficulty.ts';
+import type { DifficultyId } from '../../../shared/difficulty.ts';
+import { isBunkerSeed } from '../../../shared/home-protocol.ts';
+import type { HomeAction, HomeView, JoinHome, Loadout, MerchantId, TripReceipt } from '../../../shared/home-protocol.ts';
+import { emptyLoadout, loadoutOfEntity, validateLoadout } from '../../../shared/loadout.ts';
+import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../../shared/protocol.ts';
+import type { TransportKind } from '../../network/transport.ts';
+import type { LevelProgress } from '../level-progress.ts';
+import { SMELT_SECONDS, smeltTick } from './forge.ts';
+import { settleHands } from './gear-pool.ts';
+import type { HomeSave, HomeStore, SaveResult } from './home-store.ts';
+import { SaveQueue } from './save-queue.ts';
+import type { SaveChange } from './save-queue.ts';
+import { buy, rollStock } from './shop.ts';
+import type { ShopContext } from './shop.ts';
+import { applyReceipt, receiptKey, resolveOpenTrip } from './trip-ledger.ts';
+
+/** How long a co-op trip found open waits for the server to say whether the body is still there. */
+export const OPEN_TRIP_WAIT_MS = 10_000;
+/** A failed save is tried again this long after, rather than on every frame. */
+const RETRY_TICKS = TICK_RATE * 2;
+/** An equip unanswered this long was refused, so a later change in hand is not its answer. Not a window for the answer to fit in: the answer is matched to the request. */
+const EQUIP_EXPIRES_TICKS = TICK_RATE * 30;
+/** The most forge time one frame can count, so a stalled tab is not paid for the stall. */
+const MAX_FRAME_SECONDS = 1;
+const TRIP_ALREADY_OPEN = 'A trip is already open in another tab.';
+
+type VanState = 'away' | 'boarding' | 'ready' | 'refused';
+export type SaleResult = 'bought' | 'refused' | 'conflict' | 'failed';
+
+export interface HomeSyncOptions {
+  readonly store: HomeStore;
+  readonly mode: TransportKind;
+  readonly sendHome: (action: HomeAction) => void;
+  /** The save, the error or the forge moved. */
+  readonly onChange?: () => void;
+  /** A receipt was credited here, once. */
+  readonly onReceipt?: (receipt: TripReceipt) => void;
+}
+
+/** What to bring to the room. With a trip still open the gear is forfeit, and a body the room still holds keeps what it has. */
+export function joinHomeFor(save: HomeSave, { highest, finished }: LevelProgress): JoinHome {
+  return { loadout: save.openTrip ? emptyLoadout() : save.hands, highest, ...(finished ? { finished } : {}) };
+}
+
+const firstStock: SaveChange = (save) => (save.shop.rolls === 0 ? rollStock(save) : save);
+
+/** What was asked of the room. `text` is the loadout sent, or null for a join, where whatever the room holds is the answer. */
+interface HandsRequest {
+  readonly text: string | null;
+  readonly expires: number;
+}
+
+const sortedKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(sortedKeys);
+  if (typeof value !== 'object' || value === null) return value;
+  const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1));
+  return Object.fromEntries(entries.map(([key, inner]) => [key, sortedKeys(inner)]));
+};
+
+/** The same gear reads the same whatever order its keys were built in. */
+const textOf = (loadout: Loadout): string => JSON.stringify(sortedKeys(loadout));
+
+/** Hands the room would refuse go back in the locker before connecting, so the join brings nothing and no frame order can lose them. A trip still open keeps its forfeit. */
+const putBackRefused: SaveChange = (save) => {
+  const refused = save.openTrip === null && validateLoadout(save.hands) === null;
+  return refused ? settleHands(save, emptyLoadout()) : save;
+};
+
+export class HomeSync {
+  private readonly options: HomeSyncOptions;
+  private readonly saves: SaveQueue;
+  private difficulty: DifficultyId = BASELINE_DIFFICULTY;
+  private tick: number | null = null;
+  private retryAt = 0;
+  private van: VanState = 'away';
+  private atVan = false;
+  private arriving = false;
+  private receiptInFlight: string | null = null;
+  private forgeSeconds = 0;
+  private lastHeld: string | null = null;
+  /** The equip or join the room has not yet answered. Its answer settles against the locker; any other change in hand is a bench action. */
+  private request: HandsRequest | null = null;
+  private tripWait: ReturnType<typeof setTimeout> | null = null;
+  /** Back in a body the room kept, which may already be waiting at the van. */
+  private bodyResumed = false;
+
+  constructor(options: HomeSyncOptions) {
+    this.options = options;
+    this.saves = new SaveQueue({
+      store: options.store,
+      onChange: options.onChange,
+      onFailed: () => {
+        this.retryAt = this.now + RETRY_TICKS;
+      },
+    });
+  }
+
+  /** The save as last read, or null until it has loaded. */
+  get save(): HomeSave | null {
+    return this.saves.save;
+  }
+
+  /** Why the last save did not land, or null if it did. */
+  get saveError(): string | null {
+    return this.saves.error;
+  }
+
+  /** 0..1 through the jewel on the forge. */
+  get forgeProgress(): number {
+    return this.forgeSeconds / SMELT_SECONDS;
+  }
+
+  /** Reads the save and settles what can be settled before connecting. Solo has no body to return to. */
+  async open(): Promise<HomeSave> {
+    await this.saves.load();
+    const resumed = this.options.mode === 'solo' ? false : null;
+    await this.saves.write((save) => putBackRefused(firstStock(resolveOpenTrip(save, resumed))));
+    const save = this.saves.save as HomeSave;
+    const stillOpen = save.openTrip !== null;
+    if (stillOpen) this.tripWait = setTimeout(() => this.settleOpenTrip(false), OPEN_TRIP_WAIT_MS);
+    return save;
+  }
+
+  /** The room's answer. A join with nothing resumed means the body is gone, so there is nothing left to wait for. */
+  welcomed(packet: WelcomePacket): void {
+    this.difficulty = packet.difficulty ?? BASELINE_DIFFICULTY;
+    this.request = { text: null, expires: Number.POSITIVE_INFINITY };
+    this.bodyResumed = packet.resumed === true;
+    this.settleOpenTrip(this.bodyResumed);
+  }
+
+  observe(snapshot: SnapshotPacket, yourId: string): void {
+    const entity = snapshot.players.find((player) => player.id === yourId);
+    const home = entity?.home;
+    const canWatch = entity !== undefined && home !== undefined && this.saves.save !== null;
+    if (!canWatch) return;
+    const elapsed = this.advance(snapshot.tick);
+    const { receipt } = home;
+    if (receipt) this.takeReceipt(receipt);
+    if (isBunkerSeed(snapshot.mapSeed)) this.watchBunker(snapshot, entity, home, elapsed);
+    else this.watchTown(snapshot.level, receipt);
+  }
+
+  /** Asks the room for this gear. The save changes when the answer comes back on the player. */
+  equip(loadout: Loadout): void {
+    this.request = { text: textOf(loadout), expires: this.now + EQUIP_EXPIRES_TICKS };
+    this.options.sendHome({ kind: 'equip', loadout });
+  }
+
+  /** A sale never retries: on a conflict the shop has already refreshed, and the player can look again. */
+  async buy(merchant: MerchantId, item: string, context: ShopContext): Promise<SaleResult> {
+    let sold = false;
+    const result = await this.saves.write((save) => {
+      const next = buy(save, merchant, item, context);
+      sold = next !== null;
+      return next ?? save;
+    }, 0);
+    const landed = result.kind === 'saved';
+    if (!landed) return result.kind;
+    return sold ? 'bought' : 'refused';
+  }
+
+  /** Resolves once every save asked for so far has finished. */
+  settled(): Promise<void> {
+    return this.saves.settled();
+  }
+
+  close(): void {
+    this.clearTripWait();
+  }
+
+  private get now(): number {
+    return this.tick ?? 0;
+  }
+
+  /** A gun left in the locker is a choice, so the room issues no free pistol to someone boarding without one. */
+  private get lockerHoldsAGun(): boolean {
+    return Object.keys(this.saves.save?.locker.guns ?? {}).length > 0;
+  }
+
+  private get mustWait(): boolean {
+    return this.now < this.retryAt;
+  }
+
+  /** Seconds since the last frame. The first frame has none. */
+  private advance(tick: number): number {
+    const previous = this.tick ?? tick;
+    this.tick = tick;
+    return Math.min(MAX_FRAME_SECONDS, (tick - previous) / TICK_RATE);
+  }
+
+  private isApplied(receipt: TripReceipt): boolean {
+    return this.saves.save?.appliedReceipts.includes(receiptKey(receipt)) ?? false;
+  }
+
+  private clearTripWait(): void {
+    if (this.tripWait !== null) clearTimeout(this.tripWait);
+    this.tripWait = null;
+  }
+
+  private settleOpenTrip(resumed: boolean): void {
+    this.clearTripWait();
+    void this.saves.write((save) => resolveOpenTrip(save, resumed));
+  }
+
+  private takeReceipt(receipt: TripReceipt): void {
+    const key = receiptKey(receipt);
+    const nothingToDo = this.isApplied(receipt) || this.receiptInFlight === key || this.mustWait;
+    if (nothingToDo) return;
+    this.receiptInFlight = key;
+    let credited = false;
+    void this.saves.write((save) => {
+      const next = applyReceipt(save, receipt);
+      credited = next !== save;
+      return next;
+    }).then((result) => {
+      this.receiptInFlight = null;
+      const landed = credited && result.kind === 'saved';
+      if (landed) this.options.onReceipt?.(receipt);
+    });
+  }
+
+  private watchBunker(snapshot: SnapshotPacket, entity: PlayerEntity, home: HomeView, elapsed: number): void {
+    this.watchForge(home, elapsed);
+    const receiptSettled = home.receipt === null || this.isApplied(home.receipt);
+    if (!receiptSettled) return;
+    this.watchVan(snapshot, entity);
+    this.watchHands(entity);
+  }
+
+  private watchTown(level: number, receipt: TripReceipt | null): void {
+    this.van = 'away';
+    this.atVan = false;
+    this.forgeSeconds = 0;
+    const onFile = this.saves.save?.openTrip?.level === level;
+    const shouldOpen = receipt === null && !onFile && !this.arriving && !this.mustWait;
+    if (shouldOpen) this.arrive(level);
+  }
+
+  private withTrip(save: HomeSave, level: number): HomeSave {
+    const startedAt = save.openTrip?.startedAt ?? Date.now();
+    return { ...save, openTrip: { level, mode: this.options.mode, difficulty: this.difficulty, startedAt } };
+  }
+
+  /** In a town with no trip on file: carried along by the idle rule, or joined mid-trip. Also corrects a pick changed at the van. */
+  private arrive(level: number): void {
+    this.arriving = true;
+    void this.saves.write((save) => this.withTrip(save, level)).then(() => {
+      this.arriving = false;
+    });
+  }
+
+  /** A refresh at the van: the room still has this body ready, and the trip on file is its own, not another tab's. */
+  private rejoinVan(entity: PlayerEntity): void {
+    const stillBoarded = this.bodyResumed && entity.home?.ready === true && this.saves.save?.openTrip != null;
+    this.bodyResumed = false;
+    if (stillBoarded) this.van = 'ready';
+  }
+
+  private watchVan(snapshot: SnapshotPacket, entity: PlayerEntity): void {
+    this.rejoinVan(entity);
+    const { exit } = snapshot;
+    const level = snapshot.home?.pickedLevel ?? null;
+    const inReach = exit !== null && Math.hypot(entity.x - exit.x, entity.y - exit.y) <= EXIT_RADIUS;
+    this.atVan = inReach && level !== null && entity.status === 'alive';
+    const shouldBoard = this.atVan && this.van === 'away' && !this.mustWait;
+    if (shouldBoard) this.board(level as number);
+    const walkedOff = !this.atVan && this.van === 'ready';
+    if (walkedOff) this.stepAway();
+    const mayTryAgain = !this.atVan && this.van === 'refused';
+    if (mayTryAgain) this.van = 'away';
+  }
+
+  /** The trip is on file before the room hears ready, so nothing leaves on gear the save does not know about. */
+  private board(level: number): void {
+    this.van = 'boarding';
+    let opened = false;
+    void this.saves.write((save) => {
+      opened = save.openTrip === null;
+      return opened ? this.withTrip(save, level) : save;
+    }).then((result) => this.boarded(opened, result));
+  }
+
+  private boarded(opened: boolean, result: SaveResult): void {
+    const landed = result.kind === 'saved';
+    const onFile = opened && landed;
+    this.van = onFile ? 'ready' : 'refused';
+    const anotherTabHasIt = landed && !opened;
+    if (anotherTabHasIt) this.saves.fail(TRIP_ALREADY_OPEN);
+    if (!onFile) return;
+    if (this.atVan) this.options.sendHome({ kind: 'ready', ready: true, ownsGun: this.lockerHoldsAGun });
+    else this.stepAway();
+  }
+
+  private stepAway(): void {
+    this.van = 'away';
+    this.options.sendHome({ kind: 'ready', ready: false });
+    void this.saves.write((save) => ({ ...save, openTrip: null }));
+  }
+
+  /** Only whole jewels pay, and leaving drops the part-done one, which stays raw. */
+  private watchForge(home: HomeView, elapsed: number): void {
+    const jewels = this.saves.save?.rawJewels;
+    const hasJewels = jewels !== undefined && jewels.small + jewels.large > 0;
+    const smelting = home.station === 'forge' && hasJewels;
+    this.forgeSeconds = smelting ? this.forgeSeconds + elapsed : 0;
+    const finished = this.forgeSeconds >= SMELT_SECONDS;
+    if (!finished) return;
+    this.forgeSeconds -= SMELT_SECONDS;
+    void this.saves.write((save) => smeltTick(save, SMELT_SECONDS));
+  }
+
+  /** Gear in hand follows the player. An answer to an equip moves it out of the locker; a bench action just changes it. */
+  private watchHands(entity: PlayerEntity): void {
+    const tripUnderway = this.van !== 'away' || this.saves.save?.openTrip != null;
+    const tripHoldsTheGear = tripUnderway;
+    if (tripHoldsTheGear) this.request = null;
+    if (tripUnderway || this.mustWait) return;
+    const held = loadoutOfEntity(entity);
+    const text = textOf(held);
+    const sameAsLast = text === this.lastHeld;
+    if (sameAsLast) return;
+    this.lastHeld = text;
+    const answering = this.answeredBy(text);
+    const change: SaveChange = (save) => (answering ? settleHands(save, held) : { ...save, hands: held });
+    void this.saves.write(change).then((result) => {
+      const landed = result.kind === 'saved';
+      const settledIt = landed && answering !== null && this.request === answering;
+      if (!landed) this.lastHeld = null;
+      if (settledIt) this.request = null;
+    });
+  }
+
+  /** The request this hand answers, if any. A request stays open until its write lands, so a retry settles the same way. */
+  private answeredBy(text: string): HandsRequest | null {
+    const asked = this.request;
+    const refused = asked !== null && this.now > asked.expires;
+    if (refused) this.request = null;
+    const answers = asked !== null && this.request === asked && (asked.text === null || asked.text === text);
+    return answers ? asked : null;
+  }
+}

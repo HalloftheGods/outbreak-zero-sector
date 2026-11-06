@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { MAX_PLAYERS, TICK_RATE } from '../shared/constants.ts';
 import type { DifficultyId } from '../shared/difficulty.ts';
+import type { JoinHome } from '../shared/home-protocol.ts';
 import type { ClientPacket, ServerPacket, SnapshotPacket } from '../shared/protocol.ts';
 import type { GameSimulation } from '../shared/simulation.ts';
 import { viewFor } from '../shared/snapshot-view.ts';
@@ -76,7 +77,7 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
     tickTimer = null;
   }
 
-  function join(client: Client, name: string, token: string, character?: number, difficulty?: DifficultyId): void {
+  function join(client: Client, name: string, token: string, character?: number, difficulty?: DifficultyId, home?: JoinHome): void {
     if (client.playerId) return;
     // A dropped link can outlive its refresh: the old socket goes and the new one takes that body over.
     const heldBy = sim.playerWithToken(token);
@@ -90,7 +91,7 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
     if (difficulty && sim.playerCount === 0) sim.setDifficulty(difficulty);
     // After that restart, which lets every body go, and before addPlayer takes this one back.
     const resumed = sim.hasBodyFor(token);
-    sim.addPlayer(id, name, token, character);
+    sim.addPlayer(id, name, token, character, home);
     client.playerId = id;
     clearTimeout(client.joinDeadline);
     send(client, { type: 'welcome', yourId: id, tickRate: TICK_RATE, mapSeed: sim.map.seed, difficulty: sim.difficulty, ...(resumed ? { resumed } : {}) });
@@ -99,10 +100,11 @@ export function createRoom(sim: GameSimulation, restartVoteMs: number): Room {
   }
 
   function receive(client: Client, packet: ClientPacket): void {
-    if (packet.type === 'join') join(client, packet.name, packet.token, packet.character, packet.difficulty);
+    if (packet.type === 'join') join(client, packet.name, packet.token, packet.character, packet.difficulty, packet.home);
     else if (client.playerId === null) return;
     else if (packet.type === 'input') sim.setInput(client.playerId, packet.input);
     else if (packet.type === 'bench') sim.benchCommand(client.playerId, packet.action);
+    else if (packet.type === 'home') sim.homeCommand(client.playerId, packet.action);
     else vote.ask(client);
   }
 

@@ -1,14 +1,16 @@
 import type { ShallowRef } from 'vue';
+import type { JoinHome } from '../../shared/home-protocol.ts';
 import type { SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/protocol.ts';
 import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
-import type { GameTransport } from '../network/transport.ts';
+import type { ConnectOptions, GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
 import { ClientWorld } from './client-world.ts';
 import { loadCharacter } from './character-pref.ts';
 import { loadDifficulty } from './difficulty-pref.ts';
+import type { HomeLink } from './home-link.ts';
 import type { RunResult, UiState } from './hud-state.ts';
 import type { InputManager } from './input-manager.ts';
 import type { InputSender } from './input-sender.ts';
@@ -19,6 +21,7 @@ import type { RunStage } from './run-stage.ts';
 import { loadBest, loadLeaderboard } from './storage.ts';
 
 const FALLBACK_CALLSIGN = 'SURVIVOR';
+const HOME_UNREADABLE = 'The game could not open your saved home.';
 
 /** What a run keeps between snapshots, shared by the session and the snapshot handler. */
 export interface RunState {
@@ -31,6 +34,8 @@ export interface RunState {
   gameOverAtMs: number;
   /** Highest level already written to storage this page load, so snapshots do not hit it every tick. */
   levelNoted: number;
+  /** Whether the last snapshot was of the bunker, or null before any. */
+  inBunker: boolean | null;
 }
 
 /** The controller's parts a run reaches into. */
@@ -43,6 +48,7 @@ export interface RunHost {
   readonly runHud: RunHud;
   readonly stage: RunStage;
   readonly bench: BenchLink;
+  readonly home: HomeLink;
   readonly renderer: WorldRenderer | null;
   readonly titleMap: WorldMap | null;
   publish(patch: Partial<UiState>): void;
@@ -50,7 +56,7 @@ export interface RunHost {
 }
 
 export function newRunState(): RunState {
-  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0 };
+  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null };
 }
 
 /** Starts, restarts and ends a run: the connection from menu to welcome to menu. */
@@ -108,6 +114,7 @@ export class RunSession {
 
   toMenu(): void {
     const { state, input, audio, titleMap, renderer } = this.host;
+    this.host.home.close();
     state.transport?.disconnect();
     state.transport = null;
     state.world = null;
@@ -123,6 +130,7 @@ export class RunSession {
   onWelcome(packet: WelcomePacket): void {
     const { state, stage } = this.host;
     state.welcomed = true;
+    this.host.home.welcomed(packet);
     state.world = new ClientWorld(stage.open(packet.mapSeed), packet.yourId);
     this.beginRun();
   }
@@ -130,6 +138,7 @@ export class RunSession {
   beginRun(): void {
     const { state, input, inputs, runHud } = this.host;
     state.runResult = null;
+    state.inBunker = null;
     inputs.reset();
     runHud.reset();
     this.host.onResize();
@@ -139,6 +148,7 @@ export class RunSession {
 
   onClosed(reason: string): void {
     const { state, input, audio, titleMap, renderer } = this.host;
+    this.host.home.close();
     state.transport = null;
     if (!state.welcomed) {
       this.host.publish({ connecting: false, error: reason });
@@ -160,12 +170,35 @@ export class RunSession {
   }
 
   private beginSession(transport: GameTransport, startLevel?: number): void {
-    const { state, ui } = this.host;
+    const { state, ui, home } = this.host;
     state.transport = transport;
     state.welcomed = false;
     transport.onWelcome = (packet) => this.onWelcome(packet);
     transport.onSnapshot = this.onSnapshot;
     transport.onClosed = (reason) => this.onClosed(reason);
-    transport.connect({ name: ui.value.callsign.trim() || FALLBACK_CALLSIGN, difficulty: loadDifficulty(), character: loadCharacter(), startLevel });
+    const options = { name: ui.value.callsign.trim() || FALLBACK_CALLSIGN, difficulty: loadDifficulty(), character: loadCharacter() };
+    if (!home.enabled) {
+      transport.connect({ ...options, startLevel });
+      return;
+    }
+    this.connectHome(transport, options);
+  }
+
+  /** The save is read first, so the room hears of the gear before it hears of the player. A level is picked at the garage, not here. */
+  private connectHome(transport: GameTransport, options: Pick<ConnectOptions, 'name' | 'difficulty' | 'character'>): void {
+    const { state, home } = this.host;
+    this.host.publish({ connecting: true });
+    const stillWanted = (): boolean => state.transport === transport;
+    const connect = (join: JoinHome): void => {
+      const wanted = stillWanted();
+      if (wanted) transport.connect({ ...options, home: join, homeLoop: true });
+    };
+    const giveUp = (): void => {
+      const gone = !stillWanted();
+      if (gone) return;
+      state.transport = null;
+      this.host.publish({ connecting: false, error: HOME_UNREADABLE });
+    };
+    void home.open(transport.kind).then(connect, giveUp);
   }
 }

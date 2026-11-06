@@ -15,7 +15,7 @@ import type {
 } from './protocol.ts';
 import type { ContainerState } from './containers.ts';
 import type { FlowField, Point } from './flow-field.ts';
-import type { HomeView, Jewels } from './home-protocol.ts';
+import type { HomeView, Jewels, TripReceipt } from './home-protocol.ts';
 import { randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import type { SpatialHashGrid } from './spatial-grid.ts';
@@ -36,12 +36,18 @@ export interface GunState {
 
 /** What the sim holds for one player in a home room: what they see, and what stays on this side of the wire. */
 export interface PlayerHome extends HomeView {
-  /** The furthest level they have reached, as they said when they joined. */
+  /** The furthest level they have reached, as they said when they joined, and raised by the van. */
   highest: number;
+  /** Has cleared the last level, as they said when they joined or since, so the ending is behind them. */
+  finished: boolean;
   /** What `dropCarried` took off them on this trip, for a died receipt, since their carried treasure is gone by then. */
   lost: { silver: number; jewels: Jewels };
+  /** Said at the van: they own a gun they left in the locker, so boarding without one gets no free pistol. */
+  ownsGun: boolean;
   /** When they last pressed a key or had a station open. */
   lastActiveTick: number;
+  /** When a body out on a trip lost its player, while its carried treasure waits out the grace period. Null otherwise. */
+  leftTick: number | null;
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
@@ -175,6 +181,8 @@ export interface HomeRun {
   simId: string;
   /** The level the room is out on, or null in the bunker. */
   tripLevel: number | null;
+  /** The trip set out for a level below the room's highest. */
+  tripReplay: boolean;
   pickedLevel: number | null;
   /** The room's trip serial, which makes each trip's town a fresh one. */
   attempt: number;
@@ -183,6 +191,8 @@ export interface HomeRun {
   nextTreasure: number;
   /** The serial the next receipt takes, from 1, for the whole room. No reset or restart puts it back, so `${simId}:${serial}` never repeats. */
   nextReceipt: number;
+  /** Banked receipts the trip's start would have wiped before their player applied them, by reconnect token. They go back on the body that returns. */
+  unclaimed: Map<string, TripReceipt>;
 }
 
 export interface SimState {

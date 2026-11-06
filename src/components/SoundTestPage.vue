@@ -1,9 +1,7 @@
 <template>
   <TitlePage heading="Sound Test" size="wide" class="sound-screen" @close="emit('close')">
-    <p v-if="!unlock.radio" class="sound-locked">{{ LOCKED_LINE }}</p>
-
-    <template v-else>
-      <p class="sound-status px-label" role="status" aria-live="polite">{{ status }}</p>
+    <p class="sound-status px-label" role="status" aria-live="polite">{{ status }}</p>
+    <p class="sound-finds px-label">{{ findsLine }}</p>
 
       <section v-for="section in sections" :key="section.heading" class="sound-section">
         <h3 class="px-label">{{ section.heading }}</h3>
@@ -24,10 +22,8 @@
           </li>
         </ul>
       </section>
-    </template>
-
     <template #actions>
-      <PixelButton v-if="unlock.radio" class="sound-stop" :disabled="playing === null" @press="stop">Stop</PixelButton>
+      <PixelButton class="sound-stop" :disabled="playing === null" @press="stop">Stop</PixelButton>
     </template>
   </TitlePage>
 </template>
@@ -36,8 +32,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { trackTitlePage } from '../game/analytics/index.ts';
 import { loadLevelProgress } from '../game/level-progress.ts';
-import { loadSoundUnlock } from '../game/sound-unlock.ts';
-import { LOCKED_LINE, musicEntries, playEntry, sfxEntries } from '../game/sound-test.ts';
+import { FINDS_HINT, findCount, musicEntries, playEntry, sfxEntries } from '../game/sound-test.ts';
 import type { SoundEntry } from '../game/sound-test.ts';
 import PixelButton from './PixelButton.vue';
 import TitlePage from './TitlePage.vue';
@@ -46,13 +41,13 @@ import { useGame } from './use-game.ts';
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 trackTitlePage('sound');
-const unlock = loadSoundUnlock();
-const sections = unlock.radio
-  ? [
-      { heading: 'Music', entries: musicEntries(loadLevelProgress()) },
-      { heading: 'Sound effects', entries: sfxEntries() },
-    ]
-  : [];
+const music = musicEntries(loadLevelProgress());
+const sections = [
+  { heading: 'Music', entries: music },
+  { heading: 'Sound effects', entries: sfxEntries() },
+];
+const finds = findCount(music);
+const findsLine = `Radio finds: ${finds.found} of ${finds.total}. ${FINDS_HINT}`;
 const playing = ref<SoundEntry | null>(null);
 const status = computed(() => (playing.value ? `Playing: ${playing.value.name}` : 'Choose a sound. Choose it again to stop.'));
 let isOpen = true;
@@ -88,8 +83,6 @@ function onListKey(event: KeyboardEvent): void {
 
 /** The page opens quiet, and the title's music comes back when it closes. */
 onMounted(async () => {
-  const hasPage = unlock.radio;
-  if (!hasPage) return;
   await game.audio.unlock();
   if (isOpen) game.audio.enterPreview();
 });
@@ -101,10 +94,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sound-locked {
+.sound-finds {
   margin: 0;
   color: var(--bone-dim);
-  text-align: center;
 }
 
 .sound-status {

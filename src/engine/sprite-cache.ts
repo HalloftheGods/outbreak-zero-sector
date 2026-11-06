@@ -88,7 +88,8 @@ export function drawSilhouette(ctx: CanvasRenderingContext2D, sprite: PixelSprit
 function firstOpaqueRow(sprite: PixelSprite): number {
   for (let y = 0; y < sprite.h; y += 1) {
     for (let x = 0; x < sprite.w; x += 1) {
-      if (sprite.rgba[(y * sprite.w + x) * 4 + 3] !== 0) return y;
+      const opaque = sprite.rgba[(y * sprite.w + x) * 4 + 3] !== 0;
+      if (opaque) return y;
     }
   }
   return sprite.ay;
@@ -96,11 +97,8 @@ function firstOpaqueRow(sprite: PixelSprite): number {
 
 /** Pixels from the anchor up to the top of the painted figure, ignoring empty padding. */
 export function bodyHeight(sprite: PixelSprite): number {
-  let height = bodyHeights.get(sprite);
-  if (height === undefined) {
-    height = sprite.ay - firstOpaqueRow(sprite);
-    bodyHeights.set(sprite, height);
-  }
+  const height = bodyHeights.get(sprite) ?? sprite.ay - firstOpaqueRow(sprite);
+  bodyHeights.set(sprite, height);
   return height;
 }
 
@@ -108,19 +106,33 @@ export function clipDuration(clip: Clip): number {
   return clip.frames.length / clip.fps;
 }
 
-export function clipFrame(clip: Clip, seconds: number): PixelSprite {
+/** The index of the frame showing `seconds` into the clip. */
+export function clipIndex(clip: Clip, seconds: number): number {
   const count = clip.frames.length;
   const index = Math.floor(Math.max(0, seconds) * clip.fps);
-  return clip.frames[clip.loop ? index % count : Math.min(index, count - 1)];
+  return clip.loop ? index % count : Math.min(index, count - 1);
+}
+
+export function clipFrame(clip: Clip, seconds: number): PixelSprite {
+  return clip.frames[clipIndex(clip, seconds)];
+}
+
+/** The index of the frame at a progress through the clip, 0..1. */
+export function clipIndexAt(clip: Clip, progress: number): number {
+  return Math.min(clip.frames.length - 1, Math.floor(progress * clip.frames.length));
 }
 
 /** A frame chosen by progress through the clip, 0..1. */
 export function clipFrameAt(clip: Clip, progress: number): PixelSprite {
-  const count = clip.frames.length;
-  return clip.frames[Math.min(count - 1, Math.floor(progress * count))];
+  return clip.frames[clipIndexAt(clip, progress)];
+}
+
+/** The index of the frame for a distance covered, one frame per stride. */
+export function strideIndex(clip: Clip, distance: number, stridePx: number): number {
+  return Math.floor(distance / stridePx) % clip.frames.length;
 }
 
 /** A frame chosen by distance covered, one frame per stride. */
 export function strideFrame(clip: Clip, distance: number, stridePx: number): PixelSprite {
-  return clip.frames[Math.floor(distance / stridePx) % clip.frames.length];
+  return clip.frames[strideIndex(clip, distance, stridePx)];
 }

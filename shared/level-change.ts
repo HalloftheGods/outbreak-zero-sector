@@ -1,6 +1,8 @@
 import { LEAD_IN_SEC, LEVEL_CLEAR_HEAL, PLAYER_RADIUS, SPAWN_SCATTER } from './constants.ts';
 import { stopSearch } from './container-search.ts';
 import { FlowField } from './flow-field.ts';
+import { BUNKER_LEVEL, BUNKER_SEED } from './home-protocol.ts';
+import { parkBunkerVan } from './level-exit.ts';
 import { levelPopulation, levelSeed } from './levels.ts';
 import { placeTownLoot } from './loot.ts';
 import { giveReturnKit } from './player-health.ts';
@@ -11,15 +13,16 @@ import { placeTownTreasure } from './treasure.ts';
 import { hordesSurvivedHere } from './waves.ts';
 import { generateWorldMap } from './world-map.ts';
 
-/** Empties the world and raises a level's town, stocked and populated, ready for its lead-in. */
-export function enterTown(sim: SimState, level: number): void {
-  const seed = levelSeed(sim.runSeed, level, sim.homeRun?.attempt);
-  const newTown = seed !== sim.map.seed;
-  if (newTown) {
-    sim.map = generateWorldMap(seed);
-    sim.flow = new FlowField(sim.map);
-    sim.noiseFlow = new FlowField(sim.map);
-  }
+function raiseMap(sim: SimState, seed: number): void {
+  const sameMap = seed === sim.map.seed;
+  if (sameMap) return;
+  sim.map = generateWorldMap(seed);
+  sim.flow = new FlowField(sim.map);
+  sim.noiseFlow = new FlowField(sim.map);
+}
+
+/** Nothing left of the last place: no horde, no bodies, no bullets. */
+function emptyWorld(sim: SimState, level: number): void {
   sim.level = level;
   sim.exit = null;
   sim.bench = null;
@@ -39,9 +42,23 @@ export function enterTown(sim: SimState, level: number): void {
   sim.events = [];
   sim.flow.invalidate();
   sim.noiseFlow.invalidate();
+}
+
+/** Empties the world and raises a level's town, stocked and populated, ready for its lead-in. */
+export function enterTown(sim: SimState, level: number): void {
+  raiseMap(sim, levelSeed(sim.runSeed, level, sim.homeRun?.attempt));
+  emptyWorld(sim, level);
   placeTownLoot(sim);
   seedPopulation(sim);
   placeTownTreasure(sim);
+}
+
+/** Empties the world and goes home: no loot, no containers, no zombies, and the van parked. */
+export function enterBunker(sim: SimState): void {
+  raiseMap(sim, BUNKER_SEED);
+  emptyWorld(sim, BUNKER_LEVEL);
+  sim.containers = [];
+  parkBunkerVan(sim);
 }
 
 /** Puts someone down beside the town's entry. */

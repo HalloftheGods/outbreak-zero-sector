@@ -6,13 +6,13 @@ export interface CreditLine {
   readonly text: string;
 }
 
-export const CAST: readonly string[] = ['Night', 'Khronus8', 'Satori', 'Rex', 'Sol'];
+export const CAST: readonly string[] = ['Night', 'Bandus', 'Queen', 'Rex', 'Sol'];
 
 export const CREDITS: readonly CreditLine[] = [
   { kind: 'title', text: 'Undead of Night: Last Round' },
   { kind: 'studio', text: 'Hall of the Gods, Inc.' },
   { kind: 'role', text: 'Music by' },
-  { kind: 'name', text: 'ExoticService' },
+  { kind: 'name', text: 'Majora D.' },
   { kind: 'role', text: 'Starring' },
   ...CAST.map((text): CreditLine => ({ kind: 'name', text })),
   { kind: 'thanks', text: 'Thanks for surviving the night' },

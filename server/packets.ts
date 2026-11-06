@@ -4,6 +4,7 @@ import { isDifficultyId } from '../shared/difficulty.ts';
 import { WEAPON_ORDER } from '../shared/protocol.ts';
 import type { ClientInputPacket, ClientPacket, WeaponId } from '../shared/protocol.ts';
 import { isBenchAction } from '../shared/workbench.ts';
+import { parseHome, parseJoinHome } from './home-packets.ts';
 
 const NAME_MAX_LENGTH = 16;
 const DEFAULT_NAME = 'Survivor';
@@ -78,12 +79,15 @@ export function parseClientPacket(raw: string): ClientPacket | null {
     const valid = typeof name === 'string' && isJoinToken(token) && validCharacter;
     // An older client sends none, and an unknown one is not worth turning a player away for.
     const chosen = isDifficultyId(difficulty) ? { difficulty } : {};
-    return valid ? { type: 'join', name: sanitiseName(name), token, character, ...chosen } : null;
+    const home = parseJoinHome(value.home);
+    return valid ? { type: 'join', name: sanitiseName(name), token, character, ...chosen, ...(home ? { home } : {}) } : null;
   }
   if (value.type === 'input') {
     const input = parseInput(value.input);
     return input ? { type: 'input', input } : null;
   }
   if (value.type === 'bench') return isBenchAction(value.action) ? { type: 'bench', action: value.action } : null;
+  const homeAction = value.type === 'home' ? parseHome(value.action) : null;
+  if (homeAction) return { type: 'home', action: homeAction };
   return value.type === 'restart' ? { type: 'restart' } : null;
 }

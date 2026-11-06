@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FINAL_LEVEL, FIRST_LEVEL } from '../shared/levels.ts';
-import { allTracks, LULLS } from '../src/audio/playlists.ts';
+import { allTracks, LULLS, lockedTracksOf } from '../src/audio/playlists.ts';
 import { SFX_NAMES } from '../src/audio/sfx-registry.ts';
 import { Soundtrack } from '../src/audio/soundtrack.ts';
 import { NO_PROGRESS } from '../src/game/level-progress.ts';
 import { isRadioFound, loadSoundUnlock, NO_SOUND_UNLOCK, recordRadioFound } from '../src/game/sound-unlock.ts';
-import { HIDDEN_LABEL, musicEntries, playEntry, sfxEntries, sfxName, trackName } from '../src/game/sound-test.ts';
+import { findCount, HIDDEN_LABEL, jukeboxEntries, musicEntries, playEntry, sfxEntries, sfxName, trackName } from '../src/game/sound-test.ts';
 import type { Previewer } from '../src/game/sound-test.ts';
+
+const ALL_FOUND: ReadonlySet<string> = new Set(LULLS.flatMap((playlist) => playlist.files));
 
 function memoryStore(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -28,6 +30,22 @@ describe('the Radio unlock', () => {
     expect(loadSoundUnlock(store).radio).toBe(true);
     expect(loadSoundUnlock(memoryStore({ 'outbreak.sound-unlock': '{nope' })).radio).toBe(false);
     expect(loadSoundUnlock(null).radio).toBe(false);
+  });
+
+  it('keeps the tracks the radios gave up, once each, in the order found', () => {
+    const store = memoryStore();
+    recordRadioFound(store, 'level-01-sunken-tomb.mp3');
+    recordRadioFound(store, 'level-02-the-abattoir.mp3');
+    recordRadioFound(store, 'level-01-sunken-tomb.mp3');
+    expect(loadSoundUnlock(store).tracks).toEqual(['level-01-sunken-tomb.mp3', 'level-02-the-abattoir.mp3']);
+    expect(loadSoundUnlock(memoryStore({ 'outbreak.sound-unlock': '{"tracks":[3,"a.mp3"]}' })).tracks).toEqual(['a.mp3']);
+  });
+
+  it('hands out a level\'s finds in order and then nothing', () => {
+    const [, first, second] = LULLS[1].files;
+    expect(lockedTracksOf(2, new Set())).toEqual(LULLS[1].files.slice(1));
+    expect(lockedTracksOf(2, new Set([first]))[0]).toBe(second);
+    expect(lockedTracksOf(2, ALL_FOUND)).toEqual([]);
   });
 
   it('does not touch the level progress it sits next to', () => {
@@ -69,7 +87,7 @@ describe('the Sound Test lists', () => {
   });
 
   it('opens a level\'s tracks once it is reached', () => {
-    const entries = musicEntries({ highest: 3, finished: false });
+    const entries = musicEntries({ highest: 3, finished: false }, false, new Set(LULLS[2].files));
     expect(entries.filter((entry) => entry.where === 'LEVEL 03').every((entry) => entry.unlocked)).toBe(true);
     expect(entries.filter((entry) => entry.where === 'LEVEL 04').some((entry) => entry.unlocked)).toBe(false);
   });
@@ -77,12 +95,35 @@ describe('the Sound Test lists', () => {
   it('opens victory and credits only on finishing the game, and then everything', () => {
     const early = musicEntries({ highest: FINAL_LEVEL, finished: false });
     expect(early.filter((entry) => entry.where === 'VICTORY' || entry.where === 'CREDITS').some((entry) => entry.unlocked)).toBe(false);
-    const done = musicEntries({ highest: FINAL_LEVEL, finished: true });
+    const done = musicEntries({ highest: FINAL_LEVEL, finished: true }, false, ALL_FOUND);
     expect(done.every((entry) => entry.unlocked && entry.label === entry.name)).toBe(true);
     expect(FIRST_LEVEL).toBe(1);
   });
 
-  it('opens every sound effect with the Radio', () => {
+  it('keeps a level\'s finds as ??? until a Radio gives them up, and counts what is missing', () => {
+    const progress = { highest: FINAL_LEVEL, finished: true };
+    const none = musicEntries(progress, false, new Set());
+    const finds = none.filter((entry) => entry.find);
+    expect(finds.length).toBe(LULLS.reduce((sum, playlist) => sum + playlist.files.length - 1, 0));
+    for (const entry of finds) expect(entry.label).toBe(HIDDEN_LABEL);
+    expect(none.filter((entry) => entry.where === 'LEVEL 03' && !entry.find).every((entry) => entry.unlocked)).toBe(true);
+    expect(findCount(none)).toEqual({ found: 0, total: finds.length });
+    const one = musicEntries(progress, false, new Set([LULLS[2].files[1]]));
+    expect(findCount(one)).toEqual({ found: 1, total: finds.length });
+    expect(one.find((entry) => entry.file === LULLS[2].files[1])?.label).toBe('Factory Raid');
+  });
+
+  it('lets the bunker jukebox play only what has been heard or found', () => {
+    const progress = { highest: 3, finished: false };
+    const found = new Set([LULLS[2].files[1]]);
+    const entries = jukeboxEntries(progress, false, found);
+    expect(entries.every((entry) => entry.unlocked)).toBe(true);
+    expect(entries.map((entry) => entry.file)).toContain(LULLS[2].files[1]);
+    expect(entries.map((entry) => entry.file)).not.toContain(LULLS[2].files[2]);
+    expect(entries.map((entry) => entry.file)).not.toContain(LULLS[3].files[0]);
+  });
+
+  it('opens every sound effect without a Radio', () => {
     expect(sfxEntries().every((entry) => entry.unlocked)).toBe(true);
   });
 });

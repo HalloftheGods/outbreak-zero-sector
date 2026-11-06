@@ -13,7 +13,7 @@ import { buildFloors } from './floors.ts';
 import { ASPHALT, CRACKED, DIRT, GRASS, LANE_WEAR, SLABS, ZEBRA_WEAR } from './tile-grids.ts';
 import type { Rows, Slab } from './tile-grids.ts';
 
-const { asphalt, concrete, grass, wood, olive, ink, bone, skinDeep } = RAMPS;
+const { asphalt, concrete, grass, wood, olive, ink, bone, skinDeep, metal } = RAMPS;
 const S = TILE_SIZE;
 
 // The road sits one palette step above the INK outline, so a figure's edge shows against it.
@@ -126,9 +126,27 @@ function curb(side: CurbSide, slab: Slab, damage: CurbDamage): PixelCanvas {
   return canvas;
 }
 
-/** A stand-in for the bunker's walls: poured concrete with one seam. */
-function bunkerWall(seam: number): PixelCanvas {
-  return new PixelCanvas(S, S).fill(concrete[0]).rect(0, seam, S, 1, asphalt[2]);
+const BAND_Y = 6;
+const BOLTS = [2, 7, 12];
+
+/**
+ * Poured concrete seen from inside: a lit cap, a shaded foot, and a left seam that
+ * every tile shares so a run of them reads as panels. The first has a steel band
+ * bolted across it, the second a conduit and a damp stain.
+ */
+function bunkerWall(banded: boolean): PixelCanvas {
+  const canvas = new PixelCanvas(S, S).fill(concrete[1]);
+  canvas.rect(0, 0, S, 1, concrete[2]).rect(0, S - 2, S, 2, concrete[0]).rect(0, 0, 1, S, concrete[0]);
+  canvas.rect(1, 1, 1, S - 3, concrete[2]);
+  for (const [x, y] of [[4, 3], [11, 12], [8, 9]] as const) canvas.px(x, y, concrete[0]);
+  if (banded) {
+    canvas.rect(0, BAND_Y, S, 4, metal[1]).rect(0, BAND_Y, S, 1, metal[2]).rect(0, BAND_Y + 3, S, 1, metal[0]);
+    for (const x of BOLTS) canvas.px(x, BAND_Y + 1, metal[3]);
+    return canvas;
+  }
+  canvas.rect(0, 4, S, 2, metal[0]).rect(0, 4, S, 1, metal[1]);
+  canvas.rect(10, 6, 2, 7, concrete[0]).rect(11, 9, 1, 4, asphalt[2]);
+  return canvas;
 }
 
 export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
@@ -155,7 +173,7 @@ export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
     grass: GRASS.map((rows) => tile(olive[0], rows, LAWN)),
     dirt: DIRT.map((rows) => tile(olive[0], rows, EARTH)),
     ...buildFloors(),
-    bunker_wall: [bunkerWall(5), bunkerWall(11)],
+    bunker_wall: [bunkerWall(true), bunkerWall(false)],
   };
   return Object.fromEntries(
     TILE_KINDS.map((kind) => [kind, canvases[kind].map((canvas) => canvas.toSprite(S, S, 0, S))]),

@@ -1,8 +1,14 @@
 // Renders the art book to a PNG so it can be judged by eye.
 //   node --experimental-strip-types tools/contact-sheet.ts <group> <outfile.png> [scale] [filter]
-// group: survivors | zombies | environment | containers | fx | ui | kits | all | reference | scene | scene-night | town
+// group: survivors | costumes | zombies | environment | containers | fx | ui | kits | all | reference | scene | scene-night | town
 // filter: keep only rows whose label contains this text, e.g. "skin0/pistol/walk".
 // For town it is a crop instead, "x,y,w,h" in town pixels.
+// costumes: every survivor in every costume, the default first for comparison, with rows labelled
+// survivor/costume/weapon/clip (plus survivor/costume/portraits, /downed and /dead), e.g.
+// "night/aurora/pistol/idle". A filter of "rex/" keeps one survivor, "rex/purple/" one costume,
+// "pistol/walk" one clip across all of them. Only the rows the filter keeps are drawn. "all"
+// leaves costumes out. Example:
+//   node --experimental-strip-types tools/contact-sheet.ts costumes out.png 4 night/aurora/ asphalt
 // ground (optional 5th argument): "flat" (default) keeps the grey sheet background 0x3a3c4c, where
 // every outline pixel is visible. "asphalt" lays the game's road tiles behind each row of the row-based
 // groups, so edges can be judged on the ground figures stand on. It does not change scene, scene-night
@@ -14,7 +20,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { buildArtBook } from '../src/art/index.ts';
 import { referenceWalker } from '../src/art/zombies.ts';
-import type { ArtBook, Clip, DirClips, PixelSprite } from '../src/art/types.ts';
+import type { ArtBook, Clip, DirClips, PixelSprite, SurvivorArt, SurvivorWeaponArt } from '../src/art/types.ts';
+import { characterOf, costumesOf } from '../shared/characters.ts';
 import { WEAPON_ORDER } from '../shared/protocol.ts';
 import { KIT_ORDER } from '../shared/round-effect-data.ts';
 import { encodePng } from './png.ts';
@@ -23,6 +30,7 @@ import { drawSprite, drawText, Sheet } from './sheet.ts';
 import { renderTown } from './town.ts';
 
 const DIR_NAMES = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+const WEAPON_CLIPS: readonly (keyof SurvivorWeaponArt)[] = ['idle', 'walk', 'fire', 'reload'];
 const BACKGROUND = 0x3a3c4c;
 const LABEL_COLUMN = 180;
 const MAX_WIDTH = 1800;
@@ -49,6 +57,14 @@ const clipRow = (label: string, clip: Clip): Row => ({ label, groups: [{ tag: ''
 
 const spriteRow = (label: string, sprites: readonly PixelSprite[]): Row => ({ label, groups: [{ tag: '', sprites }] });
 
+/** A row whose sprites are drawn when the sheet lays it out, so the filter skips the rest unbuilt. */
+const lazyRow = (label: string, groups: () => readonly Group[]): Row => ({
+  label,
+  get groups() {
+    return groups();
+  },
+});
+
 function survivorRows(book: ArtBook): Row[] {
   return book.survivors.flatMap((art, skin) => [
     ...WEAPON_ORDER.flatMap((id) => {
@@ -63,6 +79,26 @@ function survivorRows(book: ArtBook): Row[] {
     clipRow(`skin${skin}/downed`, art.downed),
     clipRow(`skin${skin}/dead`, art.dead),
   ]);
+}
+
+/** One survivor in one costume: portraits, every weapon clip, then the falls. */
+function wornRows(prefix: string, record: () => SurvivorArt): Row[] {
+  const clips = WEAPON_ORDER.flatMap((weapon) =>
+    WEAPON_CLIPS.map((clip) => lazyRow(`${prefix}/${weapon}/${clip}`, () => dirRow('', record().weapons[weapon][clip]).groups)),
+  );
+  return [
+    lazyRow(`${prefix}/portraits`, () => spriteRow('', record().portraits).groups),
+    ...clips,
+    lazyRow(`${prefix}/downed`, () => clipRow('', record().downed).groups),
+    lazyRow(`${prefix}/dead`, () => clipRow('', record().dead).groups),
+  ];
+}
+
+/** Every survivor in every costume, default first, labelled by the roster's ids. */
+function costumeRows(book: ArtBook): Row[] {
+  return book.survivors.flatMap((own, skin) =>
+    costumesOf(skin).flatMap((costume, index) => wornRows(`${characterOf(skin).id}/${costume.id}`, () => own.costumes[index])),
+  );
 }
 
 function zombieRows(book: ArtBook): Row[] {
@@ -129,19 +165,23 @@ function referenceRows(): Row[] {
   return [spriteRow('walker/idle S', [idle]), spriteRow('walker/walk S', walk.frames)];
 }
 
+const ROW_GROUPS: Readonly<Record<string, (book: ArtBook) => Row[]>> = {
+  survivors: survivorRows,
+  costumes: costumeRows,
+  zombies: zombieRows,
+  environment: environmentRows,
+  containers: containerRows,
+  fx: fxRows,
+  ui: uiRows,
+  kits: kitRows,
+  reference: referenceRows,
+  all: (book) => [...survivorRows(book), ...zombieRows(book), ...environmentRows(book), ...containerRows(book), ...fxRows(book), ...uiRows(book)],
+};
+
 function rowsFor(group: string, book: ArtBook): Row[] {
-  switch (group) {
-    case 'survivors': return survivorRows(book);
-    case 'zombies': return zombieRows(book);
-    case 'environment': return environmentRows(book);
-    case 'containers': return containerRows(book);
-    case 'fx': return fxRows(book);
-    case 'ui': return uiRows(book);
-    case 'kits': return kitRows(book);
-    case 'reference': return referenceRows();
-    case 'all': return [...survivorRows(book), ...zombieRows(book), ...environmentRows(book), ...containerRows(book), ...fxRows(book), ...uiRows(book)];
-    default: throw new Error(`Unknown sheet "${group}"`);
-  }
+  const rows = Object.hasOwn(ROW_GROUPS, group) ? ROW_GROUPS[group] : undefined;
+  if (!rows) throw new Error(`Unknown sheet "${group}"`);
+  return rows(book);
 }
 
 interface Placed {
@@ -168,14 +208,16 @@ function layoutRow(row: Row, scale: number): Laid {
   let lineHeight = 0;
   for (const group of row.groups) {
     const groupWidth = group.sprites.reduce((sum, sprite) => sum + sprite.w * scale + gap, 0);
-    if (x > LABEL_COLUMN && x + groupWidth > MAX_WIDTH) {
+    const groupWraps = x > LABEL_COLUMN && x + groupWidth > MAX_WIDTH;
+    if (groupWraps) {
       x = LABEL_COLUMN;
       y += lineHeight + 4;
       lineHeight = 0;
     }
     if (group.tag) tags.push({ text: group.tag, x, y });
     for (const sprite of group.sprites) {
-      if (x > LABEL_COLUMN && x + sprite.w * scale > MAX_WIDTH) {
+      const spriteWraps = x > LABEL_COLUMN && x + sprite.w * scale > MAX_WIDTH;
+      if (spriteWraps) {
         x = LABEL_COLUMN;
         y += lineHeight + 4;
         lineHeight = 0;
@@ -221,7 +263,8 @@ function renderRows(rows: readonly Row[], scale: number, ground: Ground = 'flat'
     drawText(sheet, rows[i].label.toUpperCase(), 4, y + 4, 0xfaf2d4);
     let strip = 4;
     for (const sprite of rows[i].groups.flatMap((group) => group.sprites)) {
-      if (strip + sprite.w > LABEL_COLUMN - 4) break;
+      const stripFull = strip + sprite.w > LABEL_COLUMN - 4;
+      if (stripFull) break;
       drawSprite(sheet, sprite, strip, y + 14, 1);
       strip += sprite.w + 1;
     }
@@ -241,8 +284,9 @@ function main(): void {
     process.exit(1);
   }
   const ground: Ground = groundArg === 'asphalt' ? 'asphalt' : 'flat';
-  if (!group || !outfile) {
-    console.error('usage: contact-sheet.ts <survivors|zombies|environment|containers|fx|ui|kits|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter] [flat|asphalt]');
+  const missingArgs = !group || !outfile;
+  if (missingArgs) {
+    console.error('usage: contact-sheet.ts <survivors|costumes|zombies|environment|containers|fx|ui|kits|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter] [flat|asphalt]');
     process.exit(1);
   }
   const started = performance.now();
@@ -259,12 +303,13 @@ function main(): void {
     sheet = renderTown(book, scale, filter);
   } else {
     const rows = rowsFor(group, book).filter((row) => !filter || row.label.includes(filter));
-    if (rows.length === 0) throw new Error(`No rows match "${filter}"`);
+    const noneMatch = rows.length === 0;
+    if (noneMatch) throw new Error(`No rows match "${filter}"`);
     sheet = renderRows(rows, scale, ground, book);
   }
   mkdirSync(dirname(outfile), { recursive: true });
   writeFileSync(outfile, encodePng(sheet.w, sheet.h, sheet.data));
-  console.log(`${outfile} ${sheet.w}x${sheet.h}, art book built in ${buildMs.toFixed(0)}ms`);
+  process.stdout.write(`${outfile} ${sheet.w}x${sheet.h}, art book built in ${buildMs.toFixed(0)}ms\n`);
 }
 
 main();

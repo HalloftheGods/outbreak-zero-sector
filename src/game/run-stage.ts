@@ -1,3 +1,4 @@
+import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import { levelDef } from '../../shared/levels.ts';
 import type { SnapshotPacket, WorldMap } from '../../shared/protocol.ts';
 import { generateWorldMap } from '../../shared/world-map.ts';
@@ -39,6 +40,12 @@ export class RunStage {
     const sameLevel = snapshot.level === this.level;
     if (sameLevel) return;
     this.level = snapshot.level;
+    const home = isBunkerSeed(snapshot.mapSeed);
+    if (home) {
+      this.renderer()?.setTheme('bunker');
+      this.hud.clearNotices();
+      return;
+    }
     this.renderer()?.setTheme(levelDef(snapshot.level).theme);
     this.hud.showLevel(snapshot.level, nowMs);
   }

@@ -5,6 +5,7 @@ import type { EnvironmentArt } from './types.ts';
 import { buildBrickApartment, buildSlabApartment } from './environment/apartment.ts';
 import { buildCrates } from './containers/cartons.ts';
 import { buildFridge, buildLocker } from './containers/shelving.ts';
+import { buildForge, buildJukebox, buildLevelMap } from './environment/bunker-props.ts';
 import { buildClinic } from './environment/clinic.ts';
 import { buildDiner } from './environment/diner.ts';
 import { buildInterior } from './environment/floors.ts';
@@ -60,9 +61,9 @@ export function buildEnvironment(): EnvironmentArt {
       locker: buildLocker(),
       fridge: buildFridge(),
       workbench: buildWorkbench(),
-      // Stand-ins of the same footprint until the bunker's own props are drawn.
-      forge: buildWorkbench(),
-      level_map: buildTable(),
+      forge: buildForge(),
+      level_map: buildLevelMap(),
+      jukebox: buildJukebox(),
       ...buildMerchantProps(),
     },
     buildings: {

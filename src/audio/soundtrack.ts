@@ -7,6 +7,9 @@ const FADE_TC = 0.4;
 const SILENT_AFTER_MS = 1600;
 
 /** The parts of an audio element this class touches, so a spec can stand in for one. */
+const firstTurn = (playlist: Playlist): number =>
+  playlist.fromTop ? 0 : Math.floor(Math.random() * playlist.files.length);
+
 export type TrackElement = Pick<HTMLAudioElement, 'currentTime' | 'paused' | 'preload' | 'play' | 'pause' | 'addEventListener'>;
 
 interface Track {
@@ -116,7 +119,8 @@ export class Soundtrack {
     const playlist = this.playlist;
     const nothingToPlay = !playlist || playlist.files.length === 0;
     if (nothingToPlay) return;
-    const turn = this.turns.get(playlist) ?? 0;
+    // A level's first track is a random one of its takes; the rest follow in turn so the music never stops.
+    const turn = this.turns.get(playlist) ?? firstTurn(playlist);
     this.turns.set(playlist, turn + 1);
     const track = this.trackFor(playlist.files[turn % playlist.files.length]);
     if (playlist.fromTop) track.element.currentTime = 0;

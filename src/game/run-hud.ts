@@ -4,11 +4,14 @@ import type { SceneView } from '../engine/scene.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import type { ClientWorld } from './client-world.ts';
 import { homeUi } from './home-hud.ts';
+import type { HomeFacts } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
-import type { RunResult, UiState } from './hud-state.ts';
+import type { Banner, RunResult, UiState } from './hud-state.ts';
 import { hordeBanner, isLandmark, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
-import { isRadioFound, loadSoundUnlock, recordRadioFound } from './sound-unlock.ts';
+import { lockedTracksOf } from '../audio/playlists.ts';
+import { trackName } from './sound-test.ts';
+import { foundTracks, isRadioFound, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
 import { TownMapView } from './town-map.ts';
 
@@ -69,14 +72,19 @@ export class RunHud {
   private readonly notices = new RunNotices();
   private readonly ui: () => UiState;
   private readonly publish: (patch: Partial<UiState>) => void;
+  /** What the home screens need that no snapshot carries. */
+  private readonly homeFacts: () => HomeFacts;
   private town: TownMapView | null = null;
   private townCanvas: HTMLCanvasElement | null = null;
   private lastHudMs = 0;
+  /** The town the run is in, which is where a Radio's track belongs. */
+  private level = 1;
   private lastScene: SceneView | null = null;
 
-  constructor(ui: () => UiState, publish: (patch: Partial<UiState>) => void) {
+  constructor(ui: () => UiState, publish: (patch: Partial<UiState>) => void, homeFacts: () => HomeFacts) {
     this.ui = ui;
     this.publish = publish;
+    this.homeFacts = homeFacts;
   }
 
   setMap(map: WorldMap): void {
@@ -111,14 +119,40 @@ export class RunHud {
 
   onEvent(event: GameEvent, now: number): void {
     tapGameEvent(event);
-    const firstRadio = isRadioFound(event) && !loadSoundUnlock().radio;
-    if (isRadioFound(event)) recordRadioFound();
-    const banner = hordeBanner(event) ?? (firstRadio ? radioBanner(event) : null);
+    const track = isRadioFound(event) ? this.giveUpTrack() : null;
+    const banner = hordeBanner(event) ?? radioBanner(event, track === null ? null : trackName(track));
     if (banner) this.publish({ banner: this.notices.banner(banner, now) });
+  }
+
+  /** Notes the Radio, and hands out the next track of this level that has not been found, if any is left. */
+  private giveUpTrack(): string | null {
+    const [next = null] = lockedTracksOf(this.level, foundTracks());
+    recordRadioFound(undefined, next);
+    return next;
+  }
+
+  /** Home has no title card, and nothing said in the last town is worth keeping up in it. */
+  clearNotices(): void {
+    this.publish({ levelCard: null, banner: null, place: null });
+  }
+
+  /** A banner of the game's own, outside any event: a hint, or a question put to the player. */
+  say(banner: Omit<Banner, 'key'>, now: number): void {
+    this.publish({ banner: this.notices.banner(banner, now) });
+  }
+
+  /** The home screens read the save, which moves between the hud's beats. */
+  refreshHome(world: ClientWorld | null): void {
+    const snapshot = world?.latest ?? null;
+    const local = world?.localPlayer ?? null;
+    const hasRun = snapshot !== null && local !== null;
+    if (!hasRun) return;
+    this.publish({ home: homeUi(snapshot, local, this.homeFacts()) });
   }
 
   /** The level's title card. Nothing said in the last town is worth keeping up beside it. */
   showLevel(level: number, now: number): void {
+    this.level = level;
     this.publish({ levelCard: this.notices.levelCard(level, now), banner: null, place: null });
   }
 
@@ -152,7 +186,7 @@ export class RunHud {
     const viewer = scene.viewerId === local.id ? null : scene.players.find((player) => player.id === scene.viewerId);
     this.publish({
       hud: buildHud(snapshot, local, viewer?.name ?? null),
-      home: homeUi(snapshot, local),
+      home: homeUi(snapshot, local, this.homeFacts()),
       signalWeak: frame.networked && ms - frame.lastSnapshotMs > SIGNAL_WEAK_MS,
       ...this.notices.expired(this.ui(), ms),
     });

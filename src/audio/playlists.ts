@@ -1,4 +1,6 @@
+import { HOME_LOOP_LIVE } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL } from '../../shared/levels.ts';
+import { foundTracks } from '../game/sound-unlock.ts';
 import type { Scene } from './music.ts';
 
 export interface Playlist {
@@ -16,50 +18,92 @@ const QUIET = quiet();
 const VICTORY: Playlist = { files: ['victory-dark-salvation.mp3'], fromTop: true };
 const CREDITS: Playlist = { files: ['end-credits-surviving-the-night.mp3'], fromTop: true };
 
-/** The music between hordes in each town, in the order of LEVELS. A level with multiple takes plays them in turn. */
+const BUNKER_TRACK = 'level-06-underground-bunker.mp3';
+/** The bunker's own music, once the home loop is live. Level 6 gives the track up to it then. */
+const BUNKER = lull(BUNKER_TRACK);
+const BUNKER_LEVEL_INDEX = 5;
+
+/**
+ * The music between hordes in each town, in the order of LEVELS. The first take is the level's own and plays from the
+ * start; each take after it is a find, played only once a Radio in that level has given it up. A level plays its takes in turn.
+ */
 export const LULLS: readonly Playlist[] = [
-  lull('silent-ruins.mp3', 'level-01-abandoned-streets.mp3'),
-  lull('escalation.mp3', 'escalation-hard.mp3', 'level-02-metro-tunnels.mp3'),
-  lull('level-03-into-the-breach.mp3', 'level-03-factory-raid.mp3'),
-  lull('level-04-abyssal-depths.mp3', 'level-04-overgrown-hospital.mp3'),
-  lull('level-05-contamination-zone.mp3', 'level-05-highway-escape.mp3'),
-  lull('level-06-underground-bunker.mp3', 'level-06-toxic-silo.mp3'),
-  lull('level-07-quarantine-breach.mp3', 'level-07-quarantine-breach-alt.mp3', 'level-07-outpost-siege.mp3'),
-  lull('level-08-frozen-wasteland.mp3', 'level-08-frozen-military-base.mp3'),
-  lull('level-09-the-hive.mp3', 'level-09-the-hive-alt.mp3', 'level-09-nesting-grounds.mp3'),
-  lull('level-10-final-stand.mp3', 'level-10-final-evacuation.mp3'),
+  lull('silent-ruins.mp3', 'level-01-abandoned-streets.mp3', 'level-01-whispering-shadows.mp3', 'level-01-sunken-tomb.mp3'),
+  lull('escalation.mp3', 'escalation-hard.mp3', 'level-02-metro-tunnels.mp3', 'level-02-the-abattoir.mp3', 'level-02-catacombs-of-anubis.mp3'),
+  lull('level-03-into-the-breach.mp3', 'level-03-factory-raid.mp3', 'level-03-crawlspace.mp3', 'level-03-hide-your-kids.mp3', 'level-03-chamber-of-mummies.mp3'),
+  lull('level-04-abyssal-depths.mp3', 'level-04-overgrown-hospital.mp3', 'level-04-infested-lab.mp3', 'level-04-forgotten-oasis.mp3'),
+  lull('level-05-contamination-zone.mp3', 'level-05-highway-escape.mp3', 'level-05-static-corridor.mp3', 'level-05-valley-of-shadows.mp3'),
+  lull('level-06-underground-bunker.mp3', 'level-06-toxic-silo.mp3', 'level-06-steel-works.mp3', 'level-06-underground-temple.mp3'),
+  lull('level-07-quarantine-breach.mp3', 'level-07-quarantine-breach-alt.mp3', 'level-07-outpost-siege.mp3', 'level-07-containment-breach.mp3', 'level-07-swarm-of-the-scarabs.mp3'),
+  lull('level-08-frozen-wasteland.mp3', 'level-08-frozen-military-base.mp3', 'level-08-the-morgue.mp3', 'level-08-the-necropolis.mp3'),
+  lull('level-09-the-hive.mp3', 'level-09-the-hive-alt.mp3', 'level-09-nesting-grounds.mp3', 'level-09-mutation-core.mp3', 'level-09-inner-sanctum.mp3'),
+  lull('level-10-final-stand.mp3', 'level-10-final-evacuation.mp3', 'level-10-point-zero.mp3', 'level-10-point-zero-point-one.mp3', 'level-10-awakening-of-the-curse.mp3'),
 ];
 
-export type TrackGroup = 'title' | 'horde' | 'level' | 'victory' | 'credits';
+export type TrackGroup = 'title' | 'horde' | 'level' | 'bunker' | 'victory' | 'credits';
 
 export interface TrackInfo {
   readonly file: string;
   readonly group: TrackGroup;
   /** The level that has to be reached to hear it in a run. The title and the first horde belong to the first. */
   readonly level: number;
+  /** A level's take after the first: heard in runs and listed by name only once a Radio has given it up. */
+  readonly find: boolean;
 }
 
-const tracksOf = (playlist: Playlist, group: TrackGroup, level: number): TrackInfo[] =>
-  playlist.files.map((file) => ({ file, group, level }));
+const tracksOf = (playlist: Playlist, group: TrackGroup, level: number, finds = false): TrackInfo[] =>
+  playlist.files.map((file, index) => ({ file, group, level, find: finds && index > 0 }));
+
+/** Built once, so a scene keeps the same playlist object and the soundtrack does not restart it. */
+const HOME_LULLS: readonly Playlist[] = LULLS.map((playlist, index) =>
+  index === BUNKER_LEVEL_INDEX ? lull(...playlist.files.filter((file) => file !== BUNKER_TRACK)) : playlist,
+);
+
+const lullsFor = (homeLoop: boolean): readonly Playlist[] => (homeLoop ? HOME_LULLS : LULLS);
 
 /** Every recorded track, read from the playlists above so the Sound Test keeps no list of its own. */
-export function allTracks(): readonly TrackInfo[] {
+export function allTracks(homeLoop = HOME_LOOP_LIVE): readonly TrackInfo[] {
+  const bunker = homeLoop ? tracksOf(BUNKER, 'bunker', FIRST_LEVEL) : [];
   return [
     ...tracksOf(RUINS, 'title', FIRST_LEVEL),
     ...tracksOf(HORDE, 'horde', FIRST_LEVEL),
-    ...LULLS.flatMap((playlist, index) => tracksOf(playlist, 'level', FIRST_LEVEL + index)),
+    ...bunker,
+    ...lullsFor(homeLoop).flatMap((playlist, index) => tracksOf(playlist, 'level', FIRST_LEVEL + index, true)),
     ...tracksOf(VICTORY, 'victory', FINAL_LEVEL),
     ...tracksOf(CREDITS, 'credits', FINAL_LEVEL),
   ];
 }
 
+const levelIndex = (level: number): number => Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, Math.floor(level))) - FIRST_LEVEL;
+
+/** The tracks of a level a Radio has not yet given up, in the order they are handed out. */
+export function lockedTracksOf(level: number, found: ReadonlySet<string>, homeLoop = HOME_LOOP_LIVE): readonly string[] {
+  const [, ...finds] = lullsFor(homeLoop)[levelIndex(level)].files;
+  return finds.filter((file) => !found.has(file));
+}
+
+/** What a level plays: its own take and the finds so far. Kept by what it holds, so a scene keeps the same list object. */
+const HEARD = new Map<string, Playlist>();
+
+function heardOn(index: number, homeLoop: boolean, found: ReadonlySet<string>): Playlist {
+  const files = lullsFor(homeLoop)[index].files.filter((file, at) => at === 0 || found.has(file));
+  const key = `${homeLoop}:${index}:${files.join()}`;
+  const kept = HEARD.get(key);
+  if (kept) return kept;
+  const made = lull(...files);
+  HEARD.set(key, made);
+  return made;
+}
+
+
+
 /** What plays in a scene on a level. Levels past either end of the run hold to the nearest. */
-export function playlistFor(scene: Scene, level: number): Playlist {
+export function playlistFor(scene: Scene, level: number, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): Playlist {
   if (scene === 'menu') return RUINS;
+  if (scene === 'bunker' && homeLoop) return BUNKER;
   if (scene === 'wave') return HORDE;
   if (scene === 'victory') return VICTORY;
   if (scene === 'credits') return CREDITS;
   if (scene === 'gameover') return QUIET;
-  const index = Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, Math.floor(level))) - FIRST_LEVEL;
-  return LULLS[index] ?? LULLS[0];
+  return heardOn(levelIndex(level), homeLoop, found);
 }

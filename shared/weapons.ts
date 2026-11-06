@@ -97,7 +97,7 @@ function fire(sim: SimState, p: PlayerState): void {
     suppressed: rankOf(p.guns[p.weapon]?.fit, 'suppressor') > 0,
     ...carried,
   });
-  makeNoise(sim, p.x, p.y, stats.noiseRadius);
+  makeNoise(sim, p.x, p.y, stats.noiseRadius * characterOf(p.skin).noise);
 }
 
 function tryFire(sim: SimState, p: PlayerState): void {

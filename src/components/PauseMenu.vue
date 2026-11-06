@@ -17,19 +17,23 @@
       />
 
       <PixelButton class="pause-resume" primary silent @press="game.togglePause()">Resume</PixelButton>
+      <p v-if="warning" class="px-error" role="alert">{{ warning }}</p>
       <PixelButton @press="game.toMenu()">Main menu</PixelButton>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { leaveWarning } from '../game/home-screens.ts';
 import type { UiState } from '../game/hud-state.ts';
 import type { TransportKind } from '../network/transport.ts';
 import PixelButton from './PixelButton.vue';
 import { useGame } from './use-game.ts';
 
-defineProps<{ ui: UiState; mode: TransportKind }>();
+const { ui } = defineProps<{ ui: UiState; mode: TransportKind }>();
 const game = useGame();
+const warning = computed(() => leaveWarning(ui.home));
 
 function onVolume(event: Event): void {
   game.setVolume(Number((event.target as HTMLInputElement).value));

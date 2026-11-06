@@ -1,0 +1,82 @@
+// Rex's select-screen bust, drawn from the real kid's face: a round freckled face with rosy
+// cheeks, blue-grey eyes squinting over a big open grin that shows his top teeth, and a thick
+// wavy brown fringe curling out from under the green dinosaur hood. The hood keeps the in-game
+// look: spike-orange crest, felt eyes on top and felt teeth along the rim. The costume is zipped
+// partway, so the dark crew-neck tee shows above the cream belly. Lit from the upper left.
+
+import { RAMPS } from '../../palette.ts';
+import type { BustDef } from '../bust.ts';
+
+const { acid, ash, blood, bone, denim, fire, ink, skin, teal, wood } = RAMPS;
+
+export const REX_BUST: BustDef = {
+  legend: {
+    k: ink[0], K: ink[1],
+    a: skin[0], b: skin[1], c: skin[2], d: skin[3],
+    h: wood[0], i: wood[1], j: wood[2], l: wood[3],
+    n: teal[0], t: acid[0], u: acid[1], v: acid[2],
+    o: fire[0], S: fire[1], s: fire[2],
+    z: bone[3], Z: bone[2],
+    e: denim[2], E: denim[1],
+    r: blood[3], m: blood[1],
+    w: ash[0],
+  },
+  rows: [
+    '.......................kk.......................',
+    '......................ksSk......................',
+    '................k....ksSSok....k................',
+    '...............ksk..ksSSSok..kSk................',
+    '..............ksSok.kssSSSoo.kSSok..............',
+    '............kkkk.....kkkkkk.....kkkk............',
+    '...........kzzzZkkkkkvvvvuukkkkkzzzZk...........',
+    '...........kzkkZkvvvvvvvuuuuuuukzkkZk...........',
+    '...........kZkkZkvvvvvvvuuuuuuukZkkZk...........',
+    '............kkkkvvvvvvvuuuuuuuuukkkk............',
+    '..........kkvvvvvvvvvvuuuuuuuuuuuuuukk..........',
+    '.........kvvvvvvvvvvvuuuuuuuuuuuuuuuuuk.........',
+    '.........kvvvvkkkkkkkkkkkkkkkkkkkkuuuuk.........',
+    '........kvvvzkzzzZhzzzZhhzzzZhzzzZkuuutk........',
+    '.......kvvvvkiizZiiizZihhizZihizZhhkutttk.......',
+    '.......kvvvkjlljjijlljjijljjihjjjiihktttk.......',
+    '......kvvvvklljjijlljjijljjihjjjjiihkttttk......',
+    '......kvvvvkljjijljjihjljjihjjjjjiihkttttk......',
+    '......kvvvvkjjiihdddcihccccccjjjiihhkttttk......',
+    '......kvvvvkjiddjiiicccccccciiihjihhkttttk......',
+    '.....kvvvvvkhdddddcccccccccccccccihbktttttk.....',
+    '.....kvvvvvkddddkkkkcccccccckkkkccbbktttttk.....',
+    '.....kvvvvkddddkzekEkcccccckzekEkcbbbkttttk.....',
+    '.....kvvvvkdddddbeebccccccccbeebcbbbbkttttk.....',
+    '......kvvvkdddddccccbccccccbccccbbbbbktttk......',
+    '......kvvvkdddrrccbccccdbccccbccrrbbbktttk......',
+    '......kvvvkkddcrccccccbccbcccccbrbbbkktttk......',
+    '......kvvvknkdccckcccccccccccckbbbbknktttk......',
+    '......kvvuknkcccckkkkkkkkkkkkkkbbbbknktttk......',
+    '......kvuuukkcccckzzzzzzzzzzzZkbbbakktttnk......',
+    '.......kuuuknkcccckZZZZZZZZZZkbbbbknktttk.......',
+    '.......kuuuknnkcccckmmrrrrmmkbbbbknnkttnk.......',
+    '........kuuuknkkcccckkkkkkkkbbbbkknkttnk........',
+    '........kuuuuknnkccccbbbbbbbbbbknnkttnnk........',
+    '.........kuuuknnnkkccccccbbbbkknnnkttnk.........',
+    '..........kkuuknnnnkkkkkkkkkknnnnkttkk..........',
+    '............kkukknnnnnaaaannnnnkktkk............',
+    '..............kkukknnnbbbannnkktkk..............',
+    '................kuukkkbbnnkkkttk................',
+    '...........kkkkkukkwwwwwwwwwwkktkkkkk...........',
+    '........kkkuuuuuuukKKKKKKKKKKktttttttkkk........',
+    '......kkvvvuuuuuuuukKKKKKKKKktttttttttttkk......',
+    '....kkvvvvuuuuuuuuukKKKKKKKKkttttttttttttnkk....',
+    '..kkvvvvvvuuuuuuuuuukKKKKKKktttttttttttttnnnkk..',
+    'kkvvvvvvvvuuuuuuuuuuukKKKKktttttttttttttnnnnnnkk',
+    'kvvvvvvvkuuuuuuuuuuuukKKKKkttttttttttttknnnnnnnk',
+    'kvvvvvvvkuuuuuuuuuuuuuksSktttttttttttttknnnnnnnk',
+    'kvvvvvvvkuuuuuuuuuuuuukKKktttttttttttttknnnnnnnk',
+    'kvvvvvvvkuuuuuuuuuuukkkkkkkktttttttttttknnnnnnnk',
+    'kvvvvvvvkuuuuuuuuuukzzZZZZZZktttttttttnknnnnnnnk',
+    'kvvvvvvukuuuuuuuuukzzzZZZZZZZkttttttttnknnnnnnnk',
+    'kvvvvvvukuuuuuuuukzzzzZZZZZZZZktttttttnknnnnnnnk',
+    'kvvvvvuukuuuuuuukzzzzzZZZZZZZZZktttttnnknnnnnnnk',
+    'kvvvvvuukuuuuuuukzzzzzZZZZZZZZZktttttnnknnnnnnnk',
+    'kvvvvvuukuuuuuukzzzzzzZZZZZZZZZZktttnnnknnnnnnnk',
+    'kvvvvuuukuuuuuukzzzzzzZZZZZZZZZZktttnnnknnnnnnnk',
+  ],
+};

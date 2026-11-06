@@ -8,6 +8,7 @@ import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
 import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
+import { JEWEL_LARGE, JEWEL_SMALL, SILVER, TREASURE_LEGEND } from './treasure.ts';
 import type { Grid } from './shared.ts';
 
 const { blood, bone, fire, ink, metal, olive, wood } = RAMPS;
@@ -31,6 +32,7 @@ const ITEM: Legend = {
   a: olive[0], b: olive[1], c: olive[2],
   w: wood[0], x: wood[1], y: wood[2], z: wood[3],
   Y: fire[3], B: fire[2], C: fire[1], D: fire[0],
+  ...TREASURE_LEGEND,
 };
 
 const GLINTS: readonly Grid[] = [
@@ -148,30 +150,6 @@ const RADIO: Grid = [
   'cbmnmnmbbpbbpbba',
   'cbbbbbbbbbbbbbba',
   'aaaaaaaaaaaaaaaa',
-];
-
-/** Stand-ins for the treasure art: a short stack of coins, and two cut stones. */
-export const SILVER: Grid = [
-  '.oppo.',
-  'oppppo',
-  'noooon',
-  '.nnnn.',
-];
-
-export const JEWEL_SMALL: Grid = [
-  '.uut.',
-  'uuuts',
-  '.tts.',
-  '..s..',
-];
-
-export const JEWEL_LARGE: Grid = [
-  '..uuut..',
-  '.uuuuts.',
-  'uuuuttts',
-  '.ttttss.',
-  '..ttss..',
-  '...ss...',
 ];
 
 interface ItemSpec {

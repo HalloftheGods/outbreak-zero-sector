@@ -187,6 +187,7 @@ describe('awareness', () => {
   it.each(['pistol', 'carbine', 'shotgun'] as const)('hears the %s inside its radius, through walls, and not beyond', (weapon) => {
     const { sim, state } = quietSim();
     const [p] = state.players;
+    p.skin = 1; // Bandus: a normal noise radius, unlike the default survivor, Night
     const { noiseRadius, magSize } = WEAPONS[weapon];
     p.guns[weapon] = { ammo: magSize };
     p.owned = ['pistol', weapon];
@@ -210,7 +211,7 @@ describe('awareness', () => {
     const { sim, state } = quietSim();
     const [p] = state.players;
     const { x, y } = p;
-    const zombie = addRoamer(state, 'runner', x + 220, y);
+    const zombie = addRoamer(state, 'runner', x + 180, y);
     sim.setInput('a', input({ seq: 1, shoot: true, angle: Math.PI }));
     sim.step();
     sim.setInput('a', input({ seq: 2 }));
@@ -225,7 +226,7 @@ describe('awareness', () => {
   it('gives up on a noise that leads nowhere', () => {
     const { sim, state } = quietSim();
     const [p] = state.players;
-    const zombie = addRoamer(state, 'walker', p.x + 200, p.y);
+    const zombie = addRoamer(state, 'walker', p.x + 180, p.y);
     sim.setInput('a', input({ seq: 1, shoot: true, angle: Math.PI }));
     sim.step();
     sim.setInput('a', input({ seq: 2 }));

@@ -83,8 +83,9 @@ export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
 }
 
 /** The find banner for a Radio, shown to everyone in the run, or null for anything else. */
-export function radioBanner(event: GameEvent): Omit<Banner, 'key'> | null {
-  return isRadioFound(event) ? { title: 'A RADIO', subtitle: 'SOUND TEST UNLOCKED', tone: 'hope' } : null;
+export function radioBanner(event: GameEvent, track: string | null): Omit<Banner, 'key'> | null {
+  const gaveUpATrack = isRadioFound(event) && track !== null;
+  return gaveUpATrack ? { title: 'A RADIO', subtitle: `NEW TRACK: ${track.toUpperCase()}`, tone: 'hope' } : null;
 }
 
 /** Banners, place labels and the words over the player's head: timing and wording, no drawing. */

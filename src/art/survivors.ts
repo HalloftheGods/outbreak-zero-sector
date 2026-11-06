@@ -2,12 +2,25 @@
 
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
-import type { SurvivorArt, SurvivorWeaponArt } from './types.ts';
+import type { PixelSprite, SurvivorArt, SurvivorWeaponArt } from './types.ts';
 import type { DrawnDir } from './kit.ts';
 import { ANCHOR_X, ANCHOR_Y } from './survivors/cell.ts';
 import { idleClips, weaponClips } from './survivors/clips.ts';
 import { deadClip, downedClip } from './survivors/fallen.ts';
-import { KHRONUS8 } from './survivors/khronus8.ts';
+import { BANDUS } from './survivors/bandus.ts';
+import type { BustDef } from './survivors/bust.ts';
+import { bustOf } from './survivors/bust.ts';
+import { BANDUS_BUST } from './survivors/busts/bandus.ts';
+import { NIGHT_BUST } from './survivors/busts/night.ts';
+import { REX_BUST } from './survivors/busts/rex.ts';
+import { SATORI_BUST } from './survivors/busts/satori.ts';
+import { SOL_BUST } from './survivors/busts/sol.ts';
+import type { Costume } from './survivors/costume.ts';
+import { BANDUS_COSTUMES } from './survivors/costumes/bandus.ts';
+import { NIGHT_COSTUMES } from './survivors/costumes/night.ts';
+import { REX_COSTUMES } from './survivors/costumes/rex.ts';
+import { SATORI_COSTUMES } from './survivors/costumes/satori.ts';
+import { SOL_COSTUMES } from './survivors/costumes/sol.ts';
 import { NIGHT } from './survivors/night.ts';
 import { portraitOf, portraitsOf } from './survivors/portrait.ts';
 import { REX } from './survivors/rex.ts';
@@ -37,7 +50,17 @@ export const MUZZLE_OFFSETS: Record<WeaponId, readonly { x: number; y: number }[
   shotgun: muzzleOffsets('shotgun'),
 };
 
-const CAST: readonly Person[] = [NIGHT, KHRONUS8, SATORI, REX, SOL];
+const CAST: readonly Person[] = [NIGHT, BANDUS, SATORI, REX, SOL];
+/** The select screen's picture of each, in the same order as CAST. */
+const BUSTS: readonly BustDef[] = [NIGHT_BUST, BANDUS_BUST, SATORI_BUST, REX_BUST, SOL_BUST];
+/**
+ * Each survivor's costumes, default first, in the same order as CAST. shared/characters.ts
+ * declares the same ids and names, and tests/costumes-wiring.spec.ts checks that they agree.
+ */
+export const COSTUMES: readonly (readonly Costume[])[] = [NIGHT_COSTUMES, BANDUS_COSTUMES, SATORI_COSTUMES, REX_COSTUMES, SOL_COSTUMES];
+
+/** A survivor record before its costume list is attached. */
+type Look = Omit<SurvivorArt, 'costumes'>;
 
 /**
  * Each weapon's clips draw on first use. A solo run only ever touches one person, and
@@ -59,15 +82,46 @@ function lazyWeapons(person: Person): Record<WeaponId, SurvivorWeaponArt> {
   return weapons;
 }
 
-function art(person: Person): SurvivorArt {
+function look(person: Person, select: PixelSprite): Look {
   return {
     weapons: lazyWeapons(person),
     downed: downedClip(person),
     dead: deadClip(person),
     portrait: portraitOf(person),
     portraits: portraitsOf(person, idleClips(person, 'pistol')),
+    select,
     gunDrop: gunDrop(person),
   };
+}
+
+/** The record with its costume list attached, hidden from key walks (see SurvivorArt.costumes). */
+function wear(record: Look, costumes: readonly SurvivorArt[]): SurvivorArt {
+  return Object.defineProperty({ ...record, costumes }, 'costumes', { enumerable: false });
+}
+
+/**
+ * The survivor's own record, holding a list of one record per costume. Index 0 is that
+ * record; the others draw on first read, so building the book costs what it did before
+ * costumes. A costume wears the survivor's hand-drawn select bust until it has its own.
+ */
+function dressed(own: Look, costumes: readonly Costume[]): SurvivorArt {
+  const list: SurvivorArt[] = [];
+  const built: SurvivorArt[] = [wear(own, list)];
+  costumes.forEach((costume, index) => {
+    Object.defineProperty(list, index, {
+      enumerable: true,
+      get() {
+        built[index] ??= wear(look(costume.person, own.select), list);
+        return built[index];
+      },
+    });
+  });
+  Object.freeze(list);
+  return built[0];
+}
+
+function art(person: Person, index: number): SurvivorArt {
+  return dressed(look(person, bustOf(BUSTS[index])), COSTUMES[index]);
 }
 
 export function buildSurvivors(): readonly SurvivorArt[] {

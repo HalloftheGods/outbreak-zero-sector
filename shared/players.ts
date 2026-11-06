@@ -13,6 +13,7 @@ import { updateMelee } from './melee.ts';
 import { stepMovement } from './movement.ts';
 import { useMedkit } from './player-health.ts';
 import { updateThrow } from './bottles.ts';
+import { isBunkerMap } from './home-protocol.ts';
 import type { ClientInputPacket, Stance } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { updateStations } from './stations.ts';
@@ -50,7 +51,7 @@ function footsteps(sim: SimState, p: PlayerState): void {
   const stepDue = p.stepNoiseLeft <= 0;
   if (!stepDue) return;
   p.stepNoiseLeft = SPRINT_NOISE_INTERVAL_SEC;
-  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS);
+  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS * characterOf(p.skin).noise);
 }
 
 /** Stores the newest input. One-shot requests latch until a tick consumes them. */
@@ -80,9 +81,27 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   if (input.weapon) p.weaponQueued = input.weapon;
 }
 
+/** A key down or a station open is someone still at the keyboard. Looking around is not. */
+function noteActivity(sim: SimState, p: PlayerState): void {
+  const { home } = p;
+  if (!home) return;
+  const keyDown = p.up || p.down || p.left || p.right || p.shoot || p.searchHeld;
+  const active = keyDown || home.station !== null;
+  if (active) home.lastActiveTick = sim.tick;
+}
+
+/** Nothing is thrown, swung or fired at home, so a press spends nothing and makes no sound. */
+function holdFire(p: PlayerState): void {
+  p.shoot = false;
+  p.shootQueued = false;
+  p.meleeQueued = false;
+  p.throwQueued = false;
+}
+
 /** Applies the stored input exactly once, so speed never depends on packet rate. */
 export function updatePlayer(sim: SimState, p: PlayerState): void {
   p.lastInputSeq = p.queuedSeq;
+  noteActivity(sim, p);
   if (p.status !== 'alive') {
     p.moving = false;
     p.reloadQueued = false;
@@ -106,6 +125,7 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   footsteps(sim, p);
   p.indoors = buildingAt(sim.map, p.x, p.y)?.id ?? null;
   leaveFootprint(sim, p);
+  if (isBunkerMap(sim.map)) holdFire(p);
   updateWeapons(sim, p);
   updateMelee(sim, p);
   useMedkit(sim, p);

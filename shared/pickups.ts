@@ -17,7 +17,7 @@ import type { PickupType, WeaponId } from './protocol.ts';
 import { isKitPickup, takeKit } from './round-effects.ts';
 import type { PickupState, PlayerState, SimState } from './sim-state.ts';
 import { emit, entityId } from './sim-state.ts';
-import { isTreasurePickup, takeTreasure } from './treasure.ts';
+import { isTreasurePickup, spawnTreasure, takeTreasure } from './treasure.ts';
 import { syncGun } from './weapons.ts';
 
 /** Share of kill drops that are a bandage rather than a few rounds. */
@@ -26,6 +26,8 @@ const KILL_DROP_BANDAGE_ODDS = 0.4;
 export const isAmmoPickup = (type: PickupType): type is AmmoPickup => type in AMMO_PICKUPS;
 
 export function spawnPickup(sim: SimState, type: PickupType, x: number, y: number, rounds = 0, ttl: number | null = null): void {
+  // Treasure is numbered on its own counter, so it never moves `sim.nextEntity`.
+  if (isTreasurePickup(type) && sim.homeRun) return spawnTreasure(sim, type, x, y, rounds);
   sim.pickups.push({ id: entityId(sim, 'i'), type, x, y, ttl, rounds });
 }
 

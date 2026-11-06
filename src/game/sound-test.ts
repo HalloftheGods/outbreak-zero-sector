@@ -1,13 +1,15 @@
 /** The Sound Test's lists and what is unlocked in them. Everything comes from the real playlists and sound table. */
 import { allTracks } from '../audio/playlists.ts';
-import type { TrackGroup } from '../audio/playlists.ts';
+import type { TrackGroup, TrackInfo } from '../audio/playlists.ts';
+import { foundTracks } from './sound-unlock.ts';
 import { SFX_NAMES } from '../audio/sfx-registry.ts';
 import type { SfxName } from '../audio/sfx-registry.ts';
+import { HOME_LOOP_LIVE } from '../../shared/home-protocol.ts';
 import { isLevelUnlocked } from './level-progress.ts';
 import type { LevelProgress } from './level-progress.ts';
 
-/** All the title menu's Sound Test page shows until a Radio is found. */
-export const LOCKED_LINE = 'A radio is out there somewhere.';
+/** Said under the music list: the finds are the tracks only a Radio gives up. */
+export const FINDS_HINT = 'Radios in the towns give up the rest of each level\'s music.';
 export const HIDDEN_LABEL = '???';
 
 interface EntryBase {
@@ -23,6 +25,8 @@ interface EntryBase {
 export interface MusicEntry extends EntryBase {
   readonly kind: 'music';
   readonly file: string;
+  /** A radio find: named only once a Radio has given it up. */
+  readonly find: boolean;
 }
 
 export interface SfxEntry extends EntryBase {
@@ -60,13 +64,18 @@ const GROUP_WHERE: Readonly<Record<TrackGroup, string>> = {
   title: 'TITLE',
   horde: 'HORDE',
   level: 'LEVEL',
+  bunker: 'BUNKER',
   victory: 'VICTORY',
   credits: 'CREDITS',
 };
 
-/** Victory and credits are heard on finishing the game; the rest need their level reached. */
-function trackUnlocked(group: TrackGroup, level: number, progress: LevelProgress): boolean {
+/** Victory and credits are heard on finishing the game; the rest need their level reached, and the finds a Radio too. */
+function trackUnlocked(info: TrackInfo, progress: LevelProgress, found: ReadonlySet<string>): boolean {
+  const { group, level } = info;
+  if (info.find) return found.has(info.file);
   const isEnding = group === 'victory' || group === 'credits';
+  const isHome = group === 'bunker';
+  if (isHome) return true;
   return isEnding ? progress.finished : isLevelUnlocked(level, progress);
 }
 
@@ -74,16 +83,30 @@ function entryOf(base: Omit<EntryBase, 'label'>): EntryBase {
   return { ...base, label: base.unlocked ? base.name : HIDDEN_LABEL };
 }
 
-/** Every recorded track, named once the level it plays in has been reached. */
-export function musicEntries(progress: LevelProgress): readonly MusicEntry[] {
-  return allTracks().map(({ file, group, level }) => {
+
+
+/** Every recorded track, named once the level it plays in has been reached, and for a find once a Radio gave it up. */
+export function musicEntries(progress: LevelProgress, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
+  return allTracks(homeLoop).map((info) => {
+    const { file, group, level } = info;
     const where = group === 'level' ? `LEVEL ${String(level).padStart(2, '0')}` : GROUP_WHERE[group];
-    const unlocked = trackUnlocked(group, level, progress);
-    return { ...entryOf({ id: `music:${file}`, name: trackName(file), where, unlocked }), kind: 'music', file };
+    const unlocked = trackUnlocked(info, progress, found);
+    return { ...entryOf({ id: `music:${file}`, name: trackName(file), where, unlocked }), kind: 'music', file, find: info.find };
   });
 }
 
-/** Every sound effect. The Radio opens them all, so the page itself is the gate. */
+/** What the bunker's jukebox can play: only the tracks already heard or found, none of the ??? the Sound Test keeps. */
+export function jukeboxEntries(progress: LevelProgress, homeLoop = HOME_LOOP_LIVE, found: ReadonlySet<string> = foundTracks()): readonly MusicEntry[] {
+  return musicEntries(progress, homeLoop, found).filter((entry) => entry.unlocked);
+}
+
+/** How many of the radio finds are in hand, for the page to say what is still missing. */
+export function findCount(entries: readonly MusicEntry[]): { readonly found: number; readonly total: number } {
+  const finds = entries.filter((entry) => entry.find);
+  return { found: finds.filter((entry) => entry.unlocked).length, total: finds.length };
+}
+
+/** Every sound effect. */
 export function sfxEntries(): readonly SfxEntry[] {
   return SFX_NAMES.map((sfx) => ({
     ...entryOf({ id: `sfx:${sfx}`, name: sfxName(sfx), where: 'SOUND', unlocked: true }),

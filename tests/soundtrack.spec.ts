@@ -40,6 +40,12 @@ function fakeContext() {
   return { currentTime: 0, createGain: node, createMediaElementSource: node } as unknown as AudioContext;
 }
 
+/** What the browser has found: the takes a Radio has given up. */
+function holdFound(tracks: readonly string[]): void {
+  const saved = JSON.stringify({ radio: tracks.length > 0, tracks });
+  vi.stubGlobal('localStorage', { getItem: () => saved, setItem: () => undefined });
+}
+
 describe('the soundtrack', () => {
   let made: FakeElement[];
   let available: boolean[];
@@ -48,6 +54,8 @@ describe('the soundtrack', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    holdFound(LULLS.flatMap((playlist) => playlist.files));
     made = [];
     available = [];
     music = new Soundtrack(fakeContext(), {} as AudioNode, (on) => available.push(on), ((src: string) => {
@@ -144,8 +152,8 @@ describe('the soundtrack', () => {
 
   it('gives every level its own lull, in turn where it has multiple takes', () => {
     expect(LULLS).toHaveLength(FINAL_LEVEL);
-    expect(playlistFor('intermission', 2).files).toEqual(['escalation.mp3', 'escalation-hard.mp3', 'level-02-metro-tunnels.mp3']);
-    expect(playlistFor('intermission', 10).files).toEqual(['level-10-final-stand.mp3', 'level-10-final-evacuation.mp3']);
+    expect(playlistFor('intermission', 2).files).toEqual(['escalation.mp3', 'escalation-hard.mp3', 'level-02-metro-tunnels.mp3', 'level-02-the-abattoir.mp3', 'level-02-catacombs-of-anubis.mp3']);
+    expect(playlistFor('intermission', 10).files).toEqual(['level-10-final-stand.mp3', 'level-10-final-evacuation.mp3', 'level-10-point-zero.mp3', 'level-10-point-zero-point-one.mp3', 'level-10-awakening-of-the-curse.mp3']);
     expect(playlistFor('intermission', 99)).toBe(playlistFor('intermission', FINAL_LEVEL));
     music.setLevel(7);
     music.setScene('intermission');
@@ -165,6 +173,38 @@ describe('the soundtrack', () => {
     vi.runAllTimers();
     expect(playing()).toHaveLength(1);
     expect(playing()[0]).toContain('horde-attack');
+  });
+
+  it('starts a level on a random take and then plays the rest of its takes in turn', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    music.setLevel(3);
+    music.setScene('intermission');
+    vi.runAllTimers();
+    const takes = playlistFor('intermission', 3).files;
+    expect(takes.length).toBeGreaterThan(2);
+    expect(playing()).toEqual([`music/${takes[takes.length - 1]}`]);
+    made.find((element) => !element.paused)?.fire('ended');
+    expect(playing()).toContain(`music/${takes[0]}`);
+  });
+
+  it('plays only a level\'s own take until a Radio gives up the others', () => {
+    holdFound([]);
+    for (const level of LEVELS) {
+      const [own] = LULLS[level.number - 1].files;
+      expect(playlistFor('intermission', level.number).files, `level ${level.number}`).toEqual([own]);
+    }
+    const second = LULLS[2].files[1];
+    holdFound([second]);
+    expect(playlistFor('intermission', 3).files).toEqual([LULLS[2].files[0], second]);
+    expect(playlistFor('intermission', 3)).toBe(playlistFor('intermission', 3));
+  });
+
+  it('keeps every level on its own music', () => {
+    for (const level of LEVELS) {
+      const files = playlistFor('intermission', level.number).files;
+      const tag = `level-${String(level.number).padStart(2, '0')}`;
+      expect(files.filter((file) => file.includes(tag)).length, tag).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it('plays the victory theme and then the credits', () => {

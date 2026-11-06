@@ -1,0 +1,76 @@
+// Who is in a home room: how far the room can go, and what happens to a body left behind.
+
+import { TICK_RATE } from './constants.ts';
+import { FIRST_LEVEL } from './levels.ts';
+import type { HomeRun, PlayerState, SimState } from './sim-state.ts';
+import { dropCarried } from './treasure.ts';
+
+/** Time a refresh gets to take a body back before its carried treasure falls where it stands. */
+const GRACE_TICKS = 60 * TICK_RATE;
+
+/** The room reaches as far as whoever is in it has, and a pick past that goes with them. */
+export function syncRoomHighest(sim: SimState): void {
+  const run = sim.homeRun;
+  if (!run) return;
+  const reached = sim.players.map((p) => p.home?.highest ?? FIRST_LEVEL);
+  run.roomHighest = Math.max(FIRST_LEVEL, ...reached);
+  const pickOutOfReach = run.pickedLevel !== null && run.pickedLevel > run.roomHighest;
+  if (pickOutOfReach) run.pickedLevel = null;
+}
+
+/** The most unapplied receipts a room keeps for players who are not in it. */
+const UNCLAIMED_LIMIT = 16;
+
+/** A banked receipt the next trip would clear is kept for its token, so a slow or dropped client still gets to apply it. */
+export function stashReceipt(run: HomeRun, p: PlayerState): void {
+  const receipt = p.home?.receipt ?? null;
+  const unappliable = receipt === null || p.token === null;
+  if (unappliable) return;
+  run.unclaimed.delete(p.token);
+  run.unclaimed.set(p.token, receipt);
+  const [oldest] = run.unclaimed.keys();
+  if (run.unclaimed.size > UNCLAIMED_LIMIT) run.unclaimed.delete(oldest);
+}
+
+function claimStashedReceipt(sim: SimState, p: PlayerState): void {
+  const { home } = p;
+  const kept = p.token === null ? undefined : sim.homeRun?.unclaimed.get(p.token);
+  if (!home || !kept || home.receipt) return;
+  home.receipt = kept;
+  sim.homeRun?.unclaimed.delete(p.token as string);
+}
+
+/** A body the player has just walked back into, or a newcomer. */
+export function arriveInRoom(sim: SimState, p: PlayerState): void {
+  const { home } = p;
+  if (!home) return;
+  claimStashedReceipt(sim, p);
+  home.leftTick = null;
+  home.lastActiveTick = sim.tick;
+  syncRoomHighest(sim);
+}
+
+/** Closing the tab is never an escape: a downed body or one nobody can reclaim drops at once, and the rest get the grace period. */
+export function leaveRoom(sim: SimState, p: PlayerState): void {
+  const { home } = p;
+  if (!home) return;
+  syncRoomHighest(sim);
+  const outOnATrip = (sim.homeRun?.tripLevel ?? null) !== null;
+  if (!outOnATrip) return;
+  home.leftTick = sim.tick;
+  const noWayBack = p.status === 'downed' || p.token === null;
+  if (noWayBack) dropCarried(sim, p);
+}
+
+/** Bodies whose grace period has run out let go of what they carry. Their gear stays on them until the van leaves. */
+export function updateLeftBodies(sim: SimState): void {
+  if (!sim.homeRun) return;
+  for (const p of sim.departed.values()) {
+    const left = p.home?.leftTick ?? null;
+    const graceOver = left !== null && sim.tick - left >= GRACE_TICKS;
+    if (graceOver) {
+      dropCarried(sim, p);
+      (p.home as NonNullable<PlayerState['home']>).leftTick = null;
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { STATS, STAT_BASELINE, STAT_SLOTS, statSlots, statSlotsOf, type StatKey 
 
 const SIGNATURE: Record<string, StatKey> = {
   night: 'stealth',
-  khronus8: 'reload',
+  bandus: 'reload',
   satori: 'speed',
   rex: 'strength',
   sol: 'search',
@@ -18,6 +18,15 @@ describe('character stats', () => {
         expect(slots[key]).toBe(key === SIGNATURE[character.id] ? STAT_SLOTS : STAT_BASELINE);
       }
     }
+  });
+
+  it('reads Stealth from how far a survivor is spotted and heard together', () => {
+    const night = CHARACTERS[0];
+    const dull = { ...night, sightRange: 1, noise: 1 };
+    expect(statSlots(night).stealth).toBe(STAT_SLOTS);
+    expect(statSlots({ ...night, noise: 1 }).stealth).toBeLessThan(STAT_SLOTS);
+    expect(statSlots({ ...night, sightRange: 1 }).stealth).toBeLessThan(STAT_SLOTS);
+    expect(statSlots(dull).stealth).toBe(STAT_BASELINE);
   });
 
   it('keeps every stat an integer within the bar', () => {

@@ -1,3 +1,4 @@
+import type { DifficultyId } from '../../shared/difficulty.ts';
 import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { BuildingKind, PickupType, PropKind, TileKind, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import type { ContainerArt, ContainerLook } from './containers.ts';
@@ -44,8 +45,17 @@ export interface SurvivorArt {
   readonly portrait: PixelSprite;
   /** The same figure at the portrait's crop, one frame per facing in dirFromAngle order. */
   readonly portraits: readonly PixelSprite[];
+  /** The character select screen's large head-and-shoulders picture (survivors/bust.ts). */
+  readonly select: PixelSprite;
   /** Pixels this survivor's gun sits below the standard build's, for the muzzle flash. */
   readonly gunDrop: number;
+  /**
+   * One record per costume, in the order of shared/characters.ts costumesOf(skin), default
+   * first. Index 0 is the survivor's own record, the same object. Every other record is
+   * drawn the first time its index is read, wears its survivor's select bust, and shares
+   * this same list. Not enumerable, so walking the book's keys does not draw any of them.
+   */
+  readonly costumes: readonly SurvivorArt[];
 }
 
 export interface ZombieArt {
@@ -53,6 +63,11 @@ export interface ZombieArt {
   readonly attack: DirClips;
   /** Plays once. The last frame stays on the ground as the corpse. */
   readonly death: Clip;
+  /**
+   * Rows from the anchor down to the planted soles, so the ground shadow sits under the feet
+   * rather than the anchor. buildZombies (zombies.ts) sets it from values measured off the walk frames; a type's own builder leaves it out.
+   */
+  readonly footDrop?: number;
 }
 
 export interface MerchantArt {
@@ -60,6 +75,8 @@ export interface MerchantArt {
   readonly figure: PixelSprite;
   /** Shown beside their shop. */
   readonly portrait: PixelSprite;
+  /** The shop screen's large head-and-shoulders picture (survivors/bust.ts format, drawn in environment/merchant-busts/). */
+  readonly bust: PixelSprite;
 }
 
 export interface EnvironmentArt {
@@ -109,6 +126,12 @@ export interface UiArt {
   readonly skull: PixelSprite;
   /** Title lockup for the menu and game over screens. */
   readonly logo: PixelSprite;
+  /** The difficulty page's card picture for each difficulty (difficulty-card.ts). */
+  readonly difficulty: Record<DifficultyId, PixelSprite>;
+  /** The Play page's card picture for Solo and Multiplayer (mode-cards.ts). */
+  readonly mode: Record<'solo' | 'multi', PixelSprite>;
+  /** The Levels page's hand-drawn scene for each level, index 0 being level 1 (level-cards.ts). */
+  readonly levelScenes: readonly PixelSprite[];
 }
 
 export interface ArtBook {

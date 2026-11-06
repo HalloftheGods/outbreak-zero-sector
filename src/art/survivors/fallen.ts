@@ -2,6 +2,7 @@
 // person's own parts: the back view turned on its side, face down, for both. The cast
 // are kids and teens, so a fall stays bloodless: they lie down and the gun drops.
 
+import type { WeaponId } from '../../../shared/protocol.ts';
 import type { Clip, PixelSprite } from '../types.ts';
 import { makeClip } from '../kit.ts';
 import type { Point } from '../kit.ts';
@@ -10,7 +11,7 @@ import { LEG_SETS } from './legs.ts';
 import type { Strip } from './legs.ts';
 import { bodyDrop, drawHand, HEAD_BOTTOM, legTrim, limbSegment, placePart, torsoBottom, trimStrip } from './rig.ts';
 import type { Person, Tone } from './rig.ts';
-import { GUN_LEGEND } from './weapons.ts';
+import { GUN_LEGEND, GUNS } from './weapons.ts';
 
 const GROUND_Y = 33;
 const TORSO_X = 13;
@@ -24,9 +25,26 @@ const DROPPED_PISTOL = [
   '.ak...',
 ];
 
+/** Where a long gun's side view lies in front of the body: its left edge and top row. */
+const LONG_GUN_AT: Readonly<Record<Exclude<WeaponId, 'pistol'>, Point>> = { carbine: [19, 30], shotgun: [21, 32] };
+
+/** The gun that was in hand, on the ground by the body. */
+function dropGun(c: Cell, weapon: WeaponId): void {
+  const small = weapon === 'pistol';
+  if (small) {
+    c.grid(31, 31, DROPPED_PISTOL, GUN_LEGEND);
+    return;
+  }
+  const view = GUNS[weapon].views[0];
+  const [x, y] = LONG_GUN_AT[weapon];
+  c.grid(x, y, view.rows, GUN_LEGEND);
+  if (view.pump) c.grid(x + view.pump.at[0], y + view.pump.at[1], view.pump.rows, GUN_LEGEND);
+}
+
 function narrowed(rows: readonly string[], width: number): readonly string[] {
   const extra = Math.max(...rows.map((row) => row.length)) - width;
-  if (extra <= 0) return rows;
+  const fits = extra <= 0;
+  if (fits) return rows;
   const cut = new Set(Array.from({ length: extra }, (_, i) => Math.round(((i + 1) * width) / (extra + 1))));
   return rows.map((row) => [...row].filter((_, x) => !cut.has(x)).join(''));
 }
@@ -121,7 +139,7 @@ export function standingFrame(person: Person, bodyY: number, leg: string, headX:
   return c.toSprite();
 }
 
-function corpseFrame(person: Person, lift: number, gun: boolean): PixelSprite {
+function corpseFrame(person: Person, lift: number, gun: WeaponId | null): PixelSprite {
   const c = new Cell();
   const back = LEG_SETS[6].strips;
   const torso = sideways(person.torsos[6].rows);
@@ -133,16 +151,19 @@ function corpseFrame(person: Person, lift: number, gun: boolean): PixelSprite {
   drawLying(c, person, { torso, nearLeg: leg, farLeg: leg }, lift, 0);
   c.grid(shoulderX, top + Math.floor((torso.length - head.length) / 2), head, person.legend);
   drawArmBetween(c, [shoulderX - 3, top + torso.length - 2], [shoulderX - 10, top + torso.length], person.sleeve, person.cuff, person.hand);
-  if (gun) c.grid(31, 31, DROPPED_PISTOL, GUN_LEGEND);
+  if (gun) dropGun(c, gun);
   return c.toSprite();
 }
 
-export function deadClip(person: Person): Clip {
+/** The frame of deadClip where the body first lies down, head to the right as the crawl does. */
+export const FIRST_LYING_FRAME = 3;
+
+export function deadClip(person: Person, weapon: WeaponId = 'pistol'): Clip {
   return makeClip([
     standingFrame(person, 0, 'stand', -1, 0, 3),
     standingFrame(person, 2, 'stand', 1, 0, 1),
     standingFrame(person, 4, 'stand', 1, 1, 0),
-    corpseFrame(person, 3, false),
-    corpseFrame(person, 0, true),
+    corpseFrame(person, 3, null),
+    corpseFrame(person, 0, weapon),
   ], 7, false);
 }

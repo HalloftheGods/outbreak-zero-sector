@@ -1,3 +1,4 @@
+import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, levelDef } from '../../shared/levels.ts';
 import { townRule } from '../../shared/town-rules.ts';
 import type { HudState, LevelCard } from './hud-state.ts';
@@ -9,12 +10,16 @@ function hordesSurvived(hud: Pick<HudState, 'phase' | 'wave'>): number {
 
 /** Which level this is, for the HUD. */
 export function levelLine(level: number): string {
+  const home = level === BUNKER_LEVEL;
+  if (home) return 'Home';
   const { number, title } = levelDef(level);
   return `Level ${number}: ${title}`;
 }
 
 /** What stands between the players and the next town. */
 export function levelGoal(hud: Pick<HudState, 'level' | 'phase' | 'wave' | 'exitOpen'>): string {
+  const home = hud.level === BUNKER_LEVEL;
+  if (home) return 'Gear up, then take the van';
   if (hud.exitOpen) return 'Get to the van';
   return `${hordesSurvived(hud)} of ${levelDef(hud.level).hordes} hordes survived`;
 }

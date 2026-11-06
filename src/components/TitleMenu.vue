@@ -1,7 +1,7 @@
 <template>
   <nav ref="menu" class="px-menu" aria-label="Main menu">
     <button
-      v-for="(item, index) in TITLE_MENU"
+      v-for="(item, index) in entries"
       :key="item.page"
       ref="items"
       class="px-menu-item"
@@ -21,14 +21,16 @@
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { loadSoundUnlock } from '../game/sound-unlock.ts';
 import { isConfirmKey, menuLabel, menuOwnsKey, menuStep, steppedIndex, TITLE_MENU } from '../game/title-menu.ts';
+import type { TitleMenuItem } from '../game/title-menu.ts';
 import type { TitlePage } from '../game/title-menu.ts';
 import { useGame } from './use-game.ts';
 
+const { entries = TITLE_MENU } = defineProps<{ entries?: readonly TitleMenuItem[] }>();
 const selected = defineModel<number>({ required: true });
 const emit = defineEmits<{ open: [page: TitlePage] }>();
 const game = useGame();
 const unlock = loadSoundUnlock();
-const items = useTemplateRef<HTMLButtonElement[]>('items');
+const buttons = useTemplateRef<HTMLButtonElement[]>('items');
 const menu = useTemplateRef<HTMLElement>('menu');
 const CONTROLS = 'button, a[href], input, select, textarea, summary, [role="button"]';
 
@@ -46,12 +48,12 @@ function select(index: number): void {
  */
 function moveTo(index: number): void {
   select(index);
-  items.value?.[index]?.focus({ preventScroll: true });
+  buttons.value?.[index]?.focus({ preventScroll: true });
 }
 
 function open(index: number): void {
   game.playUi('click');
-  emit('open', TITLE_MENU[index].page);
+  emit('open', entries[index].page);
 }
 
 /**
@@ -69,7 +71,7 @@ function onKey(event: KeyboardEvent): void {
   const confirming = !browserShortcut && isConfirmKey(event.code);
   // The marker decides, so a focused button must not answer Enter as well.
   if (step !== 0 || confirming) event.preventDefault();
-  if (step !== 0) moveTo(steppedIndex(selected.value, step));
+  if (step !== 0) moveTo(steppedIndex(selected.value, step, entries.length));
   const opening = confirming && !event.repeat;
   if (opening) open(selected.value);
 }

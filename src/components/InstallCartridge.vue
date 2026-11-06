@@ -1,11 +1,6 @@
 <template>
-  <button v-if="offered" class="cartridge" type="button" @click="installController.press()">
+  <button v-if="offered" class="cartridge" type="button" aria-label="Install Game" title="Install Game" @click="installController.press()">
     <img class="cartridge-body" :src="CARTRIDGE_SRC" alt="" draggable="false" />
-    <span class="cartridge-label mag-color-tomato">
-      <span class="cartridge-tape" aria-hidden="true" />
-      <span class="cartridge-band">Install</span>
-      <span class="cartridge-name">Game</span>
-    </span>
   </button>
   <IosInstallCard v-if="installController.guideOpen.value" :kind="installController.guideKind.value" @close="installController.closeGuide()" />
 </template>
@@ -15,7 +10,6 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { cartridgeSrc } from '../art/cartridge.ts';
 import { installController, setTitleShowing } from '../game/pwa/index.ts';
 import IosInstallCard from './IosInstallCard.vue';
-import './paper-palette.css';
 
 const CARTRIDGE_SRC = cartridgeSrc();
 const offered = computed(() => installController.path.value !== 'none');
@@ -26,14 +20,15 @@ onBeforeUnmount(() => setTitleShowing(false));
 </script>
 
 <style scoped>
+/* --pixel is one pixel of the 48 by 56 cartridge picture, label included (src/art/cartridge-art.ts). */
 .cartridge {
-  --pixel: calc(var(--u) * 2.5);
+  --pixel: calc(var(--u) * 1.25);
   position: absolute;
   top: 0;
   bottom: 0;
   right: max(calc(var(--u) * 12), env(safe-area-inset-right));
-  width: calc(var(--pixel) * 24);
-  height: calc(var(--pixel) * 28);
+  width: calc(var(--pixel) * 48);
+  height: calc(var(--pixel) * 56);
   min-width: 44px;
   min-height: 44px;
   margin: auto 0;
@@ -51,7 +46,7 @@ onBeforeUnmount(() => setTitleShowing(false));
 }
 
 .cartridge:focus-visible {
-  outline: calc(var(--u) * 1) solid var(--note);
+  outline: calc(var(--u) * 1) solid var(--amber);
   outline-offset: calc(var(--u) * 2);
 }
 
@@ -62,64 +57,13 @@ onBeforeUnmount(() => setTitleShowing(false));
   image-rendering: pixelated;
 }
 
-/* The label is cut to the cartridge's recess: 4,8 and 16 by 11 of its 24 by 28 pixels. */
-.cartridge-label {
-  position: absolute;
-  left: 16.6667%;
-  top: 28.5714%;
-  width: 66.6667%;
-  height: 39.2857%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--paper);
-  color: var(--print);
-  transform: rotate(-2deg);
-  box-shadow: 0 0 0 calc(var(--u) * 0.5) var(--print-soft);
-}
-
-.cartridge-band {
-  flex: none;
-  padding: calc(var(--u) * 1) 0;
-  background: var(--band);
-  color: var(--on-band);
-  font-size: calc(var(--u) * 4);
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.cartridge-name {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  font-size: calc(var(--u) * 5.5);
-  font-weight: 700;
-  line-height: 1;
-  text-transform: uppercase;
-  border-bottom: calc(var(--u) * 1) solid var(--marker);
-}
-
-/* A scrap of tape holding the label down. */
-.cartridge-tape {
-  position: absolute;
-  z-index: 1;
-  top: calc(var(--u) * -1.5);
-  right: calc(var(--u) * -2);
-  width: calc(var(--u) * 7);
-  height: calc(var(--u) * 3);
-  background: rgba(255, 228, 92, 0.78);
-  transform: rotate(38deg);
-}
-
 /*
  * Portrait: small, centred above the credit line. It never sits in the flow, so the menu does not jump
  * when the install prompt arrives. A screen too short to hold it clear of the menu and the credit line goes without.
  */
 @media (orientation: portrait) {
   .cartridge {
-    --pixel: calc(var(--u) * 2);
+    --pixel: var(--u);
     top: auto;
     bottom: calc(var(--u) * 26);
     left: 0;
@@ -143,7 +87,7 @@ onBeforeUnmount(() => setTitleShowing(false));
 
 @media (orientation: landscape) and (max-height: 520px) {
   .cartridge {
-    --pixel: calc(var(--u) * 2);
+    --pixel: var(--u);
   }
 }
 

@@ -1,0 +1,56 @@
+// How a trip's end reaches the save: a receipt from the sim, or a trip that never came home.
+
+import type { Jewels, TripReceipt } from '../../../shared/home-protocol.ts';
+import { emptyLoadout, mergeHome } from '../../../shared/loadout.ts';
+import type { HomeSave, OpenTrip, TripRecord } from './home-store.ts';
+import { rollStock } from './shop.ts';
+
+const NO_JEWELS: Jewels = { small: 0, large: 0 };
+
+export const receiptKey = (receipt: TripReceipt): string => `${receipt.simId}:${receipt.serial}`;
+
+function recordOf({ level, outcome, difficulty, silver, jewels, replay }: TripReceipt): TripRecord {
+  return { level, outcome, difficulty, silver, jewels, replay, at: Date.now() };
+}
+
+/** Gear taken out went with the trip. What survived it comes back on a receipt, into the locker. */
+function closed(save: HomeSave, record: TripRecord): HomeSave {
+  return { ...save, hands: emptyLoadout(), openTrip: null, ledger: [...save.ledger, record] };
+}
+
+function banked(save: HomeSave, receipt: TripReceipt): HomeSave {
+  const { silver, jewels, gear } = receipt;
+  return rollStock({
+    ...save,
+    silver: save.silver + silver,
+    rawJewels: { small: save.rawJewels.small + jewels.small, large: save.rawJewels.large + jewels.large },
+    locker: gear ? mergeHome(save.locker, gear) : save.locker,
+  });
+}
+
+/**
+ * Applies a trip's result, once. The key goes in the same save as the credit, so a refresh either finds
+ * both or neither. A died receipt's amounts are what was lost: the ledger keeps them and nothing is credited.
+ */
+export function applyReceipt(save: HomeSave, receipt: TripReceipt): HomeSave {
+  const key = receiptKey(receipt);
+  const alreadyApplied = save.appliedReceipts.includes(key);
+  if (alreadyApplied) return save;
+  const credited = receipt.outcome === 'banked' ? banked(save, receipt) : save;
+  return { ...closed(credited, recordOf(receipt)), appliedReceipts: [...save.appliedReceipts, key] };
+}
+
+function neverCameHome(trip: OpenTrip): TripRecord {
+  return { level: trip.level, outcome: 'died', difficulty: trip.difficulty, silver: 0, jewels: NO_JEWELS, replay: false, at: Date.now() };
+}
+
+/**
+ * Settles a trip found open on load. Solo has no body to go back to, so it is a death.
+ * In co-op `resumed` is the server's answer: true keeps the trip, false is a death, null is not yet known.
+ */
+export function resolveOpenTrip(save: HomeSave, resumed: boolean | null): HomeSave {
+  const trip = save.openTrip;
+  if (!trip) return save;
+  const mayStillBeOut = trip.mode === 'coop' && resumed !== false;
+  return mayStillBeOut ? save : closed(save, neverCameHome(trip));
+}

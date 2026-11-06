@@ -3,7 +3,9 @@ import { rollFind } from './container-loot.ts';
 import { containerInReach, SEARCH_SEC, townContainers } from './containers.ts';
 import type { ContainerLoot } from './containers.ts';
 import { TICK_DT } from './constants.ts';
+import { isBunkerMap } from './home-protocol.ts';
 import { spawnPickup } from './pickups.ts';
+import { isTreasurePickup } from './treasure.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 import { makeNoise } from './zombie-senses.ts';
@@ -28,24 +30,35 @@ function startSearch(sim: SimState, p: PlayerState): void {
   p.searchLeft = SEARCH_SEC[target.kind];
 }
 
-/** What was put away here or, rolled now so every client agrees, what a lucky searcher turns up anyway. */
-function findIn(sim: SimState, p: PlayerState, id: number): ContainerLoot | null {
+interface Finds {
+  /** Treasure put away here. It takes the place of nothing: a search of it still rolls for luck and for a bottle. */
+  readonly treasure: ContainerLoot | null;
+  /** What was put away here or, rolled now so every client agrees, what a lucky searcher turns up anyway. */
+  readonly ordinary: ContainerLoot | null;
+}
+
+function findIn(sim: SimState, p: PlayerState, id: number): Finds {
   const { loot } = sim.containers[id];
-  const lucky = loot === null && sim.rng() < characterOf(p.skin).searchLuck;
-  return lucky ? rollFind(sim, townContainers(sim.map)[id].buildingKind) : loot;
+  const treasure = loot !== null && isTreasurePickup(loot.type) ? loot : null;
+  const stored = treasure ? null : loot;
+  const lucky = stored === null && sim.rng() < characterOf(p.skin).searchLuck;
+  const ordinary = lucky ? rollFind(sim, townContainers(sim.map)[id].buildingKind) : stored;
+  return { treasure, ordinary };
 }
 
 /** Whatever was in it falls at the searcher's feet, for them or for whoever has room for it. */
 function finishSearch(sim: SimState, p: PlayerState, id: number): void {
   const state = sim.containers[id];
-  const loot = findIn(sim, p, id);
+  const { treasure, ordinary } = findIn(sim, p, id);
   state.opened = true;
   state.loot = null;
-  const noisy = sim.rng() < CLATTER_CHANCE;
-  const found = loot !== null;
-  if (noisy) makeNoise(sim, p.x, p.y, CLATTER_RADIUS);
-  if (found) spawnPickup(sim, loot.type, p.x, p.y, loot.rounds);
-  const bottle = !found && scroungeBottle(sim, p);
+  const { clatterChance, noise } = characterOf(p.skin);
+  const noisy = sim.rng() < CLATTER_CHANCE * clatterChance;
+  const found = ordinary !== null || treasure !== null;
+  if (noisy) makeNoise(sim, p.x, p.y, CLATTER_RADIUS * noise);
+  if (treasure) spawnPickup(sim, treasure.type, p.x, p.y, treasure.rounds);
+  if (ordinary) spawnPickup(sim, ordinary.type, p.x, p.y, ordinary.rounds);
+  const bottle = ordinary === null && scroungeBottle(sim, p);
   maybeCarAlarm(sim, townContainers(sim.map)[id]);
   emit(sim, { type: 'container_opened', playerId: p.id, container: id, x: p.x, y: p.y, found, noisy, ...(bottle ? { bottle } : {}) });
   stopSearch(p);
@@ -73,6 +86,8 @@ function advanceSearch(sim: SimState, p: PlayerState, id: number): void {
 export function updateSearch(sim: SimState, p: PlayerState): void {
   const released = !p.searchHeld;
   if (released) p.searchSpent = false;
+  // The bunker has no containers, and `sim.containers` still holds the last town's.
+  if (isBunkerMap(sim.map)) return;
   const hurt = p.health < p.searchHealth;
   p.searchHealth = p.health;
   if (p.searchingId !== null) keepSearching(sim, p, p.searchingId, hurt);

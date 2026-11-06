@@ -10,7 +10,7 @@ import { darker, INK, INK_SOFT, lighter, RAMPS } from '../src/art/palette.ts';
 import type { Color } from '../src/art/palette.ts';
 import { buildSurvivors, MUZZLE_OFFSETS } from '../src/art/survivors.ts';
 import { CELL_H, CELL_W, Cell } from '../src/art/survivors/cell.ts';
-import { KHRONUS8 } from '../src/art/survivors/khronus8.ts';
+import { BANDUS } from '../src/art/survivors/bandus.ts';
 import { LEG_SETS } from '../src/art/survivors/legs.ts';
 import { NIGHT } from '../src/art/survivors/night.ts';
 import { REX } from '../src/art/survivors/rex.ts';
@@ -21,7 +21,7 @@ import { SOL } from '../src/art/survivors/sol.ts';
 import type { PixelSprite } from '../src/art/types.ts';
 
 const CAST: readonly (readonly [string, Person])[] = [
-  ['night', NIGHT], ['khronus8', KHRONUS8], ['satori', SATORI], ['rex', REX], ['sol', SOL],
+  ['night', NIGHT], ['bandus', BANDUS], ['satori', SATORI], ['rex', REX], ['sol', SOL],
 ];
 const INKS = new Set<Color>(RAMPS.ink);
 const LEG_LETTERS = 'rqpRQPgfe';
@@ -136,15 +136,15 @@ describe('far legs', () => {
   });
 
   it('shades the right-hand leg facing the camera and from behind, as the light falls', () => {
-    // Khronus8 has no leg trim, so the strips hang from the hip line unmoved.
-    const far = farLegsLegend(KHRONUS8);
+    // Bandus has no leg trim, so the strips hang from the hip line unmoved.
+    const far = farLegsLegend(BANDUS);
     for (const dir of [2, 6] as const) {
-      const sprite = drawPose(KHRONUS8, 'pistol', dir, {});
+      const sprite = drawPose(BANDUS, 'pistol', dir, {});
       const right = Math.max(LEG_SETS[dir].nearX, LEG_SETS[dir].farX);
       const left = Math.min(LEG_SETS[dir].nearX, LEG_SETS[dir].farX);
       // Row 4 of a standing front or back strip is 'RQQP': x + 1 is a Q.
       expect(colorAt(sprite, right + 1, 30), `dir ${dir} right`).toBe(far.Q);
-      expect(colorAt(sprite, left + 1, 30), `dir ${dir} left`).toBe(KHRONUS8.legend.Q);
+      expect(colorAt(sprite, left + 1, 30), `dir ${dir} left`).toBe(BANDUS.legend.Q);
     }
   });
 });
@@ -257,7 +257,7 @@ describe('outline ink in survivor legends', () => {
    */
   const KNOWN_INK_FILLS: Readonly<Record<string, { readonly legend: string; readonly far: string }>> = {
     night: { legend: 'N', far: 'N' },
-    khronus8: { legend: '', far: '' },
+    bandus: { legend: '', far: '' },
     satori: { legend: '', far: '' },
     rex: { legend: '', far: '' },
     sol: { legend: '', far: '' },

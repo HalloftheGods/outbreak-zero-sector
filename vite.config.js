@@ -1,4 +1,5 @@
 import vue from '@vitejs/plugin-vue';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -11,9 +12,12 @@ const __dirname = path.dirname(__filename);
 const clientPort = Number(process.env.ZOMBIE_CLIENT_PORT) || 8096;
 const serverPort = Number(process.env.ZOMBIE_PORT) || 8097;
 
+const { version } = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
+
 export default defineConfig({
   base: './',
   define: {
+    __APP_VERSION__: JSON.stringify(version),
     __ZOMBIE_SERVER_PORT__: JSON.stringify(serverPort),
   },
   plugins: [

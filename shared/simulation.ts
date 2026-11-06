@@ -21,6 +21,7 @@ import { openGroundNear } from './sim-state.ts';
 import { buildSnapshot, playerSnapshot } from './snapshot-build.ts';
 import { updatePopulation } from './town-population.ts';
 import { enterHome, homeCommand } from './trip.ts';
+import { arriveInRoom, leaveRoom, updateLeftBodies } from './trip-roster.ts';
 import { updateWaves } from './waves.ts';
 import { updateZombieStatuses } from './zombie-burn.ts';
 import { benchCommand, updateBench } from './workbench.ts';
@@ -84,7 +85,7 @@ export class GameSimulation {
   /** A newcomer, armed for how far the run has got. People gathering in the lead-in all start equal. */
   private newcomer(arrival: Arrival, home?: JoinHome): PlayerState {
     const player = createPlayer(arrival, this.entryPoint());
-    const runUnderway = this.sim.wave > 0 || this.sim.level > FIRST_LEVEL;
+    const runUnderway = !this.sim.homeRun && (this.sim.wave > 0 || this.sim.level > FIRST_LEVEL);
     if (runUnderway) giveReturnKit(player);
     enterHome(this.sim, player, home);
     return player;
@@ -98,9 +99,13 @@ export class GameSimulation {
     const taken = new Set(this.sim.players.map((p) => p.skin));
     const arrival: Arrival = { id, name, token, skin: freeCharacter(taken, character) };
     const live = reclaimLive(this.sim, arrival);
-    if (live) return playerSnapshot(live);
+    if (live) {
+      arriveInRoom(this.sim, live);
+      return playerSnapshot(live);
+    }
     const player = reclaimDeparted(this.sim, arrival) ?? this.newcomer(arrival, home);
     this.sim.players.push(player);
+    arriveInRoom(this.sim, player);
     return playerSnapshot(player);
   }
 
@@ -119,6 +124,7 @@ export class GameSimulation {
     const leaving = sim.players.find((p) => p.id === id);
     if (leaving) rememberDeparted(sim, leaving);
     sim.players = sim.players.filter((p) => p.id !== id);
+    if (leaving) leaveRoom(sim, leaving);
 
     const wasRunning = sim.phase !== 'gameover';
     checkGameOver(sim);
@@ -163,6 +169,7 @@ export class GameSimulation {
     removeDeadZombies(sim);
     updatePickups(sim);
     updateDownedPlayers(sim);
+    updateLeftBodies(sim);
     // Before the waves: a horde starting on this tick must not hand the fallen their return.
     checkGameOver(sim);
     if (sim.phase === 'gameover') return;

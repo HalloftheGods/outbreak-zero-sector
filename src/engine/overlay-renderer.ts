@@ -7,6 +7,7 @@ import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT } from './bitmap-font.ts';
 import type { SceneView } from './scene.ts';
+import { stationPrompt } from './station-labels.ts';
 import { bodyHeight, drawSprite } from './sprite-cache.ts';
 import { drawFingertipBox, drawStick } from './touch-overlay.ts';
 import type { VisualStore } from './visuals.ts';
@@ -174,14 +175,17 @@ export class OverlayRenderer {
     }
   }
 
-  /** A bar over anyone searching, and for the local player the key to hold. */
+  /** A bar over anyone searching, and for the local player the key to hold: for a container, or a bunker station. */
   private drawSearch(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number): void {
     for (const player of scene.players) {
       const x = Math.round(player.x) - left;
       const y = Math.round(player.y) - top - this.heightOf(player.id) - SEARCH_TAG_HEIGHT;
-      const prompted = player.id === scene.localId && scene.searchable !== null;
+      const isLocal = player.id === scene.localId;
+      const prompted = isLocal && scene.searchable !== null;
+      const atStation = isLocal && scene.station !== undefined;
       if (player.search > 0) drawBar(ctx, x - SEARCH_BAR_WIDTH / 2, y, SEARCH_BAR_WIDTH, player.search, BONE);
       else if (prompted) drawOutlinedText(ctx, `${scene.touch ? 'SEARCH' : 'HOLD E'}: ${CONTAINER_LABEL[scene.searchable.kind]}`, x, y, AMBER);
+      else if (atStation) drawOutlinedText(ctx, stationPrompt(scene.station, Boolean(scene.touch)), x, y, AMBER);
     }
   }
 

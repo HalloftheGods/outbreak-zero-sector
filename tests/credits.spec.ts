@@ -7,8 +7,9 @@ describe('the end credits', () => {
   it('name the game, the studio, the composer and the whole cast', () => {
     expect(texts).toContain('Undead of Night: Last Round');
     expect(texts).toContain('Hall of the Gods, Inc.');
-    expect(texts).toContain('ExoticService');
-    expect(CAST).toEqual(['Night', 'Khronus8', 'Satori', 'Rex', 'Sol']);
+    expect(texts).not.toContain('ExoticService');
+    expect(texts).toContain('Majora D.');
+    expect(CAST).toEqual(['Night', 'Bandus', 'Queen', 'Rex', 'Sol']);
     for (const name of CAST) expect(texts).toContain(name);
   });
 

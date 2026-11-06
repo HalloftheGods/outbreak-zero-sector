@@ -18,7 +18,7 @@ export const BUNKER_LEVEL = 0;
 export const MERCHANT_IDS = ['gunsmith', 'quartermaster', 'medic', 'powder'] as const;
 export type MerchantId = (typeof MERCHANT_IDS)[number];
 
-export const STATION_IDS = ['bench', 'forge', 'locker', 'level_map', ...MERCHANT_IDS] as const;
+export const STATION_IDS = ['bench', 'forge', 'locker', 'level_map', 'jukebox', ...MERCHANT_IDS] as const;
 export type StationId = (typeof STATION_IDS)[number];
 
 export interface Station {
@@ -48,12 +48,15 @@ export interface Loadout {
 export interface JoinHome {
   loadout: Loadout;
   highest: number;
+  /** Has seen the ending, so clearing the last level is a normal trip. Left off for no. */
+  finished?: boolean;
 }
 
 export type HomeAction =
   | { kind: 'pick_level'; level: number }
   | { kind: 'equip'; loadout: Loadout }
-  | { kind: 'ready'; ready: boolean }
+  /** `ownsGun`: the locker holds a gun, so boarding empty-handed is a choice and no free pistol is issued. Left off for no. */
+  | { kind: 'ready'; ready: boolean; ownsGun?: boolean }
   | { kind: 'leave_station' }
   | { kind: 'highest'; highest: number };
 

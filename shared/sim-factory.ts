@@ -3,6 +3,7 @@ import { BASELINE_DIFFICULTY } from './difficulty.ts';
 import type { DifficultyId } from './difficulty.ts';
 import { FlowField } from './flow-field.ts';
 import { BUNKER_LEVEL, BUNKER_SEED } from './home-protocol.ts';
+import { parkBunkerVan } from './level-exit.ts';
 import { FINAL_LEVEL, FIRST_LEVEL, levelPopulation, levelSeed } from './levels.ts';
 import { placeTownLoot } from './loot.ts';
 import { createRng } from './rng.ts';
@@ -80,7 +81,10 @@ export function createSimState(options: SimulationOptions): SimState {
     bench: null,
     homeRun: home ? newHomeRun(options.seed) : null,
   };
-  if (home) return sim;
+  if (home) {
+    parkBunkerVan(sim);
+    return sim;
+  }
   placeTownLoot(sim);
   seedPopulation(sim);
   placeTownTreasure(sim);

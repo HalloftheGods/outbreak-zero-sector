@@ -65,7 +65,8 @@ onBeforeUnmount(() => {
 .town-canvas {
   flex: none;
   width: var(--side);
-  height: var(--side);
+  /* The canvas keeps its own shape: the town is square, the bunker is wider than tall. */
+  height: auto;
   image-rendering: pixelated;
 }
 

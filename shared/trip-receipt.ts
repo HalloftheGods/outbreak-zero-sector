@@ -1,0 +1,48 @@
+// How a trip ended for one player, written as state on their body so a slow client cannot lose it.
+
+import { TICK_DT } from './constants.ts';
+import type { TripReceipt } from './home-protocol.ts';
+import { FINAL_LEVEL } from './levels.ts';
+import { loadoutOf } from './loadout.ts';
+import type { HomeRun, PlayerHome, PlayerState, SimState } from './sim-state.ts';
+import { round2 } from './snapshot-build.ts';
+import { hordesSurvivedHere } from './waves.ts';
+
+/** What `dropCarried` left on them goes with the town: downed at the van, or a body nobody came back for. */
+function forfeitCarried(home: PlayerHome): void {
+  home.lost.silver += home.silver;
+  home.lost.jewels.small += home.jewels.small;
+  home.lost.jewels.large += home.jewels.large;
+  home.silver = 0;
+  home.jewels = { small: 0, large: 0 };
+}
+
+function tripFacts(sim: SimState, run: HomeRun, p: PlayerState, level: number): Omit<TripReceipt, 'outcome' | 'silver' | 'jewels' | 'ending' | 'gear'> {
+  const serial = run.nextReceipt;
+  run.nextReceipt += 1;
+  return {
+    simId: run.simId,
+    serial,
+    level,
+    difficulty: sim.difficulty,
+    replay: run.tripReplay,
+    score: p.score,
+    kills: p.kills,
+    hordes: sim.hordesBehind + hordesSurvivedHere(sim),
+    seconds: round2((sim.tick - sim.runStartTick) * TICK_DT),
+  };
+}
+
+/** Everything on them comes home, and reaching the van unlocks the next level. */
+export function bankTrip(sim: SimState, run: HomeRun, p: PlayerState, home: PlayerHome, level: number): void {
+  const ending = level === FINAL_LEVEL && !home.finished;
+  home.receipt = { ...tripFacts(sim, run, p, level), outcome: 'banked', silver: home.silver, jewels: { ...home.jewels }, ending, gear: loadoutOf(p) };
+  home.highest = Math.max(home.highest, Math.min(FINAL_LEVEL, level + 1));
+  home.finished ||= ending;
+}
+
+/** Nothing comes home. The silver and jewels here are what was lost, and are never credited. */
+export function loseTrip(sim: SimState, run: HomeRun, p: PlayerState, home: PlayerHome, level: number): void {
+  forfeitCarried(home);
+  home.receipt = { ...tripFacts(sim, run, p, level), outcome: 'died', silver: home.lost.silver, jewels: { ...home.lost.jewels }, ending: false, gear: null };
+}

@@ -1,0 +1,61 @@
+// A save read back from storage is untrusted: each field is checked, and a bad one falls back alone.
+
+import { isDifficultyId } from '../../../shared/difficulty.ts';
+import { MERCHANT_IDS } from '../../../shared/home-protocol.ts';
+import { isJewels, isLoadout } from '../../network/home-guards.ts';
+import type { HomeSave, OpenTrip, TripRecord } from './home-store.ts';
+import type { ShopState } from './shop.ts';
+
+type Fields = Record<string, unknown>;
+
+const isFields = (v: unknown): v is Fields => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const wholeCount = (v: unknown): number => (isNumber(v) && v > 0 ? Math.floor(v) : 0);
+
+function isOpenTrip(v: unknown): v is OpenTrip {
+  return isFields(v)
+    && isNumber(v.level)
+    && isNumber(v.startedAt)
+    && (v.mode === 'solo' || v.mode === 'coop')
+    && isDifficultyId(v.difficulty);
+}
+
+function isTripRecord(v: unknown): v is TripRecord {
+  return isFields(v)
+    && isNumber(v.level)
+    && isNumber(v.silver)
+    && isNumber(v.at)
+    && (v.outcome === 'banked' || v.outcome === 'died')
+    && isDifficultyId(v.difficulty)
+    && isJewels(v.jewels)
+    && typeof v.replay === 'boolean';
+}
+
+const isStock = (v: unknown): boolean => isFields(v) && isFields(v.items) && Object.values(v.items).every(isNumber);
+
+function isShopState(v: unknown): v is ShopState {
+  return isFields(v)
+    && isNumber(v.seed)
+    && isNumber(v.rolls)
+    && isFields(v.merchants)
+    && MERCHANT_IDS.every((id) => isStock((v.merchants as Fields)[id]));
+}
+
+const listOf = <T>(value: unknown, keep: (item: unknown) => item is T): T[] => (Array.isArray(value) ? value.filter(keep) : []);
+const isString = (v: unknown): v is string => typeof v === 'string';
+
+/** Null when this is no save at all. `blank` fills any field that does not read, so one bad field costs only itself. */
+export function reviveSave(value: unknown, blank: HomeSave): HomeSave | null {
+  if (!isFields(value)) return null;
+  return {
+    version: wholeCount(value.version),
+    silver: wholeCount(value.silver),
+    rawJewels: isJewels(value.rawJewels) ? value.rawJewels : blank.rawJewels,
+    locker: isLoadout(value.locker) ? value.locker : blank.locker,
+    hands: isLoadout(value.hands) ? value.hands : blank.hands,
+    openTrip: isOpenTrip(value.openTrip) ? value.openTrip : null,
+    appliedReceipts: listOf(value.appliedReceipts, isString),
+    ledger: listOf(value.ledger, isTripRecord),
+    shop: isShopState(value.shop) ? value.shop : blank.shop,
+  };
+}

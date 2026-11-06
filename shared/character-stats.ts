@@ -13,12 +13,12 @@ export const STATS: readonly { readonly key: StatKey; readonly label: string }[]
   { key: 'reload', label: 'Reload' },
   { key: 'speed', label: 'Speed' },
   { key: 'strength', label: 'Strength' },
-  { key: 'search', label: 'Search' },
+  { key: 'search', label: 'Loot' },
 ];
 
-/** How much better than normal each stat is: 1 is normal, higher is better. Search weighs a kill's drop odds by the extra chance of a find in a bare container. */
+/** How much better than normal each stat is: 1 is normal, higher is better. Stealth is how little of the zombies' senses a survivor gives away: spotted from sightRange as far and heard from noise as far, so the two shrink the reach together. Search weighs a kill's drop odds by the extra chance of a find in a bare container. */
 const BENEFIT: Record<StatKey, (character: Character) => number> = {
-  stealth: (c) => 1 / c.sightRange,
+  stealth: (c) => 1 / (c.sightRange * c.noise),
   reload: (c) => 1 / c.reloadTime,
   speed: (c) => c.moveSpeed,
   strength: (c) => c.shoveForce,

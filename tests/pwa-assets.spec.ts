@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CARTRIDGE_HEIGHT, CARTRIDGE_LABEL, CARTRIDGE_PICTURE, CARTRIDGE_WIDTH, GUIDE_PICTURES, cartridgeSrc, guideIconSrc, pictureSvg } from '../src/art/cartridge.ts';
+import { ALL_COLORS, toHex } from '../src/art/palette.ts';
 import { guideFor } from '../src/game/pwa/ios-guide.ts';
 import { buildIdOf, isShellFile, musicVersionsOf, stampWorker } from '../tools/vite-pwa.ts';
 
@@ -92,11 +93,14 @@ describe('worker stamping', () => {
 });
 
 describe('cartridge art', () => {
-  it('is a 24 by 28 picture drawn only in its own palette', () => {
+  it('is a 48 by 56 picture drawn only in the master palette', () => {
     const svg = pictureSvg(CARTRIDGE_PICTURE);
+    expect([CARTRIDGE_WIDTH, CARTRIDGE_HEIGHT]).toEqual([48, 56]);
     expect(svg).toContain(`viewBox="0 0 ${CARTRIDGE_WIDTH} ${CARTRIDGE_HEIGHT}"`);
     const palette = Object.values(CARTRIDGE_PICTURE.colors);
     for (const [, fill] of svg.matchAll(/fill="([^"]+)"/g)) expect(palette).toContain(fill);
+    const master = ALL_COLORS.map(toHex);
+    for (const color of palette) expect(master).toContain(color);
     expect(cartridgeSrc().startsWith('data:image/svg+xml,')).toBe(true);
   });
 

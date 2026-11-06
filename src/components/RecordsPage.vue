@@ -12,7 +12,7 @@
       <ol v-if="rows.length > 0" class="px-rows">
         <li v-for="row in rows" :key="row.key" class="px-row">
           <span class="records-rank">{{ row.rank }}</span>
-          <span class="records-name">{{ row.name }}</span>
+          <span class="records-name">{{ row.name }}<span v-if="row.classic" class="records-classic"> classic</span></span>
           <span class="records-score">{{ row.score }}</span>
         </li>
       </ol>
@@ -30,8 +30,8 @@ import TitlePage from './TitlePage.vue';
 const { ui } = defineProps<{ ui: UiState }>();
 const emit = defineEmits<{ close: [] }>();
 
-const stats = computed(() => recordStats(ui.best));
-const rows = computed(() => recordRows(ui.leaderboard));
+const stats = computed(() => recordStats(ui.best, ui.homeLoop));
+const rows = computed(() => recordRows(ui.leaderboard, ui.homeLoop));
 </script>
 
 <style scoped>
@@ -65,6 +65,10 @@ const rows = computed(() => recordRows(ui.leaderboard));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.records-classic {
+  color: var(--bone-dim);
 }
 
 .records-score {

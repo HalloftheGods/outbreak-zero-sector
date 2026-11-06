@@ -1,5 +1,5 @@
-/** The Play page's two steps: how you play (mode, server, difficulty, callsign), then who you are (the survivor, where Start lives). The component only shows the step it is told; every move is decided here. */
-export type PlayStep = 'how' | 'who';
+/** The Play page's three steps: how you play (mode, server, callsign), then the difficulty, then who you are (the survivor, where Start lives). The component only shows the step it is told; every move is decided here. */
+export type PlayStep = 'mode' | 'difficulty' | 'who';
 export type PlayMode = 'solo' | 'multi';
 
 export interface PlayFlow {
@@ -7,27 +7,33 @@ export interface PlayFlow {
   readonly mode: PlayMode;
 }
 
-export const PLAY_START: PlayFlow = { step: 'how', mode: 'solo' };
+/** The steps in the order Next walks them. */
+const STEPS: readonly PlayStep[] = ['mode', 'difficulty', 'who'];
+const HEADINGS: Record<PlayStep, string> = { mode: 'Play', difficulty: 'Difficulty', who: 'Choose Survivor' };
+
+export const PLAY_START: PlayFlow = { step: 'mode', mode: 'solo' };
 
 /** An invite link lands on the co-op setup step; the callsign is on that step, so nothing is skipped. */
-export const PLAY_JOIN: PlayFlow = { step: 'how', mode: 'multi' };
+export const PLAY_JOIN: PlayFlow = { step: 'mode', mode: 'multi' };
 
 export function chooseMode(flow: PlayFlow, mode: PlayMode): PlayFlow {
   return { ...flow, mode };
 }
 
-/** Enter, or the Next link: step 1 walks to step 2, and step 2 stays put (starting is the button's job). */
+/** Enter, or the Next link: one step on, and the last step stays put (starting is the button's job). */
 export function advance(flow: PlayFlow): PlayFlow {
-  return flow.step === 'how' ? { ...flow, step: 'who' } : flow;
+  const next = STEPS[STEPS.indexOf(flow.step) + 1];
+  return next ? { ...flow, step: next } : flow;
 }
 
-/** Back or Esc: step 2 returns to step 1, and step 1 returns null, meaning leave Play for the title. */
+/** Back or Esc: one step back, and the first step returns null, meaning leave Play for the title. */
 export function retreat(flow: PlayFlow): PlayFlow | null {
-  return flow.step === 'who' ? { ...flow, step: 'how' } : null;
+  const earlier = STEPS[STEPS.indexOf(flow.step) - 1];
+  return earlier ? { ...flow, step: earlier } : null;
 }
 
 export function showsServer(flow: PlayFlow): boolean {
-  return flow.mode === 'multi' && flow.step === 'how';
+  return flow.mode === 'multi' && flow.step === 'mode';
 }
 
 /** The Start button belongs to the survivor step, the last one. */
@@ -36,5 +42,5 @@ export function startsRun(flow: PlayFlow): boolean {
 }
 
 export function playHeading(flow: PlayFlow): string {
-  return flow.step === 'who' ? 'Choose Survivor' : 'Play';
+  return HEADINGS[flow.step];
 }

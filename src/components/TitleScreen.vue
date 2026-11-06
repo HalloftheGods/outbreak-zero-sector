@@ -3,7 +3,7 @@
     <SpriteImg v-if="ui.art" class="title-logo" :sprite="ui.art.ui.logo" />
     <h1 v-else class="px-heading">UNDEAD OF NIGHT: LAST ROUND</h1>
 
-    <TitleMenu v-model="selected" @open="page = $event" />
+    <TitleMenu v-model="selected" :entries="menu" @open="page = $event" />
     <InstallCartridge />
 
     <footer class="title-foot">
@@ -17,7 +17,7 @@
   </section>
 
   <PlaySetup v-else-if="page === 'play'" :ui :join="invited" :level="startLevel" @close="closePlay" />
-  <LevelsPage v-else-if="page === 'levels'" @start="startFromLevel" @close="close" />
+  <LevelsPage v-else-if="page === 'levels'" :art="ui.art" @start="startFromLevel" @close="close" />
   <HowToPlay v-else-if="page === 'howto'" @close="close" />
   <RecordsPage v-else-if="page === 'records'" :ui @close="close" />
   <SoundTestPage v-else-if="page === 'sound'" @close="close" />
@@ -25,11 +25,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { openPrivacy, privacyOpen } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { parseJoinParam, withoutJoinParam } from '../game/invite-link.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
+import { titleMenu } from '../game/title-menu.ts';
 import type { TitlePage } from '../game/title-menu.ts';
 import HowToPlay from './HowToPlay.vue';
 import InstallCartridge from './InstallCartridge.vue';
@@ -46,7 +47,8 @@ import { useGame } from './use-game.ts';
 declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
-defineProps<{ ui: UiState }>();
+const { ui } = defineProps<{ ui: UiState }>();
+const menu = computed(() => titleMenu(ui.homeLoop));
 
 const game = useGame();
 const page = ref<TitlePage | null>(null);

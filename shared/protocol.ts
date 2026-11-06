@@ -349,6 +349,7 @@ export const PROP_DEFS = {
   workbench: { w: 40, h: 12 },
   forge: { w: 40, h: 12 },
   level_map: { w: 24, h: 14 },
+  jukebox: { w: 20, h: 8 },
   gunsmith: { w: 12, h: 8 },
   quartermaster: { w: 12, h: 8 },
   medic: { w: 12, h: 8 },

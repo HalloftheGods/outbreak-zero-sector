@@ -1,10 +1,15 @@
-// Skin 0, Night: long dark hair that shimmers with blue galaxy colours, a violet hoodie
-// with a star on it, jeans and white sneakers.
+// Skin 0, Night: long starfield hair (a night sky with a violet nebula and stars), a
+// violet hoodie with a star on it, jeans and white sneakers. This is her default
+// costume, "Starfield"; the others are in costumes/night.ts.
 //
-// Hair: a dark denim mass 'n' with a lit sheen band 'o' arcing over the crown from the
-// upper left, 'X' strand highlights inside it, and at most two 'Y' over 'X' glints per
-// facing. 'N' (ink) is kept only where hair meets the face; the cell outline draws the
-// outer edge, so the hair has no ring of its own.
+// Hair: a navy mass 'n' with a lit sheen 'o'/'X' arcing over the crown from the upper
+// left. A violet nebula cloud ('w' rim, 'W' body, 'v' core, which is also the hoodie's
+// light) with a teal glow ('j', 'J') sits on the back of the head, and a small wisp of
+// it crosses the fringe and the fall beside the face, so the galaxy shows from every
+// side. Stars are 'Y' over 'X', or a 'Y' cross with 'y' arms on the back; none touches
+// the face. Every hair edge that lies on the hoodie stays navy, so violet hair never
+// merges into the violet hoodie. 'N' (ink) is kept only where hair meets the face; the
+// cell outline draws the outer edge, so the hair has no ring of its own.
 
 import { RAMPS } from '../palette.ts';
 import type { Person } from './rig.ts';
@@ -14,7 +19,8 @@ const { bone, denim, ink, skin, teal, violet } = RAMPS;
 const legend = {
   k: ink[0], K: ink[1],
   a: skin[0], b: skin[1], c: skin[2], d: skin[3],
-  N: ink[1], n: denim[0], o: denim[1], X: denim[2], y: teal[2], Y: bone[3],
+  N: ink[1], n: denim[0], o: denim[1], X: denim[2], y: denim[2], Y: bone[3],
+  w: violet[0], W: violet[1], j: teal[0], J: teal[1],
   t: violet[0], u: violet[1], v: violet[2], z: bone[3],
   r: denim[2], q: denim[1], p: denim[0], R: denim[2], Q: denim[1], P: denim[0],
   e: bone[0], f: bone[1], g: bone[2],
@@ -32,74 +38,80 @@ export const NIGHT: Person = {
   cuff: [violet[0], violet[1], violet[2]],
   hand: [skin[1], skin[2], skin[3]],
   heads: {
+    // Side: the nebula on the back of the head with a star under it, and a wisp of it
+    // over the brow where the crown's sheen ends.
     0: { dy: HAIR_FALL, rows: [
       '...nnnnnn..',
-      '..nnnooonn.',
-      '.nnoXooonnn',
+      '..nnnooovW.',
+      '.nnoXoooWWw',
       '.nooXonNNcd',
-      '.nnonnNcddc',
-      '.nYonnNckdc',
-      '.nXnnnNcccc',
-      '.nnonnNbcbc',
-      '.nnonnNccc.',
-      '.nnonn.bb..',
+      '.nnownNcddc',
+      '.nvWwnNckdc',
+      '.nWWjnNcccc',
+      '.nwjJnNbcbc',
+      '.nnnYnNccc.',
+      '.nnoXn.bb..',
       '..nonn.....',
       '...nn......',
     ] },
     1: { dy: HAIR_FALL, rows: [
       '....nnnnn...',
-      '..nnnooonnn.',
-      '.nnoXooonnnn',
+      '..nnnooovWn.',
+      '.nnoXoooWWwn',
       '.nooXonNNnnn',
       '.nnonNcddcNn',
-      '.nYoNckdckcn',
-      '.nXnNcccccbn',
-      '.nonNccbcbn.',
-      '.nonNNcccbn.',
-      '.nonn.bbb.n.',
+      '.nvWNckdckcn',
+      '.nWwNcccccbn',
+      '.nwjNccbcbn.',
+      '.nYnNNcccbn.',
+      '.nXnn.bbb.n.',
       '..nnn.......',
       '...n........',
     ] },
+    // Front: the wisp crosses the fringe and runs down the shaded fall on her left; a
+    // star sits on the lit fall below the cheek, clear of the face.
     2: { dy: HAIR_FALL, rows: [
       '....nnnnn...',
-      '..nnoXoonn..',
-      '.noooXonnnn.',
+      '..nnoXovWn..',
+      '.noooXonWwn.',
       '.ooNnnnnNnon',
-      '.noNcddcNnon',
-      '.nockdckcNon',
-      '.nncccccbNnn',
+      '.noNcddcNnWn',
+      '.nockdckcNWn',
+      '.nncccccbNwn',
       '.nncccbcbNnn',
-      '.noNcccbNnnn',
-      '.non.bb.nnn.',
+      '.nYNcccbNnnn',
+      '.nXn.bb.nnn.',
       '..nn....nn..',
       '..n......n..',
     ] },
+    // Back: the showpiece. The nebula's lit core faces the upper left and its teal glow
+    // trails down to the right; a cross star and two-pixel stars sit round it.
     6: { dy: HAIR_FALL, rows: [
       '....nnnnn...',
-      '..nnnoooon..',
-      '.nnooXooonn.',
-      '.ooXoXonnnnn',
-      '.ooXonnnnonn',
-      '.nonnnonnonn',
-      '.nonYnonnonn',
-      '.nonXnonnnnn',
-      '.nnnnnonYnn.',
-      '.nnonnnnXnn.',
-      '..nonnnnnn..',
+      '..nnoooonn..',
+      '.nnoXXoonnn.',
+      '.nooXonnnYnn',
+      '.nonnnwwnXnn',
+      '.nnnwvvWwnnn',
+      '.nnwWvWWWwnn',
+      '.nnnwWWwjJjn',
+      '.nnynnwjJjnn',
+      '.nyYynnnjnn.',
+      '..nynnnnnn..',
       '...nnnnnn...',
     ] },
     7: { dy: HAIR_FALL, rows: [
       '....nnnnn...',
       '..nnnoooonn.',
-      '.nnooXooonnn',
-      '.ooXoXonnnNc',
-      '.ooXonnnnNcc',
-      '.nonnnonnNcb',
-      '.nonYnonnNbb',
-      '.nonXnonnn..',
-      '.nnnnnonnn..',
-      '.nnonnnnn...',
-      '..nonnnn....',
+      '.nnooXoonnnn',
+      '.nooXonnnnNc',
+      '.nonnnwwnNcc',
+      '.nnnwvvWwNcb',
+      '.nnwWvWWnNbb',
+      '.nnnwWWjJn..',
+      '.nnynwjJjn..',
+      '.nyYynnjn...',
+      '..nynnnn....',
       '...nnnn.....',
     ] },
   },

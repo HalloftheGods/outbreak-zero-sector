@@ -15,7 +15,7 @@ const isIdList = (v: unknown): boolean => Array.isArray(v) && v.every((id) => ty
 
 const isRankEntry = ([upgrade, rank]: [string, unknown]): boolean => UPGRADE_ORDER.includes(upgrade as GunUpgrade) && isCount(rank);
 
-function isGunFit(v: unknown): v is GunFit {
+export function isGunFit(v: unknown): v is GunFit {
   return isFields(v)
     && isFields(v.ranks)
     && Object.entries(v.ranks).every(isRankEntry)

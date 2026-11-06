@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { characterOf, CHARACTERS, freeCharacter, isCharacterIndex } from '../shared/characters.ts';
-import { KILL_DROP_CHANCE, MELEE_KNOCKBACK_SPEED, PLAYER_SPEED, TICK_DT, WEAPONS, ZOMBIE_SIGHT_RANGE } from '../shared/constants.ts';
+import { KILL_DROP_CHANCE, MELEE_KNOCKBACK_SPEED, PLAYER_SPEED, SPRINT_NOISE_RADIUS, TICK_DT, WEAPONS, ZOMBIE_SIGHT_RANGE } from '../shared/constants.ts';
 import { maybeDropOnKill } from '../shared/pickups.ts';
 import { playerSpeed } from '../shared/players.ts';
 import { GameSimulation } from '../shared/simulation.ts';
@@ -10,12 +10,22 @@ const skinOf = (id: string): number => CHARACTERS.findIndex((character) => chara
 
 describe('the character table', () => {
   it('gives everyone a name, a trait and one thing they do better', () => {
-    expect(CHARACTERS.map((character) => character.name)).toEqual(['Night', 'Khronus8', 'Satori', 'Rex', 'Sol']);
+    expect(CHARACTERS.map((character) => character.name)).toEqual(['Night', 'Bandus', 'Queen', 'Rex', 'Sol']);
     for (const { sightRange, reloadTime, moveSpeed, shoveForce, dropOdds, trait } of CHARACTERS) {
       expect(trait).not.toBe('');
       const edges = [sightRange < 1, reloadTime < 1, moveSpeed > 1, shoveForce > 1, dropOdds > 1];
       expect(edges.filter(Boolean)).toHaveLength(1);
     }
+  });
+
+  it('makes only Night quieter: three quarters of the noise radius and half the clatter chance', () => {
+    for (const character of CHARACTERS) {
+      const night = character.id === 'night';
+      expect(character.noise).toBe(night ? 0.75 : 1);
+      expect(character.clatterChance).toBe(night ? 0.5 : 1);
+    }
+    expect(CHARACTERS[0].trait).toBe('Moves quieter');
+    expect(CHARACTERS[0].sightRange).toBe(0.75);
   });
 
   it('falls back to the first survivor for a skin it does not know', () => {
@@ -73,13 +83,13 @@ describe('traits in play', () => {
     return ticks;
   }
 
-  it('reloads faster as Khronus8', () => {
+  it('reloads faster as Bandus', () => {
     const normal = Math.ceil(WEAPONS.pistol.reloadMs / 1000 / TICK_DT);
     expect(reloadTicks(skinOf('night'))).toBeGreaterThanOrEqual(normal);
-    expect(reloadTicks(skinOf('khronus8'))).toBeLessThan(normal * 0.8);
+    expect(reloadTicks(skinOf('bandus'))).toBeLessThan(normal * 0.8);
   });
 
-  it('runs faster as Satori, in the sim and in the speed the client predicts with', () => {
+  it('runs faster as Queen, in the sim and in the speed the client predicts with', () => {
     expect(playerSpeed(skinOf('satori'))).toBeGreaterThan(PLAYER_SPEED);
     expect(playerSpeed(skinOf('sol'))).toBe(PLAYER_SPEED);
 
@@ -123,6 +133,30 @@ describe('traits in play', () => {
     };
     expect(spotted(skinOf('sol'))).toBe(true);
     expect(spotted(skinOf('night'))).toBe(false);
+  });
+
+  it('carries Night\'s shots and sprinting steps three quarters as far', () => {
+    const heardBy = (skin: number, act: 'shoot' | 'sprint', reach: number): boolean => {
+      const { sim, state } = quietSim();
+      const [p] = state.players;
+      p.skin = skin;
+      const roamer = addRoamer(state, 'walker', p.x - reach, p.y);
+      roamer.speed = 0;
+      roamer.senseOffset = 1;
+      const shooting = input({ seq: 1, shoot: true, angle: 0 });
+      const sprinting = input({ seq: 1, angle: 0, right: true, sprint: true });
+      sim.setInput('a', act === 'shoot' ? shooting : sprinting);
+      steps(sim, 2);
+      return roamer.mode !== 'wander';
+    };
+    const shot = WEAPONS.pistol.noiseRadius;
+    const between = (radius: number): number => radius * 0.875;
+    expect(heardBy(skinOf('sol'), 'shoot', between(shot))).toBe(true);
+    expect(heardBy(skinOf('night'), 'shoot', between(shot))).toBe(false);
+    expect(heardBy(skinOf('night'), 'shoot', shot * 0.6)).toBe(true);
+    expect(heardBy(skinOf('sol'), 'sprint', between(SPRINT_NOISE_RADIUS))).toBe(true);
+    expect(heardBy(skinOf('night'), 'sprint', between(SPRINT_NOISE_RADIUS))).toBe(false);
+    expect(heardBy(skinOf('night'), 'sprint', SPRINT_NOISE_RADIUS * 0.6)).toBe(true);
   });
 
   it('drops more often from the zombies Sol kills', () => {

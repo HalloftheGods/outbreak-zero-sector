@@ -1,12 +1,19 @@
 /**
  * The Install Game cartridge and the small icons on the how to install card.
- * All original: a plain grey cartridge with a grip, a label recess and gold contacts, in no console's shape.
- * The printed label is real text laid over the recess by InstallCartridge.vue, so it stays sharp and readable.
+ * The cartridge, label and all, is painted by cartridge-art.ts in the master palette and kept here as flat
+ * rectangles. Its label says INSTALL and GAME in pixels; the button's aria-label says it in words.
  */
 import type { GuideIcon } from '../game/pwa/ios-guide.ts';
+import type { PixelCanvas } from './kit.ts';
+import { CARTRIDGE_HEIGHT, CARTRIDGE_LABEL, CARTRIDGE_WIDTH, LABEL_SKY, drawCartridge } from './cartridge-art.ts';
+import { RAMPS, toHex } from './palette.ts';
+import type { Color } from './palette.ts';
+
+export { CARTRIDGE_HEIGHT, CARTRIDGE_LABEL, CARTRIDGE_WIDTH };
 
 /** One flat rectangle of a pixel picture: colour key, x, y, width, height. */
 type Block = readonly [string, number, number, number, number];
+type OpenBlock = [string, number, number, number, number];
 
 interface Picture {
   readonly width: number;
@@ -15,46 +22,57 @@ interface Picture {
   readonly blocks: readonly Block[];
 }
 
-export const CARTRIDGE_WIDTH = 24;
-export const CARTRIDGE_HEIGHT = 28;
-/** Where the label sits on the cartridge, in its own pixels. */
-export const CARTRIDGE_LABEL = { x: 4, y: 8, width: 16, height: 11 } as const;
+/** A palette colour's key is its ramp and step, such as blood2. */
+function keyOf(color: Color): string {
+  for (const [name, ramp] of Object.entries(RAMPS)) {
+    const step = (ramp as readonly Color[]).indexOf(color);
+    const found = step >= 0;
+    if (found) return `${name}${step}`;
+  }
+  throw new Error(`cartridge: ${toHex(color)} is not in the master palette`);
+}
 
-const gripRidges: Block[] = Array.from({ length: 8 }, (_, i): Block => ['groove', 4 + i * 2, 3, 1, 3]);
-const contactGaps: Block[] = [7, 11, 15].map((x): Block => ['gap', x, 24, 1, 3]);
+function inLabel(x: number, y: number): boolean {
+  const { x: left, y: top, width, height } = CARTRIDGE_LABEL;
+  return x >= left && x < left + width && y >= top && y < top + height;
+}
 
-const CARTRIDGE: Picture = {
-  width: CARTRIDGE_WIDTH,
-  height: CARTRIDGE_HEIGHT,
-  colors: {
-    outline: '#17181f',
-    plastic: '#8d909b',
-    light: '#b9bcc7',
-    shade: '#5b5e69',
-    groove: '#4a4c57',
-    recess: '#2c2d36',
-    gold: '#c9a24a',
-    gap: '#8a6c26',
-  },
-  blocks: [
-    ['outline', 0, 2, 24, 22],
-    ['outline', 2, 0, 20, 24],
-    ['plastic', 2, 1, 20, 22],
-    ['plastic', 1, 2, 22, 20],
-    ['light', 2, 1, 20, 1],
-    ['light', 1, 2, 1, 20],
-    ['shade', 22, 2, 1, 20],
-    ['shade', 2, 22, 20, 1],
-    ...gripRidges,
-    ['outline', 3, 7, 18, 13],
-    ['recess', CARTRIDGE_LABEL.x, CARTRIDGE_LABEL.y, CARTRIDGE_LABEL.width, CARTRIDGE_LABEL.height],
-    ['groove', 3, 21, 1, 1],
-    ['groove', 20, 21, 1, 1],
-    ['outline', 4, 24, 16, 4],
-    ['gold', 5, 24, 14, 3],
-    ...contactGaps,
-  ],
-};
+/**
+ * Each row's runs of one colour, merged down while the run below matches, so the picture stays a few hundred rects.
+ * The label's backing is one 'recess' rectangle, and runs of that colour inside it are left to show through.
+ */
+function pictureOf(canvas: PixelCanvas): Picture {
+  const backing = LABEL_SKY;
+  const colors: Record<string, string> = { recess: toHex(backing) };
+  const blocks: OpenBlock[] = [['recess', CARTRIDGE_LABEL.x, CARTRIDGE_LABEL.y, CARTRIDGE_LABEL.width, CARTRIDGE_LABEL.height]];
+  let open = new Map<string, OpenBlock>();
+  for (let y = 0; y < canvas.h; y++) {
+    const next = new Map<string, OpenBlock>();
+    let x = 0;
+    while (x < canvas.w) {
+      const color = canvas.get(x, y);
+      let end = x + 1;
+      while (end < canvas.w && canvas.get(end, y) === color) end++;
+      const showsBacking = color === backing && inLabel(x, y);
+      const drawn = color !== null && !showsBacking;
+      if (drawn) {
+        const key = keyOf(color);
+        colors[key] = toHex(color);
+        const id = `${x},${end},${key}`;
+        const above = open.get(id);
+        const block: OpenBlock = above ?? [key, x, y, end - x, 0];
+        if (!above) blocks.push(block);
+        block[4]++;
+        next.set(id, block);
+      }
+      x = end;
+    }
+    open = next;
+  }
+  return { width: canvas.w, height: canvas.h, colors, blocks };
+}
+
+const CARTRIDGE: Picture = pictureOf(drawCartridge());
 
 const PRINT = '#2b2233';
 const MARKER = '#dc2237';

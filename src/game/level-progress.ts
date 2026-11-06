@@ -56,6 +56,11 @@ export function recordLevelReached(level: number, store: Store | null = browserS
   return next;
 }
 
+/** Notes a banked trip: reaching the van on level n opens level n+1. Home play's only way up, so a carried player does not unlock on arrival. */
+export function recordLevelCleared(level: number, store: Store | null = browserStore()): LevelProgress {
+  return recordLevelReached(level + 1, store);
+}
+
 /** Notes the last level cleared, which also means every level was reached. */
 export function recordGameFinished(store: Store | null = browserStore()): LevelProgress {
   const progress = loadLevelProgress(store);

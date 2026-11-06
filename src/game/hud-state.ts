@@ -1,5 +1,6 @@
 import { characterOf } from '../../shared/characters.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
+import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
 import { levelDef } from '../../shared/levels.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type {
@@ -202,7 +203,9 @@ export interface HordeStatus {
   readonly loud: boolean;
 }
 
-export function hordeStatus(hud: Pick<HudState, 'phase' | 'wave' | 'intermission' | 'hostiles'>): HordeStatus {
+export function hordeStatus(hud: Pick<HudState, 'phase' | 'wave' | 'intermission' | 'hostiles'> & Partial<Pick<HudState, 'level'>>): HordeStatus {
+  const home = hud.level === BUNKER_LEVEL;
+  if (home) return { title: 'Bunker', detail: '', loud: false };
   const runOver = hud.phase === 'gameover';
   if (runOver) return { title: 'Game over', detail: '', loud: true };
   const hunted = hud.phase === 'wave';

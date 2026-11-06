@@ -1,4 +1,5 @@
 import { townContainers } from '../../shared/containers.ts';
+import { isBunkerMap } from '../../shared/home-protocol.ts';
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
@@ -9,6 +10,11 @@ import { isLandmark } from './run-notices.ts';
 /** Map pixels per world tile. 200 tiles makes a 400px map, which scales up by whole numbers. */
 const TILE_PX = 2;
 const WORLD_PER_PX = TILE_SIZE / TILE_PX;
+/** The bunker is 40 tiles across, so it can afford to be drawn big enough to carry its room names. */
+const BUNKER_TILE_PX = 6;
+const BUNKER_FLOOR: readonly [number, number, number] = [70, 58, 46];
+const BUNKER_WALL: readonly [number, number, number] = [22, 20, 24];
+const STATION_COLOR = '#ffb066';
 
 const ROAD: readonly [number, number, number] = [40, 41, 47];
 const PAVEMENT: readonly [number, number, number] = [62, 62, 66];
@@ -90,12 +96,18 @@ function overlaps(a: LabelBox, b: LabelBox): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 }
 
-function paintTiles(ctx: CanvasRenderingContext2D, map: WorldMap, width: number, height: number): void {
+/** What a tile looks like on the map: the town's greys, or the bunker's warm floor and dark walls. */
+function tileColor(map: WorldMap, kind: TileKind): readonly [number, number, number] {
+  if (!isBunkerMap(map)) return TILE_RGB[kind];
+  return kind === 'bunker_wall' ? BUNKER_WALL : BUNKER_FLOOR;
+}
+
+function paintTiles(ctx: CanvasRenderingContext2D, map: WorldMap, width: number, height: number, tilePx: number): void {
   const image = ctx.createImageData(width, height);
   for (let y = 0; y < height; y += 1) {
-    const row = Math.floor(y / TILE_PX) * map.cols;
+    const row = Math.floor(y / tilePx) * map.cols;
     for (let x = 0; x < width; x += 1) {
-      const [r, g, b] = TILE_RGB[TILE_KINDS[map.tiles[row + Math.floor(x / TILE_PX)]]];
+      const [r, g, b] = tileColor(map, TILE_KINDS[map.tiles[row + Math.floor(x / tilePx)]]);
       image.data.set([r, g, b, 255], (y * width + x) * 4);
     }
   }
@@ -151,7 +163,7 @@ function paintBuildings(ctx: CanvasRenderingContext2D, map: WorldMap): void {
   }
 }
 
-/** Writes text at the first spot that does not sit on an earlier label. */
+/** Writes text at the first spot that does not sit on an earlier label. True if it found one. */
 function placeLabel(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -159,7 +171,7 @@ function placeLabel(
   y: number,
   color: string,
   placed: LabelBox[],
-): void {
+): boolean {
   const half = Math.ceil(textWidth(text) / 2) + 1;
   for (const nudge of LABEL_NUDGES) {
     const top = y + nudge;
@@ -169,15 +181,21 @@ function placeLabel(
     if (clear) {
       placed.push(box);
       drawOutlinedText(ctx, text, centerX, top, color);
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 /** The town as a player would sketch it: streets, buildings by use, names, and where they have been. */
 export class TownMapView {
   readonly width: number;
   readonly height: number;
+  /** Map pixels per world tile. */
+  readonly pixelsPerTile: number;
+  /** The room names that found a clear place on the map, in the order the map lists them. */
+  readonly roomLabels: string[] = [];
+  private readonly worldPerPx: number;
   private readonly map: WorldMap;
   private readonly base: HTMLCanvasElement;
   private readonly visited = new Set<string>();
@@ -186,8 +204,10 @@ export class TownMapView {
 
   constructor(map: WorldMap) {
     this.map = map;
-    this.width = map.cols * TILE_PX;
-    this.height = map.rows * TILE_PX;
+    this.pixelsPerTile = isBunkerMap(map) ? BUNKER_TILE_PX : TILE_PX;
+    this.worldPerPx = TILE_SIZE / this.pixelsPerTile;
+    this.width = map.cols * this.pixelsPerTile;
+    this.height = map.rows * this.pixelsPerTile;
     this.base = document.createElement('canvas');
     this.base.width = this.width;
     this.base.height = this.height;
@@ -205,8 +225,9 @@ export class TownMapView {
 
   private paintBase(): void {
     const ctx = this.base.getContext('2d')!;
-    paintTiles(ctx, this.map, this.width, this.height);
+    paintTiles(ctx, this.map, this.width, this.height, this.pixelsPerTile);
     paintBuildings(ctx, this.map);
+    this.paintStations(ctx);
     const placed: LabelBox[] = [];
     for (const building of this.map.buildings) {
       if (!isLandmark(building.kind)) continue;
@@ -214,7 +235,21 @@ export class TownMapView {
       placeLabel(ctx, BUILDING_DEFS[building.kind].label, Math.round((box.x0 + box.x1) / 2), box.y1 + 3, LABEL_COLOR, placed);
     }
     for (const district of this.map.districts) {
-      placeLabel(ctx, district.name, Math.round(district.x / WORLD_PER_PX), Math.round(district.y / WORLD_PER_PX), DISTRICT_COLOR, placed);
+      const x = Math.round(district.x / this.worldPerPx);
+      const y = Math.round(district.y / this.worldPerPx);
+      if (placeLabel(ctx, district.name, x, y, DISTRICT_COLOR, placed)) this.roomLabels.push(district.name);
+    }
+  }
+
+  /** A lamp-coloured dot where each bunker station stands. The town has none. */
+  private paintStations(ctx: CanvasRenderingContext2D): void {
+    for (const station of this.map.stations ?? []) {
+      const x = Math.round(station.x / this.worldPerPx);
+      const y = Math.round(station.y / this.worldPerPx);
+      ctx.fillStyle = EDGE_COLOR;
+      ctx.fillRect(x - 2, y - 2, 5, 5);
+      ctx.fillStyle = STATION_COLOR;
+      ctx.fillRect(x - 1, y - 1, 3, 3);
     }
   }
 
@@ -287,8 +322,8 @@ export class TownMapView {
   }
 
   private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerEntity, isLocal: boolean): void {
-    const x = Math.round(player.x / WORLD_PER_PX);
-    const y = Math.round(player.y / WORLD_PER_PX);
+    const x = Math.round(player.x / this.worldPerPx);
+    const y = Math.round(player.y / this.worldPerPx);
     if (isLocal) {
       drawArrow(ctx, { x, y, dir: dirFromAngle(player.angle) }, SELF_COLOR);
       return;
@@ -300,8 +335,8 @@ export class TownMapView {
   }
 
   private drawExit(ctx: CanvasRenderingContext2D, exit: ExitEntity): void {
-    const x = Math.round(exit.x / WORLD_PER_PX);
-    const y = Math.round(exit.y / WORLD_PER_PX);
+    const x = Math.round(exit.x / this.worldPerPx);
+    const y = Math.round(exit.y / this.worldPerPx);
     ctx.fillStyle = EDGE_COLOR;
     ctx.fillRect(x - 5, y - 3, 11, 7);
     ctx.fillStyle = EXIT_COLOR;

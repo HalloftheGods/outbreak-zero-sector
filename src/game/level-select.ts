@@ -1,6 +1,19 @@
 /** The words the setup page shows for a level picked on the Levels page. The decisions live in level-progress.ts. */
 import { LEVELS } from '../../shared/levels.ts';
 
+/** The theme names the level cards show. */
+export const THEME_NAMES: Readonly<Record<string, string>> = {
+  night: 'Night',
+  'industrial-dusk': 'Dusk',
+  flooded: 'Flooded',
+  contaminated: 'Toxic',
+  blackout: 'Blackout',
+  emergency: 'Emergency',
+  snow: 'Blizzard',
+  infested: 'Infested',
+  burning: 'Inferno',
+};
+
 export const COOP_LEVEL_NOTE = 'Co-op always starts on level 1. Your chosen level applies to solo only.';
 
 /** The setup page's line for a chosen level, or null for none or an unknown level. */

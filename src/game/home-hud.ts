@@ -56,7 +56,7 @@ export interface HomeActions {
   continueFromEnding(): void;
 }
 
-/** Stubs until the client-run lane wires each to the store and the transport. */
+/** Outside a home session there is nothing to ask. */
 export const NO_HOME_ACTIONS: HomeActions = {
   pickLevel() {},
   equip() {},
@@ -72,9 +72,15 @@ export interface HomeFacts {
   readonly save: HomeSave | null;
   readonly highest: number;
   readonly difficulty: DifficultyId;
+  /** 0..1 through the jewel on the forge. Left off for none. */
+  readonly forgeProgress?: number;
+  /** Why the last save did not land. Left off for none. */
+  readonly saveError?: string | null;
+  /** A death waiting to be read. Left off for none. */
+  readonly death?: HomeDeath | null;
 }
 
-/** Until the client-run lane reads the real ones. */
+/** Outside a home session there is nothing to know. */
 const NO_HOME_FACTS: HomeFacts = { save: null, highest: FIRST_LEVEL, difficulty: BASELINE_DIFFICULTY };
 
 export function shopContext(home: HomeUi): ShopContext {
@@ -101,8 +107,8 @@ export function homeUi(snapshot: SnapshotPacket, local: PlayerEntity, facts: Hom
     difficulty: facts.difficulty,
     receipt: home.receipt,
     save: facts.save,
-    forgeProgress: 0,
-    saveError: null,
-    death: null,
+    forgeProgress: facts.forgeProgress ?? 0,
+    saveError: facts.saveError ?? null,
+    death: facts.death ?? null,
   };
 }

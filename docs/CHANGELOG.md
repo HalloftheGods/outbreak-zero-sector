@@ -2,6 +2,28 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-06] - Radio Finds
+
+### Added
+- Ten more level tracks by Majora D. (one per level).
+- Each level's first take is its own; every take after it is a radio find. A Radio now gives up the next unfound track of the level it was found in, with a banner naming it, and the track joins that level's rotation.
+- The Sound Test is always open and shows ??? for tracks not yet found, with a count of radio finds.
+
+- A Jukebox station in the bunker's quarters (hold E) plays any track already heard or found, and says how many radio finds are still missing. Dark with the rest of the bunker until the home loop goes live.
+
+### Changed
+- All the music is credited to Majora D.
+- Night now moves quieter: her shots, sprinting steps and search clatter carry three quarters as far, and a search clatters half as often. She is still spotted from three quarters as far. The select screen's Stealth bar weighs sight and noise together.
+
+## [2026-11-06] - Majora D. Level Music
+
+### Added
+- Twelve new level tracks by Majora D. (128 kbps MP3, 48 kHz stereo, like the rest) join the lull of their level as alternate takes: two more for levels 3 and 10, one each for the other eight.
+- Majora D. is credited in the end credits beside ExoticService, and in the MP3 artist tag of the new tracks.
+
+### Changed
+- A level's music now starts on a random one of its takes, then plays the others in turn, so a level never goes quiet and level N only ever plays level N's music.
+
 ## [2026-11-06] - Combat & Scavenging Telemetry
 
 ### Added

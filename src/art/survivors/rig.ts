@@ -204,6 +204,17 @@ const ORDER: Readonly<Record<DrawnDir, readonly Layer[]>> = {
   7: ['gun', 'farArm', 'legs', 'torso', 'pack', 'nearArm', 'nearHand', 'head'],
 };
 
+/**
+ * Seen from the side the support hand is the far one, behind the body. While it works a
+ * reload it comes round in front of the torso, or the magazine it carries would float.
+ */
+const WORKING_EAST: readonly Layer[] = ['pack', 'legs', 'torso', 'farArm', 'head', 'nearArm', 'gun', 'nearHand'];
+
+function layersOf(dir: DrawnDir, pose: Pose): readonly Layer[] {
+  const handAtWork = pose.hand !== undefined;
+  return handAtWork && dir === 0 ? WORKING_EAST : ORDER[dir];
+}
+
 /** A three pixel tube, lit along its upper or left side. Stamped across the line so diagonals stay clean. */
 export function limbSegment(c: Cell, a: Point, b: Point, tone: Tone, thick = false): void {
   const [dark, mid, light] = tone;
@@ -352,11 +363,12 @@ export function drawPose(person: Person, weapon: WeaponId, dir: DrawnDir, pose: 
   const grip = gunPoint(view, view.grip, gx, gy);
   const rack = pose.rack ?? 0;
   const [axisX, axisY] = AXIS[dir];
-  const reached: Point | null = pose.hand ? [pose.hand[0], pose.hand[1] + drop] : null;
+  // A reaching hand moves with the body, as the gun it works on does.
+  const reached: Point | null = pose.hand ? [pose.hand[0] + bx, pose.hand[1] + by] : null;
   const fore = reached ?? gunPoint(view, view.fore, gx - axisX * rack, gy - axisY * rack);
 
   let torso: PlacedGrid | null = null;
-  for (const layer of ORDER[dir]) {
+  for (const layer of layersOf(dir, pose)) {
     if (layer === 'legs') drawLegs(c, person, dir, pose);
     else if (layer === 'torso') torso = placePart(c, person.torsos[dir], torsoBottom(person), person.legend, bx, by);
     else if (layer === 'head') {

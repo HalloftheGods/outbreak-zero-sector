@@ -101,6 +101,28 @@ export const pickupShells: Recipe = (v) => {
   noise(v, { at: 0.2, filter: 'lowpass', freq: 500, decay: 0.08, gain: 0.35 });
 };
 
+/** Coins dropped into a palm: a few bright clinks on top of a soft metal thud. */
+export const pickupSilver: Recipe = (v) => {
+  tone(v, { type: 'sine', f0: 210, f1: 140, decay: 0.07, gain: 0.35, lp: 400 });
+  [0.02, 0.07, 0.12].forEach((at, i) => {
+    tone(v, { at, type: 'square', f0: 2350 + i * 310, f1: 2200 + i * 260, attack: 0.002, decay: 0.05, gain: 0.07 });
+    tone(v, { at, type: 'triangle', f0: 3700 + i * 380, decay: 0.09, gain: 0.12 });
+  });
+};
+
+/** A cut stone lifted out of the dirt: one glassy note with a quick shimmer over it. */
+export const pickupJewel: Recipe = (v) => {
+  chime(v, [1318.5, 1760], 0.06, 'sine', 0.2, 0.28);
+  tone(v, { at: 0.12, type: 'triangle', f0: 2637, f1: 2700, attack: 0.01, decay: 0.3, gain: 0.07 });
+};
+
+/** The same stone, bigger: a lower note under a slower, fuller shimmer. */
+export const pickupJewelLarge: Recipe = (v) => {
+  tone(v, { type: 'sine', f0: 392, f1: 392, attack: 0.01, decay: 0.45, gain: 0.22 });
+  chime(v, [783.99, 1174.7, 1568], 0.08, 'sine', 0.18, 0.4);
+  tone(v, { at: 0.24, type: 'triangle', f0: 3136, f1: 3200, attack: 0.02, decay: 0.45, gain: 0.07 });
+};
+
 /** A door or drawer coming open. */
 export const containerOpen: Recipe = (v) => {
   noise(v, { filter: 'bandpass', freq: 700, freq1: 1100, q: 2, attack: 0.02, decay: 0.12, gain: 0.3 });

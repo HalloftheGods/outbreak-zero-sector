@@ -1,0 +1,80 @@
+// Doc the Medic's shop-screen bust: an adult in a pale bone-white coat with blood-red piping on
+// the lapels and a red cross on the breast, teal scrubs underneath. Dark hair swept across from a
+// side part, tired kind eyes under raised brows, a small closed smile, a tiny bandage on the lit
+// cheek, and a stethoscope draped around the neck. Same colours as the stall figure (LOOKS.medic).
+// Lit from the upper left like the survivor busts.
+
+import { RAMPS } from '../../palette.ts';
+import type { BustDef } from '../../survivors/bust.ts';
+
+const { blood, bone, ink, metal, skin, teal, wood } = RAMPS;
+
+export const MEDIC_BUST: BustDef = {
+  legend: {
+    k: ink[0], K: ink[1],
+    a: skin[0], b: skin[1], c: skin[2], d: skin[3],
+    W: wood[0], w: wood[1], h: wood[2],
+    Z: bone[0], y: bone[1], z: bone[2], Y: bone[3],
+    R: blood[1], r: blood[2], q: blood[3],
+    n: teal[0], t: teal[1],
+    M: metal[0], m: metal[1], G: metal[2], g: metal[3],
+  },
+  rows: [
+    '................................................',
+    '................................................',
+    '...................kkkkkkkkkk...................',
+    '................kkkWWWWWWWWWKkkk................',
+    '..............kkKWWWWwWwwwWWWWKKkk..............',
+    '.............kKKhhwhWhhhwWwwwWWWKKk.............',
+    '............khWKhhKKwwWWWwwwWwwWWKKk............',
+    '...........kwhWKWhhWKKWWWWWWwwwWWWKKk...........',
+    '...........kwhwKwWWWWWKKWWWWWWwWWWKKk...........',
+    '..........kWWhwKWWKKWWWWKWWWWWWWWWKKKk..........',
+    '..........kWwwwKWWWWKKWWWKKWWWWWWWKKKk..........',
+    '..........kWwwwKkkkkWWKWWWWKWWWWWWKKKk..........',
+    '..........kWWwWkddddkkkKKWWWKWWWWWKKKk..........',
+    '..........kWwwkddddddcckkkKWWKKWWWKKKk..........',
+    '..........kWWwkddddddccccckKWWWKWWKKKk..........',
+    '..........kWWkdddddddcccccckWkkWKWKKKk..........',
+    '..........kWWkdddddddccccccckcckWKKKKk..........',
+    '..........kKWkdddddddcccccccccbbkWKKKk..........',
+    '..........kKkddddddddcccccccccbbbkkKKk..........',
+    '..........kKkddddWWWWWccccWWWWWbbkakKk..........',
+    '.........kKkddWWWdddccccccccccbWWWaakKk.........',
+    '.........kkcdddbbbbbccccccccbbbbbbaaakk.........',
+    '........kckccddkkkkkkcccccckkkkkkbaaakbk........',
+    '........kckccccaYwwYaccccbcaYwwYaaaaakbk........',
+    '........kckcccccbbbbcccccbccbbbbbaaaakbk........',
+    '........kckccccccccccccccbccbbbbbaaaakbk........',
+    '.........kckcccccccccccccbccbbzYYYzakbk.........',
+    '.........kkkkccccccccccdcccbbbzYyYzkkkk.........',
+    '.............kcccccccbaccabbbbbbaak.............',
+    '.............kccccccccbbbbbbbbbaaak.............',
+    '..............kccccacccccbbbabaaak..............',
+    '..............kcccccaaaaaaaabbaaak..............',
+    '...............kccccccdddcbbbaaak...............',
+    '................kccbbbbbbbbbaaak................',
+    '.................kkbbbbbbbbaakk.................',
+    '..................kkkbbbbaakkk..................',
+    '..................kaakkkkkkaak..................',
+    '................kkkkcbbbbbbakk..................',
+    '...............kmMttkbbbbbbknnmMk...............',
+    '...........kkkkKmMrttkbbbbknnRKmMkkkk...........',
+    '........kkkzzzkmMYYrttkbbknnRzzmMyyyykkk........',
+    '.....kkkzzzzzzzmMYYrttnkknnnRzzzmMyyyyZZkkk.....',
+    '...kkzzzzzzzzzKmMYYrttnnnnnnRzzzmMyyyyyZZZZkk...',
+    '..kzzzzzzzzzzkmMYYYrttnnnnnnRzzzmMyyyyyyyZZZZk..',
+    '.kzYYYYYYYYYYYmMYYYYrtnnnnnRzzzzmMzzykkkkyyZZZk.',
+    'kYYYYYYYyYYYYYmMYYYYrtnnnnnRzzzzmMzzzkqrkyZyZZZk',
+    'kYYYYYkkyYYYYYmMKKYYrtnnnnnRzzKKgGzkkkqrkkkyyyZk',
+    'kYYYYYrkyYYYYYmMYYKYYrnnnnRzzKzzgGzkqqqrrRkyyyZk',
+    'kYYYYYqkyYYYYYmMYYKYYrnnnnRzzKzgzzGkrrrrRRkyyyyk',
+    'kYYYYYrkyYYYkkkkYYYKYrnnnnRzKzzgzzGkkkrRkkkyyyyk',
+    'kYYyyygkyyykggGMkYYYKrnnnnRKzzzkzzkzzkrRkyZyyyyk',
+    'kYYyYYYyYYykgGGMkYYYzznnnnzzzzzzzzzzzkkkkyyZyyyk',
+    'kYYyYYYyYYykGMMMkYYYzznnnnzzzzzzzzzzzzyyyyyZyyyk',
+    'kYYyYYYyYYyYkkkkYYzzzznnnnzzzzzzzzzzzzyyyyyZyyyk',
+    'kYYyYYYyYYyYYYYYYzzzzznnnnzzzzzzzzzzzyyyyyyZyyyk',
+    'kYYyYYYyYYyYYYzzzzzzzzznnzzzzzzzzzzzyyyyyyyZyyyk',
+  ],
+};

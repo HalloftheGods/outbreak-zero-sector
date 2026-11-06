@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS } from '../shared/characters.ts';
+import { CHARACTERS, characterOf } from '../shared/characters.ts';
 import { CLATTER_CHANCE, CLATTER_RADIUS } from '../shared/container-search.ts';
 import { CONTAINER_LOOT, containerLoot } from '../shared/container-loot.ts';
 import { containerInReach, SEARCH_SEC, townContainers } from '../shared/containers.ts';
@@ -304,13 +304,36 @@ describe('a clatter', () => {
   it('wakes what is near through the noise system, and stays rare', () => {
     expect(CLATTER_CHANCE).toBeLessThanOrEqual(0.15);
     const { sim, state, p, container } = setup();
-    const near = addRoamer(state, 'walker', p.x + CLATTER_RADIUS - 20, p.y);
-    const far = addRoamer(state, 'walker', p.x + CLATTER_RADIUS + 60, p.y);
-    fixRoll(state, CLATTER_CHANCE / 2);
+    const { noise, clatterChance } = characterOf(p.skin);
+    const near = addRoamer(state, 'walker', p.x + CLATTER_RADIUS * noise - 20, p.y);
+    const far = addRoamer(state, 'walker', p.x + CLATTER_RADIUS * noise + 60, p.y);
+    fixRoll(state, (CLATTER_CHANCE * clatterChance) / 2);
     hold(sim);
     steps(sim, ticksFor(container));
-    expect(near.mode).toBe('alert');
+    expect(eventsOf(sim.snapshot(), 'container_opened')[0].noisy).toBe(true);
+    expect(near.mode).not.toBe('wander');
     expect(far.mode).toBe('wander');
+  });
+
+  it('carries three quarters as far from Night, and clatters half as often', () => {
+    const skin = CHARACTERS.findIndex((character) => character.id === 'night');
+    const searched = (night: boolean, roll: number) => {
+      const { sim, state, p, container } = setup();
+      p.skin = night ? skin : 1;
+      const between = addRoamer(state, 'walker', p.x + CLATTER_RADIUS * 0.875, p.y);
+      const near = addRoamer(state, 'walker', p.x + CLATTER_RADIUS * 0.6, p.y);
+      fixRoll(state, roll);
+      hold(sim);
+      steps(sim, ticksFor(container));
+      const woken = (zombie: { mode: string }): boolean => zombie.mode !== 'wander';
+      return { between: woken(between), near: woken(near), noisy: eventsOf(sim.snapshot(), 'container_opened')[0].noisy };
+    };
+    const lucky = CLATTER_CHANCE * 0.4;
+    const between = CLATTER_CHANCE * 0.75;
+    expect(searched(false, lucky)).toEqual({ noisy: true, between: true, near: true });
+    expect(searched(true, lucky)).toEqual({ noisy: true, between: false, near: true });
+    expect(searched(false, between).noisy).toBe(true);
+    expect(searched(true, between).noisy).toBe(false);
   });
 
   it('is silent otherwise', () => {

@@ -1,8 +1,11 @@
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_DT } from '../../shared/constants.ts';
 import { containerInReach } from '../../shared/containers.ts';
 import type { Container } from '../../shared/containers.ts';
+import { isBunkerMap } from '../../shared/home-protocol.ts';
+import type { StationId } from '../../shared/home-protocol.ts';
 import { stepMovement } from '../../shared/movement.ts';
 import { playerSpeed } from '../../shared/players.ts';
+import { stationInReach } from '../../shared/stations.ts';
 import { groundSpeedScale } from '../../shared/town-rules.ts';
 import type { EntityId, PlayerEntity, SnapshotPacket, Stance, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt, circleHitsSolid } from '../../shared/world-query.ts';
@@ -14,7 +17,7 @@ const MAX_BULLET_LEAD_SEC = 0.1;
 
 export type WorldEntities = Pick<
   SceneView,
-  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'tracks' | 'searchable' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
+  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'tracks' | 'searchable' | 'station' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
 >;
 
 /** What this client currently believes: buffered snapshots plus the predicted local player. */
@@ -103,6 +106,12 @@ export class ClientWorld {
     return free ? containerInReach(this.map, player.x, player.y, (id) => opened.includes(id)) : null;
   }
 
+  /** The bunker station the local player could open from where they stand: none once one is open, or anywhere but the bunker. */
+  private stationBy(player: PlayerEntity | null): StationId | undefined {
+    const free = player !== null && player.status === 'alive' && !player.home?.station;
+    return free && isBunkerMap(this.map) ? stationInReach(this.map, player.x, player.y)?.id : undefined;
+  }
+
   /** Advances prediction by dt and returns this frame's entities, or null before any snapshot. */
   advance(nowMs: number, delayMs: number, dirX: number, dirY: number, aim: number, dt: number): WorldEntities | null {
     const newest = this.buffer.latest;
@@ -116,6 +125,7 @@ export class ClientWorld {
     const shownLocal = players.find((player) => player.id === this.localId) ?? null;
     const viewer = shownLocal ? this.viewer(players, shownLocal) : players[0] ?? null;
     const lead = Math.min(MAX_BULLET_LEAD_SEC, Math.max(0, (nowMs - this.latestArrival) / 1000));
+    const station = this.stationBy(shownLocal);
     return {
       players,
       zombies: interpolateZombies(sample),
@@ -125,6 +135,7 @@ export class ClientWorld {
       openedContainers: newest.snapshot.openedContainers,
       tracks: newest.snapshot.tracks ?? [],
       searchable: this.searchableBy(shownLocal, newest.snapshot.openedContainers),
+      ...(station ? { station } : {}),
       localId: this.localId,
       viewerId: viewer?.id ?? null,
       focusX: viewer?.x ?? 0,

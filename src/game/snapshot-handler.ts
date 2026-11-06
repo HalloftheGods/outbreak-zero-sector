@@ -1,3 +1,4 @@
+import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { ClientWorld } from './client-world.ts';
 import { recordGameFinished, recordLevelReached } from './level-progress.ts';
@@ -19,7 +20,7 @@ export class SnapshotHandler {
   ) {}
 
   onSnapshot(snapshot: SnapshotPacket): void {
-    const { state, stage, bench, audio, renderer } = this.host;
+    const { state, stage, bench, home, audio, renderer } = this.host;
     const world = state.world;
     if (!world) return;
     const now = performance.now();
@@ -33,22 +34,37 @@ export class SnapshotHandler {
     }
     stage.follow(world, snapshot, now);
     bench.observe(snapshot);
-    // Someone joining mid-horde gets no wave_start, so the first frame sets the mood.
     audio.setLevel(snapshot.level);
+    const before = world.localPlayer;
+    const after = snapshot.players.find((player) => player.id === world.localId) ?? null;
+    // Reaching a town on a trip opens nothing: only the van home does, and that comes on a receipt.
+    const onATrip = after?.home !== undefined;
     const newLevel = snapshot.level > state.levelNoted;
     if (newLevel) {
       state.levelNoted = snapshot.level;
-      recordLevelReached(snapshot.level);
+      if (!onATrip) recordLevelReached(snapshot.level);
     }
-    const firstOfRun = world.latest === null;
-    if (firstOfRun) audio.setScene(snapshot.phase === 'wave' ? 'wave' : 'intermission');
+    this.setMood(snapshot, world.latest === null);
     state.lastSnapshotMs = now;
-    const before = world.localPlayer;
-    const after = snapshot.players.find((player) => player.id === world.localId) ?? null;
     for (const event of snapshot.events) this.onGameEvent(event, world, now, before, after);
     world.push(snapshot, now);
+    if (onATrip) home.observe(snapshot, world.localId, now);
     const justEnded = snapshot.gameOver !== null && state.runResult === null;
     if (justEnded) this.enterGameOver(snapshot.gameOver!, world.localId, now);
+  }
+
+  /** Someone joining mid-horde gets no wave_start, so the first frame sets the mood. The bunker has its own. */
+  private setMood(snapshot: SnapshotPacket, firstOfRun: boolean): void {
+    const { state, audio } = this.host;
+    const bunker = isBunkerSeed(snapshot.mapSeed);
+    const moved = state.inBunker !== bunker;
+    state.inBunker = bunker;
+    if (bunker) {
+      if (moved) audio.setScene('bunker');
+      return;
+    }
+    const settling = firstOfRun || moved;
+    if (settling) audio.setScene(snapshot.phase === 'wave' ? 'wave' : 'intermission');
   }
 
   onGameEvent(event: GameEvent, world: ClientWorld, now: number, before: PlayerEntity | null, after: PlayerEntity | null): void {

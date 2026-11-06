@@ -42,8 +42,12 @@ export class LocalSession implements GameTransport {
     this.sim?.homeCommand(LOCAL_PLAYER_ID, action);
   }
 
-  /** Every run in solo gets a fresh city. Plain Play again goes back to level 1; Continue passes its level. */
+  /**
+   * Every run in solo gets a fresh city. Plain Play again goes back to level 1; Continue passes its level.
+   * Home play has no runs to restart: one sim stays up across trips, so its receipts keep their serials.
+   */
   requestRestart(fromLevel?: number): void {
+    if (this.options.homeLoop) return;
     this.options = { ...this.options, startLevel: fromLevel };
     this.clock.stop();
     this.beginRun();
@@ -68,7 +72,7 @@ export class LocalSession implements GameTransport {
     sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);
     this.sim = sim;
     this.paused = false;
-    this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: seed });
+    this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: sim.map.seed, difficulty: sim.difficulty });
     this.onSnapshot(sim.snapshot());
     this.clock.start();
   }

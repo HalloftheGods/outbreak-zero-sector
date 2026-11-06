@@ -14,6 +14,7 @@
           {{ signalWeak ? 'Signal weak' : 'Linked' }}
         </span>
       </div>
+      <TreasureChip v-if="home && !home.inBunker" :home />
     </header>
 
     <ul v-if="hud.teammates.length" class="hud-team">
@@ -81,6 +82,7 @@ import { computed } from 'vue';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
 import type { ArtBook } from '../art/types.ts';
+import type { HomeUi } from '../game/home-hud.ts';
 import { ammoState, gunRounds, hordeStatus, switchKey } from '../game/hud-state.ts';
 import type { HudState, PlaceBanner } from '../game/hud-state.ts';
 import { levelGoal, levelLine } from '../game/level-hud.ts';
@@ -89,6 +91,7 @@ import { effectOf } from '../../shared/gun-upgrades.ts';
 import { GUN_EFFECTS } from '../../shared/round-effect-data.ts';
 import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
+import TreasureChip from './TreasureChip.vue';
 
 const LOW_HEALTH = 0.34;
 
@@ -98,6 +101,7 @@ const { hud } = defineProps<{
   mode: TransportKind;
   signalWeak: boolean;
   place: PlaceBanner | null;
+  home: HomeUi | null;
 }>();
 
 const isLow = computed(() => hud.health / hud.maxHealth < LOW_HEALTH);
