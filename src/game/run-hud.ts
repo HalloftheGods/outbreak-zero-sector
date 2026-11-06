@@ -7,7 +7,7 @@ import { buildHud } from './hud-state.ts';
 import type { RunResult, UiState } from './hud-state.ts';
 import { hordeBanner, isLandmark, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
-import { isRadioFound, recordRadioFound } from './sound-unlock.ts';
+import { isRadioFound, loadSoundUnlock, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
 import { TownMapView } from './town-map.ts';
 
@@ -109,8 +109,9 @@ export class RunHud {
 
   onEvent(event: GameEvent, now: number): void {
     tapGameEvent(event);
+    const firstRadio = isRadioFound(event) && !loadSoundUnlock().radio;
     if (isRadioFound(event)) recordRadioFound();
-    const banner = hordeBanner(event) ?? radioBanner(event);
+    const banner = hordeBanner(event) ?? (firstRadio ? radioBanner(event) : null);
     if (banner) this.publish({ banner: this.notices.banner(banner, now) });
   }
 

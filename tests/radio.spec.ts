@@ -15,25 +15,33 @@ const radios = (state: SimState): number => containerLoot(state).filter((loot) =
 describe('the Radio', () => {
   const towns = SEEDS.map((seed) => stateOf(new GameSimulation({ seed })));
 
-  it('is never more than one to a town, and never loose on the floor', () => {
-    for (const state of towns) {
-      expect(radios(state)).toBeLessThanOrEqual(1);
-      expect(state.pickups.some((item) => item.type === 'radio')).toBe(false);
-    }
+  const radioSpots = (state: SimState) => townContainers(state.map).filter(({ id }) => state.containers[id].loot?.type === 'radio');
+  const inCars = (state: SimState) => radioSpots(state).filter(({ kind }) => kind === 'car');
+  const inBuildings = (state: SimState) => radioSpots(state).filter(({ kind }) => kind !== 'car');
+
+  it('is never loose on the floor', () => {
+    for (const state of towns) expect(state.pickups.some((item) => item.type === 'radio')).toBe(false);
   });
 
-  it('is in some towns and not others', () => {
-    const withRadio = towns.filter((state) => radioContainerId(state) !== null).length;
+  it('sits in about one car in ten', () => {
+    const cars = towns.flatMap((state) => townContainers(state.map).filter(({ kind }) => kind === 'car')).length;
+    const share = towns.flatMap(inCars).length / cars;
+    expect(share).toBeGreaterThan(0.05);
+    expect(share).toBeLessThan(0.15);
+    expect(towns.filter((state) => inCars(state).length > 0).length).toBeGreaterThan(SEEDS.length * 0.75);
+  });
+
+  it('is in at most one building a town, and only some towns', () => {
+    for (const state of towns) expect(inBuildings(state).length).toBeLessThanOrEqual(1);
+    const withRadio = towns.filter((state) => inBuildings(state).length > 0).length;
     expect(withRadio).toBeGreaterThan(SEEDS.length * 0.25);
     expect(withRadio).toBeLessThan(SEEDS.length * 0.75);
   });
 
-  it('is left in a home, diner or garage', () => {
-    const ids = towns.map((state) => ({ state, id: radioContainerId(state) })).filter(({ id }) => id !== null);
-    expect(ids.length).toBeGreaterThan(0);
-    for (const { state, id } of ids) {
-      expect(['house', 'apartment', 'diner', 'garage']).toContain(townContainers(state.map)[id as number].buildingKind);
-    }
+  it('is left in a home, diner or garage when it is not in a car', () => {
+    const left = towns.flatMap(inBuildings);
+    expect(left.length).toBeGreaterThan(0);
+    for (const { buildingKind } of left) expect(['house', 'apartment', 'diner', 'garage']).toContain(buildingKind);
   });
 
   it('falls out of the town\'s seed alone, whatever else the run rolled', () => {

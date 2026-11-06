@@ -10,6 +10,10 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 - Level select: a level you have reached on the Levels page starts a solo run there. Co-op always starts on level 1 (`src/game/level-select.ts`).
 - The survivor picker turns the highlighted survivor through all eight facings, under reduced motion too, since pointing at one asks for it. On a touch screen the chosen survivor keeps turning by itself, and reduced motion keeps that one still (`src/game/survivor-spin.ts`).
 
+### Changed
+- Round kits are easier to find: three a town, sometimes a fourth on later levels, up from one or two, and four in five now lie on a floor rather than in a container.
+- The Radio is far easier to find: about one car in ten now has one, on top of the one some towns leave in a building. Only the first find shows the banner.
+
 ### Fixed
 - Acid: a shotgun blast now adds one corrosion stack, not one per pellet, and corrosion only raises the damage of acid rounds and burns, so a plain gun beside an acid one no longer passes the power cap. Brutes corrode 15% a stack against 10% for the rest, so a capped acid gun now beats a capped plain gun on a brute.
 - A kill a burn lands while the shooter has disconnected is credited to their departed record and is still theirs when they reconnect.

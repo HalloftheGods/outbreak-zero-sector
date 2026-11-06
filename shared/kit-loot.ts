@@ -3,7 +3,7 @@ import type { Point } from './flow-field.ts';
 import { freeSpot } from './part-loot.ts';
 import { spawnPickup } from './pickups.ts';
 import type { BuildingInstance } from './protocol.ts';
-import { GUN_EFFECTS, KIT_CONTAINER_SHARE, KIT_SECOND_ODDS, KIT_SECOND_ODDS_PER_LEVEL, KIT_SOURCES } from './round-effect-data.ts';
+import { GUN_EFFECTS, KIT_CONTAINER_SHARE, KIT_EXTRA_ODDS_PER_LEVEL, KIT_SOURCES, KITS_PER_TOWN } from './round-effect-data.ts';
 import type { GunEffect, KitCounts, RoundKitId } from './round-effect-data.ts';
 import { createRng, pickWeighted, shuffle } from './rng.ts';
 import type { Rng } from './rng.ts';
@@ -12,10 +12,10 @@ import type { SimState } from './sim-state.ts';
 /** Off the town's seed, so kits leave the run's RNG, and all the loot rolled from it, as it was. */
 const KIT_SEED_SALT = 0x6b17;
 
-/** One kit, or two: the odds of the second are all that a later level changes. */
+/** Three kits, or four: the odds of the fourth are all that a later level changes. */
 export function kitsInTown(rng: Rng, level: number): number {
-  const secondOdds = KIT_SECOND_ODDS + KIT_SECOND_ODDS_PER_LEVEL * (level - 1);
-  return rng() < secondOdds ? 2 : 1;
+  const extraOdds = KIT_EXTRA_ODDS_PER_LEVEL * (level - 1);
+  return rng() < extraOdds ? KITS_PER_TOWN + 1 : KITS_PER_TOWN;
 }
 
 function rollKit(rng: Rng, building: BuildingInstance): RoundKitId {

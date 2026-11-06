@@ -23,11 +23,11 @@ const inContainers = (state: SimState) => state.containers.filter(({ loot }) => 
 const kitsIn = (state: SimState): number => onFloors(state).length + inContainers(state).length;
 
 describe('round kits in town', () => {
-  it.each(SEEDS.slice(0, 8))('seed %i: comes to one or two a town at every level', (seed) => {
+  it.each(SEEDS.slice(0, 8))('seed %i: comes to three or four a town at every level', (seed) => {
     for (let level = FIRST_LEVEL; level <= FINAL_LEVEL; level += 3) {
       const count = kitsIn(town(seed, level));
-      expect(count).toBeGreaterThanOrEqual(1);
-      expect(count).toBeLessThanOrEqual(2);
+      expect(count).toBeGreaterThanOrEqual(3);
+      expect(count).toBeLessThanOrEqual(4);
     }
   });
 

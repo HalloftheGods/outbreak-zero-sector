@@ -63,11 +63,11 @@ export const GUN_EFFECTS: Readonly<Record<GunEffect, EffectDef>> = {
   tranq: { label: 'Tranq rounds', note: 'Slows what it hits, and hits lighter', kit: 'tranq_kit', damage: 0.7, power: 0 },
 };
 
-/** Every town has one kit, and sometimes a second. Later towns lean towards the second, gently. */
-export const KIT_SECOND_ODDS = 0.35;
-export const KIT_SECOND_ODDS_PER_LEVEL = 0.03;
+/** Every town has three kits. Later towns lean towards a fourth, gently. */
+export const KITS_PER_TOWN = 3;
+export const KIT_EXTRA_ODDS_PER_LEVEL = 0.03;
 /** Share of kits shut away in a container rather than lying on a floor. */
-export const KIT_CONTAINER_SHARE = 0.5;
+export const KIT_CONTAINER_SHARE = 0.2;
 
 /** Who keeps what, with relative odds. */
 export const KIT_SOURCES: Partial<Record<BuildingKind, Partial<KitCounts>>> = {

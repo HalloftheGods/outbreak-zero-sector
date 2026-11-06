@@ -3,10 +3,13 @@ import type { BuildingKind, PickupType } from './protocol.ts';
 import { createRng, shuffle } from './rng.ts';
 import type { SimState } from './sim-state.ts';
 
-/** Roughly one town in two has a Radio, so most players come across one within the first few levels. */
+/** Roughly one town in two has a Radio left in a building. */
 export const RADIO_ODDS = 0.5;
+/** Every car has a radio in it, and about one in ten still works, so going through cars is how most players find one. */
+export const CAR_RADIO_ODDS = 0.1;
 /** Keeps the Radio's rolls apart from the town's own use of its seed. */
 const RADIO_SALT = 0x52414449;
+const CAR_RADIO_SALT = 0x43415252;
 /** Where a Radio is left: the places someone would have kept one. */
 const RADIO_PLACES: ReadonlySet<BuildingKind | 'outdoors'> = new Set(['house', 'apartment', 'diner', 'garage']);
 
@@ -21,11 +24,21 @@ function canTakeRadio(sim: SimState, id: number): boolean {
   return held === null || SMALL_FINDS.has(held.type);
 }
 
+function placeCarRadios(sim: SimState): void {
+  const rng = createRng(sim.map.seed ^ CAR_RADIO_SALT);
+  for (const car of townContainers(sim.map).filter((container) => container.kind === 'car')) {
+    const works = rng() < CAR_RADIO_ODDS;
+    const hasOne = works && canTakeRadio(sim, car.id);
+    if (hasOne) sim.containers[car.id].loot = { type: 'radio', rounds: 0 };
+  }
+}
+
 /**
- * Leaves at most one Radio in a container in some towns. It is picked from the town's seed alone, on a
- * generator of its own, so it never moves the simulation's rolls, and a Radio is never loose on the floor.
+ * Leaves Radios in some cars and at most one in a building. All of it is picked from the town's seed alone,
+ * on generators of its own, so it never moves the simulation's rolls, and a Radio is never loose on the floor.
  */
 export function placeRadio(sim: SimState): void {
+  placeCarRadios(sim);
   const rng = createRng(sim.map.seed ^ RADIO_SALT);
   const townHasRadio = rng() < RADIO_ODDS;
   if (!townHasRadio) return;
@@ -34,7 +47,7 @@ export function placeRadio(sim: SimState): void {
   if (chosen) sim.containers[chosen.id].loot = { type: 'radio', rounds: 0 };
 }
 
-/** The container holding the Radio, or null when this town has none. */
+/** The first container holding a Radio, or null when this town has none. */
 export function radioContainerId(sim: SimState): number | null {
   const held = sim.containers.findIndex((state) => state.loot?.type === 'radio');
   return held < 0 ? null : held;
