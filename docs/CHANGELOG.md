@@ -2,6 +2,14 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-06] - Combat & Scavenging Telemetry
+
+### Added
+- Expanded Google Analytics telemetry for insider gameplay metrics:
+  - Per-level telemetry: `kills`, `headshots`, `damage_taken`, and `containers_searched` recorded on `level_complete`.
+  - Run outcome telemetry: cumulative totals for `kills`, `headshots`, `damage_taken`, `containers_searched`, and `killer_type` (the zombie type that landed the final hit: walker, runner, bloater, brute, screamer) recorded on `run_end`.
+  - Privacy and catalog boundaries: parameter bounds and type guards registered in `catalog.ts` and documented in `privacy-text.ts`.
+
 ## [2026-11-05] - Special Rounds
 
 ### Added

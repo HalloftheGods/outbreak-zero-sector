@@ -66,6 +66,11 @@ describe('analytics run tracker', () => {
     tracker.event({ type: 'shot', playerId: 'someone-else', weapon: 'pistol', x: 0, y: 0, angle: 0 });
     tracker.event({ type: 'dry_fire', playerId: 'p1', x: 0, y: 0 });
     tracker.event({ type: 'player_downed', playerId: 'p1', x: 0, y: 0 });
+    tracker.event({ type: 'zombie_die', zombieId: 'z1', zombieType: 'walker', x: 0, y: 0, angle: 0, killerId: 'p1', points: 10 });
+    tracker.event({ type: 'zombie_die', zombieId: 'z2', zombieType: 'walker', x: 0, y: 0, angle: 0, killerId: 'someone-else', points: 10 });
+    tracker.event({ type: 'headshot', playerId: 'p1', zombieId: 'z1', zombieType: 'walker', x: 0, y: 0, angle: 0, points: 5 });
+    tracker.event({ type: 'player_hurt', playerId: 'p1', x: 0, y: 0, damage: 25 });
+    tracker.event({ type: 'container_opened', playerId: 'p1', container: 1, x: 0, y: 0, found: true, noisy: false });
     tracker.event({ type: 'level_complete', level: 2 });
     expect(sent.filter((each) => each.name === 'level_complete')).toHaveLength(1);
     expect(last('level_complete')).toEqual({
@@ -75,6 +80,10 @@ describe('analytics run tracker', () => {
       ammo_left: 12,
       shots_fired: 40,
       dry_fires: 1,
+      kills: 1,
+      headshots: 1,
+      damage_taken: 25,
+      containers_searched: 1,
       difficulty: 'lights_out',
       survivor: 'night',
     });
@@ -117,11 +126,40 @@ describe('analytics run tracker', () => {
       level_reached: 10,
       seconds: 3600.4,
       score_band: '10000-24999',
+      kills: 99,
+      headshots: 0,
+      damage_taken: 0,
+      containers_searched: 0,
       difficulty: 'undead_tired',
       survivor: 'rex',
     });
+    tracker.event({ type: 'zombie_attack', zombieId: 'z-boss', zombieType: 'brute', x: 0, y: 0 });
     tracker.event({ type: 'game_over', stats: { outcome: 'defeat', difficulty: 'lights_out', level: 1, wave: 1, durationSec: 1, players: [] } });
     expect(names().filter((each) => each === 'run_end')).toHaveLength(1);
+  });
+
+  it('records killer type on defeat when run ends', () => {
+    const { tracker, last } = setup();
+    tracker.localPlayer('p1');
+    tracker.ui(ui('game', { hud: hud() }));
+    tracker.event({ type: 'zombie_attack', zombieId: 'z-screamer', zombieType: 'screamer', x: 0, y: 0 });
+    tracker.event({
+      type: 'game_over',
+      stats: { outcome: 'defeat', difficulty: 'lights_out', level: 3, wave: 2, durationSec: 45, players: [{ id: 'p1', name: 'P1', skin: 0, kills: 15, score: 300 }] },
+    });
+    expect(last('run_end')).toEqual({
+      result: 'defeat',
+      level_reached: 3,
+      seconds: 45,
+      score_band: '1-999',
+      kills: 15,
+      headshots: 0,
+      damage_taken: 0,
+      containers_searched: 0,
+      killer_type: 'screamer',
+      difficulty: 'lights_out',
+      survivor: 'night',
+    });
   });
 
   it('never lets a callsign into anything it emits', () => {

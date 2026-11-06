@@ -54,6 +54,9 @@ const LEVEL = whole(99);
 const RUN_RESULTS = ['victory', 'defeat', 'quit', 'disconnected'] as const;
 export type RunResultName = (typeof RUN_RESULTS)[number];
 
+export const KILLER_TYPES = ['walker', 'runner', 'bloater', 'brute', 'screamer', 'unknown'] as const;
+const KILLER = oneOf(KILLER_TYPES);
+
 const RULES: Readonly<Record<EventName, Readonly<Record<string, Rule>>>> = {
   title_view: {},
   how_to_play_open: {},
@@ -74,6 +77,10 @@ const RULES: Readonly<Record<EventName, Readonly<Record<string, Rule>>>> = {
     ammo_left: whole(9999),
     shots_fired: whole(99999),
     dry_fires: whole(9999),
+    kills: whole(99999),
+    headshots: whole(9999),
+    damage_taken: whole(99999),
+    containers_searched: whole(999),
     difficulty: DIFFICULTY,
     survivor: SURVIVOR,
   },
@@ -82,6 +89,11 @@ const RULES: Readonly<Record<EventName, Readonly<Record<string, Rule>>>> = {
     level_reached: LEVEL,
     seconds: whole(86400),
     score_band: oneOf(SCORE_BANDS),
+    kills: whole(99999),
+    headshots: whole(9999),
+    damage_taken: whole(99999),
+    containers_searched: whole(999),
+    killer_type: KILLER,
     difficulty: DIFFICULTY,
     survivor: SURVIVOR,
   },

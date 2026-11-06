@@ -3,7 +3,7 @@
  * one event per level or run, never per shot. It only reads; it never touches the simulation.
  */
 import { characterOf } from '../../../shared/characters.ts';
-import type { GameEvent, GameOverStats } from '../../../shared/protocol.ts';
+import type { GameEvent, GameOverStats, ZombieType } from '../../../shared/protocol.ts';
 import { isRadioFound } from '../sound-unlock.ts';
 import type { BenchAction } from '../../../shared/workbench.ts';
 import { gunRounds } from '../hud-state.ts';
@@ -63,6 +63,15 @@ export class RunTracker {
   private downs = 0;
   private ammoLeft = 0;
   private score = 0;
+  private levelKills = 0;
+  private levelHeadshots = 0;
+  private levelDamage = 0;
+  private levelSearches = 0;
+  private runKills = 0;
+  private runHeadshots = 0;
+  private runDamage = 0;
+  private runSearches = 0;
+  private lastAttacker: ZombieType | 'unknown' = 'unknown';
   private frames = 0;
   private framedMs = 0;
   private lastFrameMs: number | null = null;
@@ -121,6 +130,11 @@ export class RunTracker {
   private startRun(mode: TrackedUi['mode'], hud: HudState): void {
     this.running = true;
     this.runStartMs = this.deps.now();
+    this.runKills = 0;
+    this.runHeadshots = 0;
+    this.runDamage = 0;
+    this.runSearches = 0;
+    this.lastAttacker = 'unknown';
     this.frames = 0;
     this.framedMs = 0;
     this.lastFrameMs = null;
@@ -162,6 +176,36 @@ export class RunTracker {
       case 'player_downed':
         this.downs += isMine ? 1 : 0;
         break;
+      case 'player_hurt':
+        if (isMine) {
+          this.levelDamage += event.damage;
+          this.runDamage += event.damage;
+        }
+        break;
+      case 'container_opened':
+        if (isMine) {
+          this.levelSearches += 1;
+          this.runSearches += 1;
+        }
+        break;
+      case 'headshot':
+        if (isMine) {
+          this.levelHeadshots += 1;
+          this.runHeadshots += 1;
+        }
+        break;
+      case 'zombie_die':
+        if (event.killerId === this.localId) {
+          this.levelKills += 1;
+          this.runKills += 1;
+        }
+        break;
+      case 'zombie_attack':
+        this.lastAttacker = event.zombieType;
+        break;
+      case 'bloater_burst':
+        this.lastAttacker = 'bloater';
+        break;
       case 'level_start':
         this.startLevel(event.level);
         break;
@@ -182,6 +226,10 @@ export class RunTracker {
     this.shots = 0;
     this.dryFires = 0;
     this.downs = 0;
+    this.levelKills = 0;
+    this.levelHeadshots = 0;
+    this.levelDamage = 0;
+    this.levelSearches = 0;
     this.levelWaiting = true;
     if (this.running) this.announceLevel();
   }
@@ -195,6 +243,10 @@ export class RunTracker {
       ammo_left: this.ammoLeft,
       shots_fired: this.shots,
       dry_fires: this.dryFires,
+      kills: this.levelKills,
+      headshots: this.levelHeadshots,
+      damage_taken: this.levelDamage,
+      containers_searched: this.levelSearches,
       difficulty,
       survivor,
     });
@@ -226,13 +278,20 @@ export class RunTracker {
   private finish(stats: GameOverStats): void {
     const mine = stats.players.find((player) => player.id === this.localId);
     const survivor = mine ? characterOf(mine.skin).id : this.profile().survivor;
-    this.endRun(stats.outcome, {
+    const isDefeat = stats.outcome === 'defeat';
+    const finishStats: Record<string, unknown> = {
       level_reached: stats.level,
       seconds: stats.durationSec,
       score_band: scoreBand(mine?.score ?? 0),
+      kills: mine?.kills ?? this.runKills,
+      headshots: this.runHeadshots,
+      damage_taken: this.runDamage,
+      containers_searched: this.runSearches,
       difficulty: stats.difficulty,
       survivor,
-    });
+    };
+    if (isDefeat) finishStats.killer_type = this.lastAttacker;
+    this.endRun(stats.outcome, finishStats);
   }
 
   private endRun(result: string, known: Readonly<Record<string, unknown>> = {}): void {
@@ -241,13 +300,22 @@ export class RunTracker {
     this.finished = this.screen === 'game';
     this.levelWaiting = false;
     const { difficulty, survivor, input } = this.profile();
-    this.deps.emit('run_end', {
+    const hasKiller = result === 'defeat' && this.lastAttacker !== 'unknown';
+    const baseStats: Record<string, unknown> = {
       result,
       level_reached: this.level,
       seconds: (this.deps.now() - this.runStartMs) / 1000,
       score_band: scoreBand(this.score),
+      kills: this.runKills,
+      headshots: this.runHeadshots,
+      damage_taken: this.runDamage,
+      containers_searched: this.runSearches,
       difficulty,
       survivor,
+    };
+    if (hasKiller) baseStats.killer_type = this.lastAttacker;
+    this.deps.emit('run_end', {
+      ...baseStats,
       ...known,
     });
     const hasFrames = this.frames >= MIN_FRAMES && this.framedMs > 0;

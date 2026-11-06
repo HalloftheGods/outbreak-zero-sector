@@ -30,8 +30,23 @@ describe('analytics catalog', () => {
   });
 
   it('rounds and bounds numbers, and drops anything that is not one', () => {
-    const kept = allowedParams('level_complete', { level: 2.6, seconds: 1e9, downs: -4, ammo_left: '12', shots_fired: Number.NaN });
-    expect(kept).toEqual({ level: 3, seconds: 86400, downs: 0 });
+    const kept = allowedParams('level_complete', {
+      level: 2.6,
+      seconds: 1e9,
+      downs: -4,
+      ammo_left: '12',
+      shots_fired: Number.NaN,
+      kills: 55.4,
+      headshots: 12.1,
+      damage_taken: 84.8,
+      containers_searched: 6.2,
+    });
+    expect(kept).toEqual({ level: 3, seconds: 86400, downs: 0, kills: 55, headshots: 12, damage_taken: 85, containers_searched: 6 });
+  });
+
+  it('keeps known killer types on run_end and drops unlisted attackers', () => {
+    expect(allowedParams('run_end', { killer_type: 'runner' })).toEqual({ killer_type: 'runner' });
+    expect(allowedParams('run_end', { killer_type: 'giant_boss' })).toEqual({});
   });
 
   it('has a rule set for every event it names', () => {

@@ -27,8 +27,8 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
     lines: [
       'Which screens you open: the title, How to Play, play setup and Sound Test.',
       'When a run starts and ends: the survivor, difficulty, solo or co-op, starting level, touch or mouse, and screen orientation.',
-      'For each level: the level, seconds taken, times downed, ammo left, shots fired and dry fires.',
-      'At the end of a run: win or lose, level reached, seconds, and a score range, not the exact score.',
+      'For each level: the level, seconds taken, times downed, ammo left, shots fired, dry fires, kills, headshots, damage taken and containers searched.',
+      'At the end of a run: win or lose, level reached, seconds, score range, kills, headshots, damage taken, containers searched, and the zombie type that struck last on defeat.',
       'Workbench visits, which gun effect you fitted, and radios found.',
       'Whether you opened an invite link or joined co-op.',
       'When you press the Install Game cartridge, and whether it opened the browser’s install prompt or the how-to-install steps. Also when the browser reports the game was installed.',
