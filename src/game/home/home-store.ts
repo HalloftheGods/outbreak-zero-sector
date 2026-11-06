@@ -68,9 +68,13 @@ export interface OverrunRecord {
 }
 
 export interface OpenOverrun {
+  /** The wire does not carry the sim's id before a receipt, so this may be empty. Nothing matches on it. */
   simId: string;
   mode: 'solo' | 'coop';
   startedAt: number;
+  /** What the record of a death in this breach reads. Absent from an older save, which reads 0 and the baseline. */
+  highest?: number;
+  difficulty?: DifficultyId;
 }
 
 /** A first save with nothing in it, before `rollStock` has filled the shops. */

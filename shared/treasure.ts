@@ -16,8 +16,8 @@ const TREASURE_SALT = 0x54524541;
 
 export const SMALL_JEWEL_SILVER = 40;
 export const LARGE_JEWEL_SILVER = 200;
-const SILVER_STACK_MIN = 5;
-const SILVER_STACK_MAX = 20;
+export const SILVER_STACK_MIN = 5;
+export const SILVER_STACK_MAX = 20;
 
 export type TreasurePickup = (typeof TREASURE_TYPES)[number];
 

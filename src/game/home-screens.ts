@@ -8,7 +8,7 @@ import type { Jewels, Loadout } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, LEVELS } from '../../shared/levels.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
-import type { HomeActions, HomeDeath, HomeUi } from './home-hud.ts';
+import type { ChestOpened, HomeActions, HomeDeath, HomeUi } from './home-hud.ts';
 import type { HomeSave } from './home/home-store.ts';
 import { COOP_LEVEL_NOTE, startAtLabel } from './level-select.ts';
 
@@ -131,6 +131,15 @@ export function closeLocker(draft: LockerDraft, actions: HomeActions): void {
   actions.closeStation();
 }
 
+/**
+ * The locker went away without Close, as when the blast door bursts and every station shuts. Hands that were
+ * moved still go on the player, so nobody faces the horde with the old ones. `sent` is the draft last put on.
+ */
+export function lockerGone(draft: LockerDraft | null, sent: LockerDraft | null, actions: HomeActions): void {
+  const unsent = draft !== null && draft !== sent;
+  if (unsent) actions.equip(draft.hands);
+}
+
 // The forge
 
 export interface ForgeView {
@@ -177,11 +186,30 @@ export function garageLevels(home: HomeUi): readonly GarageLevel[] {
 
 // The death summary
 
-function plural(count: number, one: string, many = `${one}s`): string {
+export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+export const LOCKER_HELD = 'The locker held';
+
+/** The heading: a trip names its level, the overrun says who fell. */
+export function deathHeading(death: HomeDeath): string {
+  if (death.overrun) return death.overrun.bunkerFell ? 'The bunker fell' : 'You fell holding the bunker';
+  return `You died on level ${death.receipt.level}`;
+}
+
+export function deathNote(death: HomeDeath): string {
+  return death.overrun ? 'You stand up in the bunker again. Lost:' : 'You wake in the bunker with what was stored. Lost:';
+}
+
+/** In the bunker only the gear in hand goes, and the line after it says the rest did not. */
+function overrunLost(lost: Loadout): readonly string[] {
+  const gear = loadoutRows(lost).map(gearLine);
+  return [...(gear.length > 0 ? gear : ['Nothing was in your hands']), LOCKER_HELD];
+}
+
 export function deathSummary(death: HomeDeath): readonly string[] {
+  if (death.overrun) return overrunLost(death.lost);
   const { receipt, lost } = death;
   const lines: string[] = [];
   if (receipt.silver > 0) lines.push(`${receipt.silver} silver`);
@@ -205,6 +233,21 @@ function gearLine(row: LockerRow): string {
   return `${row.count} ${row.label.toLowerCase()}`;
 }
 
+// The reward chest
+
+export const CHEST_HEADING = 'The chest held';
+export const CHEST_NOTE = 'The gear is in your locker. The silver and jewels are in the bank.';
+
+/** What the chest held: silver, jewels, then each piece of gear. */
+export function chestLines(chest: ChestOpened): readonly string[] {
+  const lines: string[] = [];
+  if (chest.silver > 0) lines.push(`${chest.silver} silver`);
+  if (chest.jewels.small > 0) lines.push(plural(chest.jewels.small, 'small jewel'));
+  if (chest.jewels.large > 0) lines.push(plural(chest.jewels.large, 'large jewel'));
+  for (const row of loadoutRows(chest.gear)) lines.push(gearLine(row));
+  return lines;
+}
+
 // Pause, cursor and setup
 
 /** Quitting mid-trip counts as dying, so the pause menu says so first. */
@@ -224,7 +267,7 @@ export interface AimState {
 export function aimsCursor(state: AimState): boolean {
   const { screen, paused, mapOpen, bench, home } = state;
   const stationOpen = home !== null && home.station !== null;
-  const summaryOpen = home !== null && home.death !== null;
+  const summaryOpen = home !== null && (home.death !== null || home.chest !== null);
   return screen === 'game' && !paused && !mapOpen && !bench && !stationOpen && !summaryOpen;
 }
 

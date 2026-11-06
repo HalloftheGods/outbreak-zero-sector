@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { CHEST_STATION, generateBunkerMap } from '../shared/bunker-map.ts';
 import { CHARACTERS } from '../shared/characters.ts';
 import { PLAYER_SPEED, TICK_DT } from '../shared/constants.ts';
+import type { HomeView, OverrunPhase } from '../shared/home-protocol.ts';
 import { playerSpeed } from '../shared/players.ts';
 import { BUILDING_DEFS } from '../shared/protocol.ts';
 import type { PlayerEntity, SnapshotPacket, WorldMap } from '../shared/protocol.ts';
@@ -152,6 +154,38 @@ describe('ClientWorld', () => {
     world.restart();
     world.push(snapshot(50, [player('me', { x: 42 })], 'intermission'), 1100);
     expect(world.localPlayer?.x).toBe(42);
+  });
+});
+
+describe('the station prompt in the bunker', () => {
+  const bunker = generateBunkerMap();
+  const home = (patch: Partial<HomeView> = {}): HomeView => ({
+    silver: 0, jewels: { small: 0, large: 0 }, station: null, stationHold: 0, ready: false, receipt: null, overrun: null, ...patch,
+  });
+
+  /** What the local player is offered standing at this point, with the room's overrun at this phase. */
+  function offered(x: number, y: number, phase: OverrunPhase | undefined, view: HomeView = home()) {
+    const world = new ClientWorld(bunker, 'me');
+    const frame = { ...snapshot(1, [player('me', { x, y, home: view })]), mapSeed: bunker.seed };
+    const overrun = phase ? { overrun: { phase, left: 0, slowed: false, hostiles: 0, total: 0 } } : {};
+    world.push({ ...frame, home: { pickedLevel: null, roomHighest: 1, ...overrun } }, 1000);
+    return world.advance(1000, 66, 0, 0, 0, 1 / 60)!.station;
+  }
+
+  const gunsmith = bunker.stations!.find((station) => station.id === 'gunsmith')!;
+
+  it('offers the chest to a player whose view says theirs is waiting', () => {
+    expect(offered(CHEST_STATION.x, CHEST_STATION.y, 'held', home({ chest: true }))).toBe('chest');
+  });
+
+  it('offers no chest to a player who has none', () => {
+    expect(offered(CHEST_STATION.x, CHEST_STATION.y, 'held')).toBeUndefined();
+  });
+
+  it('offers no merchant while the horde is in, as the sim refuses to open one', () => {
+    expect(offered(gunsmith.x, gunsmith.y, 'breached')).toBeUndefined();
+    expect(offered(gunsmith.x, gunsmith.y, 'counting')).toBe('gunsmith');
+    expect(offered(gunsmith.x, gunsmith.y, undefined)).toBe('gunsmith');
   });
 });
 

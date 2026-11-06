@@ -188,7 +188,7 @@ The constants live in a new `shared/overrun.ts`. They are starting numbers for t
 - **Slowed in menus, never stopped.** Each tick takes `TICK_DT × rate` off the clock. The rate is `OVERRUN_MENU_RATE` while every player who counts has a station open, and 1 otherwise. Who counts is who the van waits for: alive and not gone quiet (60 seconds with no key and no station). If nobody counts, the clock runs at full speed. Any station counts: the shops, the locker, the bench, the forge, the garage map and the jukebox.
 - **Why half speed.** A full stop would make the clock meaningless. Input is held while a station is open, so a player who goes from screen to screen would only spend clock on the short walks between stations, and the horde would never come. Full speed punishes reading a shop. At half speed, a player who spends the whole visit in screens gets 10 minutes and one who wanders the floor gets 5. A jewel's 3 seconds at the forge cost 1.5. It is also easy to say and to show: "the clock runs at half speed in menus". At 0.25 only the walk would cost anything, and 0.75 is too small a change to notice.
 - **Why everyone, not anyone and not each player.** There is one door, one horde and so one clock. If anyone is free to act, the room is acting. It is the same test the van uses, so players learn one rule. With "slowed if anyone is in a menu", one friend parked at the jukebox would stretch the clock for everybody.
-- **The solo pause menu stops it.** Pausing solo already stops the whole sim (`LocalSession.setPaused` stops its clock), so the overrun clock stops too, as a town horde does. That is a pause, not a menu. Esc puts a station away before the pause menu opens, so nothing can be bought, smelted or equipped while paused. The co-op pause menu stops nothing and is not a station, so the clock runs at full speed under it. **Open:** question 2 below.
+- **The solo pause menu stops it.** Pausing solo already stops the whole sim (`LocalSession.setPaused` stops its clock), so the overrun clock stops too, as a town horde does. That is a pause, not a menu. Esc puts a station away before the pause menu opens, so nothing can be bought, smelted or equipped while paused. The co-op pause menu stops nothing and is not a station, so the clock runs at full speed under it. Settled: question 2 below.
 - **Leaving before the breach costs nothing.** `startTrip` sets `sim.overrun` to null. The clock is a deadline for shopping, not a sentence.
 - **A trip already open.** Saving the open trip and being ready do not touch the clock. A ready player still in the bunker at the breach is in the fight like anyone else. If they die there, the died overrun receipt clears `openTrip` along with their gear in hand, as stepping away from the van does.
 
@@ -249,7 +249,7 @@ The sim emits `overrun_warning { step, left }` once at each step, then `overrun_
 **Go down (`died`, `lost`).** Dying in the bunker costs only what you carry, and in the bunker that is the gear in hand (`HomeSave.hands`, what the body holds). There is never carried treasure in the bunker. The locker, the bank, raw jewels and the stock are untouched.
 - Solo, nobody can revive you, so bleeding out leaves nobody standing (`standingPlayers` counts the downed) and the overrun is `lost`.
 - Co-op, the downed can be revived as in town. A bleed-out writes a died receipt at once. The body stays dead and watches until the overrun ends, then stands at the spawn, healed and holding nothing.
-- Nobody standing makes it `lost`. Every body still holding gear gets a died receipt, the horde goes back out through the door (every horde zombie is removed), and everyone stands at the spawn, healed. No merchant dies when the bunker falls. **Open:** question 5. The overrun is over until the next arrival.
+- Nobody standing makes it `lost`. Every body still holding gear gets a died receipt, the horde goes back out through the door (every horde zombie is removed), and everyone stands at the spawn, healed. No merchant dies when the bunker falls. Settled: question 5. The overrun is over until the next arrival.
 - **Quitting, a crash or a disconnect while `breached` counts as dying there.** The client writes `HomeSave.openOverrun` when it first sees `breached`. If it is still there on load, it resolves as a died overrun and the gear in hand is lost: at once in solo, and in co-op once the server answers `resumed` or `OPEN_TRIP_WAIT_MS` passes, as an open trip does. Quitting before the breach costs nothing.
 
 ### Co-op
@@ -273,7 +273,7 @@ The sim emits `overrun_warning { step, left }` once at each step, then `overrun_
 
 ### The switch
 
-`OVERRUN_LIVE = false` sits in `shared/home-protocol.ts` beside `HOME_LOOP_LIVE`. `SimulationOptions.overrun` is off by default. `server/server.ts` and the solo session pass `overrun: HOME_LOOP_LIVE && OVERRUN_LIVE`, and a dev build turns it on with `?home&overrun`. The overrun has its own switch because the home loop can ship first and the overrun needs its own soak. With it off there is no clock, so every existing home spec stays green.
+`OVERRUN_LIVE = false` sits in `shared/home-protocol.ts`. `SimulationOptions.overrun` is off by default. The solo session and the renderer ask `overrunOn(search, dev)` in `src/game/home-mode.ts`, which is `OVERRUN_LIVE`, or a dev build with `?overrun` in its address. `server/server.ts` passes `overrun: OVERRUN_LIVE` alone, so a co-op room has no dev switch and runs the overrun only once `OVERRUN_LIVE` is flipped. The overrun has its own switch because the home loop shipped first and the overrun needed its own soak. With it off there is no clock, so every existing home spec stays green. The flip is the user's call, made after the soak report in `tests/overrun-soak.spec.ts`.
 
 ### Build order
 
@@ -293,18 +293,18 @@ The sim emits `overrun_warning { step, left }` once at each step, then `overrun_
 
 ### Open questions for Xopher
 
-These are the calls only Xopher can make. Each has a default the build follows until it is answered.
+These are the calls only Xopher can make. Settled ones are marked; the others keep the default the build follows until they are answered.
 
-1. **Open:** are 300 seconds and half speed right to start the soak with? Default: yes, tuned in #7223.
-2. **Open:** should the solo pause menu stop the clock, as a true pause, or run it at the menu rate? Default: it stops. Leaving the tab pauses solo too, so a phone call costs nothing.
-3. **Open:** should the first visit be free of the clock (no clock below level 2), or should it run from the very first visit? Default: free.
-4. **Open:** should the horde be sized by highest level only, or grow with trip count too? Default: highest level only.
-5. **Open:** when the bunker falls (`lost`), should the merchants be spared, or die as in a flight at share 1? Default: spared, so dying costs gear and running costs merchants, a real choice.
-6. **Open:** can Mags the gunsmith be killed? Default: yes, since the free pistol still means nobody is stuck.
-7. **Open:** should a replacement merchant keep the same name and portrait, or get a new one? Default: the same, since the names are working names.
-8. **Open:** one chest per player in co-op, or one shared chest? Default: one each, since banks and lockers are per player.
-9. **Open:** should leaving while `armed` (door holding, guns free) cost anything? Default: no, only the breach does.
-10. **Open:** should the co-op pause menu count as a menu? Default: no. The sim cannot see it, and it would need a new packet.
+1. **Settled:** 300 seconds and half speed in menus. The soak (#7223) reports against them; they stay `OVERRUN_CLOCK_SEC` and `OVERRUN_MENU_RATE`.
+2. **Settled:** the solo pause menu stops the clock, as a true pause. Leaving the tab pauses solo too, so a phone call costs nothing.
+3. **Default kept, not yet confirmed:** should the first visit be free of the clock (no clock below level 2), or should it run from the very first visit? Default: free.
+4. **Settled:** the horde is sized by the room's highest level only, capped at 40.
+5. **Settled:** spared. When the bunker falls (`lost`), should the merchants be spared, or die as in a flight at share 1? Default: spared, so dying costs gear and running costs merchants, a real choice.
+6. **Settled:** yes, any merchant can die, Mags included. Can Mags the gunsmith be killed? Default: yes, since the free pistol still means nobody is stuck.
+7. **Default kept, not yet confirmed:** should a replacement merchant keep the same name and portrait, or get a new one? Default: the same, since the names are working names.
+8. **Settled:** one each. One chest per player in co-op, or one shared chest? Default: one each, since banks and lockers are per player.
+9. **Default kept, not yet confirmed:** should leaving while `armed` (door holding, guns free) cost anything? Default: no, only the breach does.
+10. **Default kept, not yet confirmed:** should the co-op pause menu count as a menu? Default: no. The sim cannot see it, and it would need a new packet.
 
 ## How it is built
 
@@ -312,7 +312,7 @@ These decisions were checked against the code.
 
 1. **Walls are data.** `WorldMap` gains optional `walls`, `exit` and `stations`. `wallBoxes()` returns `map.walls` when set. No new `BuildingKind`, so the tables keyed by it and `building-layer.ts` stay untouched. Walls draw as an appended `bunker_wall` tile, and `map.districts` name the rooms.
 2. **The bunker is a reserved seed.** `BUNKER_SEED = -1`, and `generateWorldMap` dispatches on it, so welcome and snapshot packets need no new field. `isBunkerSeed(snapshot.mapSeed)` is the client's signal. `sim.level` is 0 there, which clamps to level 1's look and triggers no town rule and no unlock. Phase stays `intermission`, `step()` skips waves and population on the bunker, and the HUD, `run-stage` and audio each branch on the signal, so they show no horde timer, level card or town weather.
-3. **One switch.** `home?: boolean` on `SimulationOptions`, off by default. `HOME_LOOP_LIVE = false` in `shared/home-protocol.ts` is the only flip, so players see nothing and existing specs stay green on `main`. In a dev build, `?home` turns it on, so it can be played before the flip.
+3. **One switch.** `home?: boolean` on `SimulationOptions`, off by default. `HOME_LOOP_LIVE = false` in `shared/home-protocol.ts` is the only flip, so players see nothing and existing specs stay green on `main`. (Superseded: `HOME_LOOP_LIVE` and `?home` are gone, and the player chooses Campaign or Arcade for each run. The overrun keeps a switch of its own, see [The switch](#the-switch).)
 4. **The sim holds carried treasure and gear in hand.** Bank, locker, forge, shops and ledger stay in the browser, so they never go on the wire. The one privacy change to `viewFor` is that it drops other players' receipts.
 5. **Home packets.** `ClientPacket` gains `{ type: 'home', action }`, `GameTransport` gains `sendHome`, `GameSimulation` gains `homeCommand`, and `server/home-packets.ts` parses it. `HomeAction` is `pick_level`, `equip`, `ready`, `leave_station` and `highest`. A join carries the same gear and highest level. Gear the server refuses stays in the locker: the client debits only what comes back on `PlayerEntity`, and a bad loadout gets the free pistol.
 6. **The van waits for ready.** `exitBoarded` counts `ready` riders. The sim cannot wait on an async save, so the client saves the open trip first and then sends `ready`. This reuses the 2 second hold, with `sim.exit` pre-opened at a fixed spot and a destination added.

@@ -1,8 +1,8 @@
 <template>
   <section class="px-screen">
     <div class="px-panel px-frame summary">
-      <h2 class="px-heading is-danger">You died on level {{ death.receipt.level }}</h2>
-      <p class="px-note">You wake in the bunker with what was stored. Lost:</p>
+      <h2 class="px-heading is-danger">{{ deathHeading(death) }}</h2>
+      <p class="px-note">{{ deathNote(death) }}</p>
       <ul class="summary-lost">
         <li v-for="line in lines" :key="line">{{ line }}</li>
       </ul>
@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { HomeDeath } from '../game/home-hud.ts';
-import { deathSummary } from '../game/home-screens.ts';
+import { deathHeading, deathNote, deathSummary } from '../game/home-screens.ts';
 import PixelButton from './PixelButton.vue';
 import { useGame } from './use-game.ts';
 

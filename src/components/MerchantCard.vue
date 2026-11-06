@@ -1,6 +1,6 @@
 <template>
   <div class="select-card">
-    <div class="select-bust px-frame" :style="BUST_SIZE">
+    <div class="select-bust px-frame" :class="{ 'is-closed': closed }" :style="BUST_SIZE">
       <span class="merchant-bust">
         <SpriteImg :sprite="bust" />
       </span>
@@ -31,9 +31,11 @@ interface MerchantCardProps {
   name: string;
   role: string;
   greeting: string;
+  /** No one keeps the stall: the bust is drawn greyed out. */
+  closed?: boolean;
 }
 
-const { bust, name, role, greeting } = defineProps<MerchantCardProps>();
+const { bust, name, role, greeting, closed = false } = defineProps<MerchantCardProps>();
 /** Art sizes for the bust's box, the survivor bust's, which every merchant bust is drawn to. */
 const BUST_SIZE = { '--bust-w': BUST_W, '--bust-h': BUST_H };
 </script>
@@ -74,6 +76,10 @@ const BUST_SIZE = { '--bust-w': BUST_W, '--bust-h': BUST_H };
 
 .merchant-bust img {
   flex: none;
+}
+
+.is-closed .merchant-bust {
+  filter: grayscale(1) brightness(0.4);
 }
 
 /* The nameplate sits over the bust's shoulders, so it adds no height to the card. */

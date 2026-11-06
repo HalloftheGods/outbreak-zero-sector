@@ -17,7 +17,7 @@ import { emptySave } from '../src/game/home/home-store.ts';
 import { buy, shopRows } from '../src/game/home/shop.ts';
 import { homeUi, shopContext } from '../src/game/home-hud.ts';
 import { overrunOn } from '../src/game/home-mode.ts';
-import { isRoomHomeView } from '../src/network/home-guards.ts';
+import { isHomeView, isRoomHomeView } from '../src/network/home-guards.ts';
 import { LocalSession } from '../src/network/local-session.ts';
 import { homeSim } from './helpers/home-harness.ts';
 import { input, SEED, stateOf, steps } from './helpers/sim-harness.ts';
@@ -288,5 +288,16 @@ describe('the overrun on the wire', () => {
     expect(viewFor(frame, 'a').players[1].home?.overrun).toBeNull();
     expect(viewFor(frame, 'b').players[1].home?.overrun).toEqual(receipt);
     expect(viewFor(frame, 'a').players[0].home).toEqual(QUIET_HOME);
+  });
+
+  it('tells only its owner that a chest is waiting, and nobody once it is opened', () => {
+    const { sim, state } = homeSim({ players: ['a', 'b'] });
+    state.players[1].home!.chest = true;
+    const frame = sim.snapshot();
+    expect(viewFor(frame, 'b').players[1].home?.chest).toBe(true);
+    expect(viewFor(frame, 'a').players[1].home).toEqual(QUIET_HOME);
+    expect(isHomeView(viewFor(frame, 'b').players[1].home)).toBe(true);
+    state.players[1].home!.chest = false;
+    expect(sim.snapshot().players[1].home).toEqual(QUIET_HOME);
   });
 });

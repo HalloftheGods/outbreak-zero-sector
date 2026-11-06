@@ -14,6 +14,7 @@ import {
   forgeView,
   garageLevels,
   leaveWarning,
+  lockerGone,
   lockerView,
   moveToHands,
   moveToLocker,
@@ -40,6 +41,7 @@ function homeUi(patch: Partial<HomeUi> = {}): HomeUi {
     forgeProgress: 0,
     saveError: null,
     death: null,
+    chest: null,
     ...patch,
   };
 }
@@ -61,6 +63,32 @@ describe('the locker', () => {
     const equip = vi.fn();
     closeLocker(save, { ...NO_HOME_ACTIONS, equip });
     expect(equip).toHaveBeenCalledWith(save.hands);
+  });
+
+  it('puts moved hands on the player when the breach shuts the locker before Close', () => {
+    const opened = { locker: gear({ guns: { carbine: {} } }), hands: gear({ guns: { pistol: {} } }) };
+    const moved = moveToHands(opened, 'gun:carbine');
+    const equip = vi.fn();
+    lockerGone(moved, opened, { ...NO_HOME_ACTIONS, equip });
+    expect(equip).toHaveBeenCalledWith(moved.hands);
+    expect(moved.hands.guns.carbine).toEqual({});
+  });
+
+  it('sends nothing more when the locker goes with nothing moved, after Close, or before the save loaded', () => {
+    const opened = { locker: gear({ guns: { carbine: {} } }), hands: gear() };
+    const moved = moveToHands(opened, 'gun:carbine');
+    const equip = vi.fn();
+    const actions = { ...NO_HOME_ACTIONS, equip };
+    lockerGone(opened, opened, actions);
+    lockerGone(moved, moved, actions);
+    lockerGone(null, null, actions);
+    expect(equip).not.toHaveBeenCalled();
+  });
+
+  it('wires the locker screen to send an unsent draft when it unmounts', () => {
+    const screen = readFileSync(new URL('../src/components/LockerScreen.vue', import.meta.url), 'utf8');
+    expect(screen).toMatch(/onBeforeUnmount\(\(\) => \{\s*lockerGone\(draft\.value, sent, game\.home\)/);
+    expect(screen).toMatch(/function close\(\): void \{\s*sent = draft\.value;/);
   });
 
   it('moves a whole gun or a count between the sides, and refuses what is not there', () => {

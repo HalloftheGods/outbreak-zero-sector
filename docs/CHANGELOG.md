@@ -2,6 +2,24 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-06] - The Overrun (behind a switch)
+
+### Added
+- The overrun: a 300 second clock on every arrival in the bunker, at half speed while everyone who counts has a station open and stopped by the solo pause menu. Warnings, then the blast door bursts and a horde (sized by the room's highest level, at most 40) comes in. Killing it pays each player a reward chest; running for the van kills merchants and thins the rest; dying costs the gear in hand. A first visit (below level 2) has no clock. It is built across #7213 to #7222 with HUD, sound, art, screens, save receipts and co-op specs.
+- It is **off for players**: `OVERRUN_LIVE` in `shared/home-protocol.ts` stays false. A dev build turns it on with `?overrun` in the address (solo only; a co-op server follows `OVERRUN_LIVE`). Tuning constants: `OVERRUN_CLOCK_SEC` and `OVERRUN_MENU_RATE` in `shared/overrun.ts`.
+- `tests/overrun-soak.spec.ts`: a bot that shops at menu speed and holds the quarters, printing the clear rate and minutes per visit at highest 1, 5 and 10 on each difficulty.
+- How to Play does not mention the overrun yet; its chapter goes in with the flip, since the text would describe a feature players cannot reach.
+
+### Fixed (final review, #7262)
+- A co-op refresh in the middle of the breach joins with empty hands, as a refresh mid-trip does, so the death on file is not undone by the body rejoining armed. The locker comes through untouched. Hands the room would refuse stay forfeit while a breach is on file.
+- HOLD E: CHEST (OPEN on touch) shows for a player whose chest is waiting, and no merchant prompt shows while the horde is in. The client asks the same rule the sim does (`openableStation` in `shared/stations.ts`). The snapshot carries `home.chest` on its owner's view only, and the chest is drawn only for a player who has one.
+- A body written off as the van left gets its died receipt applied and recorded in town without the bunker death summary, and a fall summary or chest card still up when the van leaves is put away, so neither holds the keys over the town.
+- A body that left from the van before the breach gets no flight receipt and costs no merchants.
+- Opening the chest after falling in the horde keeps the died receipt inside the held one (`died`), so a death the save had not applied yet is still applied and both are recorded.
+- A home view without an overrun receipt, from a server older than the overrun, is read as none.
+- A breach closing (survived or over) is written once while the write is in flight, so a failed save waits for its retry.
+- `tests/overrun-off-rng.spec.ts` pins the `sim.rng()` draws of a seeded home run with the overrun off.
+
 ## [2026-11-06] - Campaign and Arcade
 
 ### Added
@@ -35,7 +53,7 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 
 ### Changed
 - The sound test lays its track tiles out four across instead of five, so titles stop wrapping.
-- The app icon is now the game's cartridge with its name on the label (UNDEAD OF / NIGHT), instead of the zombie head. The Install Game cartridge and the browser-tab favicon are unchanged. Reinstall the app to see it: installed shortcuts keep the icon they were made with.
+- The app icon is now the game's cartridge with its name on the label (UNDEAD OF / NIGHT), instead of the zombie head, filling the icon on a transparent background so the desktop shows around it (the maskable and Apple icons stay on ink, as they must be opaque). The Install Game cartridge and the browser-tab favicon are unchanged. Reinstall the app to see it: installed shortcuts keep the icon they were made with.
 
 ### Added
 - Sprinting now tires you. The Sprint bar drains while you sprint on the move, refills when you do not, and a survivor who runs it dry walks until it is back to a quarter. A survivor's Speed sets how long a bar lasts. How to Play and Options list the sprint and sneak keys.

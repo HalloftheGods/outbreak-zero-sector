@@ -62,11 +62,12 @@ function startFreshRoomClock(sim: SimState): void {
 /**
  * Whether the room holds this body for its token to come back to. In the bunker with nothing at stake (not ready for the van, no result left to credit) the
  * save is the newer word on the gear and the level, since a solo run can have changed both while the tab was away, so the body goes and a rejoin is a newcomer.
+ * An overrun receipt still on the body is at stake too: a chest or a flight not yet credited, and a died receipt not yet applied, would be thrown away with it.
  */
 export function keepsBodyOnLeaving(sim: SimState, p: PlayerState): boolean {
   const { home } = p;
   const inBunker = sim.homeRun !== null && sim.homeRun.tripLevel === null;
-  const nothingAtStake = home !== null && !home.ready && home.receipt === null;
+  const nothingAtStake = home !== null && !home.ready && home.receipt === null && home.overrun === null;
   return !(inBunker && nothingAtStake);
 }
 

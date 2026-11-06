@@ -3,6 +3,7 @@
 import type { MerchantId } from '../../../shared/home-protocol.ts';
 import { shopContext } from '../home-hud.ts';
 import type { HomeUi } from '../home-hud.ts';
+import { plural } from '../home-screens.ts';
 import type { HomeSave } from './home-store.ts';
 import { MERCHANTS, itemOf } from './merchant-data.ts';
 import type { ItemGrant } from './merchant-data.ts';
@@ -23,12 +24,35 @@ export interface MerchantLine {
   refusal: string | null;
 }
 
+/** Whether anyone keeps the stall, after a flight from the overrun. `trips` are banked trips until it recovers. */
+export type Stall = { kind: 'open' } | { kind: 'closed'; trips: number } | { kind: 'thin'; trips: number };
+
 export interface MerchantView {
   name: string;
   role: string;
   greeting: string;
   silver: number;
   lines: MerchantLine[];
+  stall: Stall;
+  /** What the screen says about the stall, or null for an ordinary one. */
+  notice: string | null;
+}
+
+const OPEN_STALL: Stall = { kind: 'open' };
+
+function stallOf(save: HomeSave | null, merchant: MerchantId): Stall {
+  const stock = save?.shop.merchants[merchant];
+  const closed = stock?.closedTrips ?? 0;
+  const thin = stock?.thinTrips ?? 0;
+  if (closed > 0) return { kind: 'closed', trips: closed };
+  if (thin > 0) return { kind: 'thin', trips: thin };
+  return OPEN_STALL;
+}
+
+export function stallNotice(stall: Stall): string | null {
+  if (stall.kind === 'closed') return `No one at this stall. A new keeper in ${plural(stall.trips, 'trip')}.`;
+  if (stall.kind === 'thin') return `Short on stock for ${plural(stall.trips, 'trip')}`;
+  return null;
 }
 
 const GREETING_STRIDE = 7;
@@ -66,5 +90,6 @@ export function merchantView(home: HomeUi, merchant: MerchantId): MerchantView {
     const refusal = refusalOf(save, merchant, row, context);
     return [{ ...row, label: def.label, grant: def.grant, canBuy: refusal === null, refusal }];
   });
-  return { name, role, greeting: greetingFor(merchant, save?.shop.seed ?? 0), silver: save?.silver ?? 0, lines };
+  const stall = stallOf(save, merchant);
+  return { name, role, greeting: greetingFor(merchant, save?.shop.seed ?? 0), silver: save?.silver ?? 0, lines, stall, notice: stallNotice(stall) };
 }

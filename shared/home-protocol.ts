@@ -122,6 +122,8 @@ export interface OverrunReceipt {
   lost: Loadout | null;
   kills: number;
   seconds: number;
+  /** Held: the died receipt of a body that fell in the horde and then opened its chest, so the death still reaches the save. Left off otherwise. */
+  died?: OverrunReceipt;
 }
 
 /** One player's side of the bunker and the trip, on PlayerEntity. */
@@ -134,8 +136,10 @@ export interface HomeView {
   stationHold: number;
   ready: boolean;
   receipt: TripReceipt | null;
-  /** The last overrun's receipt, until the next arrival in the bunker. */
-  overrun: OverrunReceipt | null;
+  /** The last overrun's receipt, until the next arrival in the bunker. Left off by a server from before the overrun. */
+  overrun?: OverrunReceipt | null;
+  /** This player's chest from a held overrun is waiting unopened. Left off otherwise, and off every other player's body. */
+  chest?: true;
 }
 
 /** The room's side, on SnapshotPacket. */

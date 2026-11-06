@@ -15,6 +15,7 @@ import { stepMovement } from './movement.ts';
 import { useMedkit } from './player-health.ts';
 import { updateThrow } from './bottles.ts';
 import { isBunkerMap } from './home-protocol.ts';
+import { gunsFree } from './overrun.ts';
 import type { ClientInputPacket, Stance } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { updateStations } from './stations.ts';
@@ -91,7 +92,7 @@ function noteActivity(sim: SimState, p: PlayerState): void {
   if (active) home.lastActiveTick = sim.tick;
 }
 
-/** Nothing is thrown, swung or fired at home, so a press spends nothing and makes no sound. */
+/** Nothing is thrown, swung or fired at home but against an overrun, so a press spends nothing and makes no sound. */
 function holdFire(p: PlayerState): void {
   p.shoot = false;
   p.shootQueued = false;
@@ -128,7 +129,8 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   footsteps(sim, p);
   p.indoors = buildingAt(sim.map, p.x, p.y)?.id ?? null;
   leaveFootprint(sim, p);
-  if (isBunkerMap(sim.map)) holdFire(p);
+  const holdingFire = isBunkerMap(sim.map) && !gunsFree(sim);
+  if (holdingFire) holdFire(p);
   updateWeapons(sim, p);
   updateMelee(sim, p);
   useMedkit(sim, p);

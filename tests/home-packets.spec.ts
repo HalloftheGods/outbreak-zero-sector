@@ -157,9 +157,26 @@ describe('home guards', () => {
     expect(isHomeView({ ...view, overrun: value })).toBe(false);
   });
 
-  it('refuses a view that leaves the overrun receipt off', () => {
+  it('reads a view that leaves the overrun receipt off, as a server from before the overrun sends it', () => {
     const { overrun: _left, ...withoutOverrun } = view;
-    expect(isHomeView(withoutOverrun)).toBe(false);
+    expect(isHomeView(withoutOverrun)).toBe(true);
+    expect(isPlayerEntity({ ...player, home: withoutOverrun })).toBe(true);
+  });
+
+  it('reads a chest waiting, and refuses one that is not a plain yes', () => {
+    expect(isHomeView({ ...view, chest: true })).toBe(true);
+    expect(isHomeView({ ...view, chest: false })).toBe(false);
+    expect(isHomeView({ ...view, chest: 'yes' })).toBe(false);
+  });
+
+  it('reads a held receipt carrying the death before it, one level deep and only a death', () => {
+    const died = { ...overrun, outcome: 'died', chest: null, lost: emptyLoadout() };
+    const held = { ...overrun, outcome: 'held' };
+    expect(isOverrunReceipt({ ...held, died })).toBe(true);
+    expect(isOverrunReceipt({ ...held, died: { ...died, outcome: 'fled' } })).toBe(false);
+    expect(isOverrunReceipt({ ...held, died: { ...died, died } })).toBe(false);
+    expect(isOverrunReceipt({ ...died, died })).toBe(false);
+    expect(isOverrunReceipt({ ...held, died: { ...died, serial: 'one' } })).toBe(false);
   });
 
   it('reads the room\'s clock, and a room view without one', () => {

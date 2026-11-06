@@ -4,6 +4,8 @@ import type { HomeAction, JoinHome } from './home-protocol.ts';
 import { enterBunker, enterTown, placeAtEntry } from './level-change.ts';
 import { FIRST_LEVEL } from './levels.ts';
 import { applyLoadout, emptyLoadout, issueFreePistol, validateLoadout } from './loadout.ts';
+import { openPendingChests } from './overrun-chest.ts';
+import { writeFlight } from './overrun-fight.ts';
 import { startOverrunClock } from './overrun.ts';
 import { announceRunStart, clampLevel } from './sim-factory.ts';
 import type { HomeRun, PlayerHome, PlayerState, SimState } from './sim-state.ts';
@@ -39,6 +41,7 @@ export function enterHome(sim: SimState, p: PlayerState, join?: JoinHome): void 
     highest: clampLevel(join?.highest),
     finished: join?.finished === true,
     lost: { silver: 0, jewels: { small: 0, large: 0 } },
+    chest: false,
     lastActiveTick: sim.tick,
     leftTick: null,
   };
@@ -84,6 +87,8 @@ export function startTrip(sim: SimState, level: number): void {
   run.tripLevel = level;
   run.tripReplay = level < run.roomHighest;
   run.pickedLevel = null;
+  openPendingChests(sim);
+  writeFlight(sim);
   sim.overrun = null;
   sim.runStartTick = sim.tick;
   sim.hordesBehind = 0;

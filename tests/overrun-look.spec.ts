@@ -5,14 +5,15 @@ import { OVERRUN_CLOCK_SEC, OVERRUN_WARNINGS } from '../shared/overrun.ts';
 import type { PlayerEntity } from '../shared/protocol.ts';
 import { buildEnvironment } from '../src/art/environment.ts';
 import { spriteToCanvas } from '../src/art/kit.ts';
-import { chestPending, doorState } from '../src/engine/overrun-look.ts';
+import { generateBunkerMap } from '../shared/bunker-map.ts';
+import { chestPending, doorState, hiddenProp } from '../src/engine/overrun-look.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import { closedStalls } from '../src/game/home/shop.ts';
 import type { PixelSprite } from '../src/art/types.ts';
 
 const view = (phase: OverrunPhase, left: number): OverrunView => ({ phase, left, slowed: false, hostiles: 0, total: 0 });
-const playerWith = (outcome: 'held' | 'fled' | 'died' | null): PlayerEntity =>
-  ({ home: { overrun: outcome ? { outcome } : null } }) as unknown as PlayerEntity;
+const playerWith = (outcome: 'held' | 'fled' | 'died' | null, chest = false): PlayerEntity =>
+  ({ home: { overrun: outcome ? { outcome } : null, ...(chest ? { chest: true } : {}) } }) as unknown as PlayerEntity;
 
 const changed = (a: PixelSprite, b: PixelSprite): number => {
   const [x, y] = [spriteToCanvas(a), spriteToCanvas(b)];
@@ -40,15 +41,39 @@ describe('the blast door by overrun phase', () => {
   });
 });
 
+describe('the blast door with the switch off', () => {
+  const kinds = generateBunkerMap().props.map((prop) => prop.kind);
+
+  it('is not drawn, so the bunker looks as it did before the overrun', () => {
+    const drawn = kinds.filter((kind) => !hiddenProp(kind, false));
+    expect(kinds).toContain('blast_door');
+    expect(drawn).not.toContain('blast_door');
+    expect(drawn).toHaveLength(kinds.length - 1);
+  });
+
+  it('is drawn with the switch on, and every other prop is drawn either way', () => {
+    expect(kinds.filter((kind) => !hiddenProp(kind, true))).toEqual(kinds);
+  });
+});
+
 describe('the reward chest', () => {
   it('stands once the room holds, until this player opens theirs', () => {
-    expect(chestPending(view('held', 0), playerWith(null))).toBe(true);
+    expect(chestPending(view('held', 0), playerWith(null, true))).toBe(true);
     expect(chestPending(view('held', 0), playerWith('held'))).toBe(false);
   });
 
+  it('stands for a body that fell in the horde and still has one waiting', () => {
+    expect(chestPending(view('held', 0), playerWith('died', true))).toBe(true);
+  });
+
+  it('is not there for a player who has none, such as one who came in after the hold', () => {
+    expect(chestPending(view('held', 0), playerWith(null))).toBe(false);
+    expect(chestPending(view('held', 0), playerWith('died'))).toBe(false);
+  });
+
   it('is not there before the hold, without an overrun, or with nobody to open it', () => {
-    expect(chestPending(view('breached', 0), playerWith(null))).toBe(false);
-    expect(chestPending(undefined, playerWith(null))).toBe(false);
+    expect(chestPending(view('breached', 0), playerWith(null, true))).toBe(false);
+    expect(chestPending(undefined, playerWith(null, true))).toBe(false);
     expect(chestPending(view('held', 0), null)).toBe(false);
   });
 });

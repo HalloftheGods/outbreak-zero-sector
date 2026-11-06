@@ -292,6 +292,12 @@ describe('a trip found open on load', () => {
     expect(joinHomeFor({ ...emptySave(1), hands }, progress)).toEqual({ loadout: hands, highest: 3 });
     expect(joinHomeFor(emptySave(1), { highest: 10, finished: true })).toMatchObject({ finished: true });
   });
+
+  it('a join with a breach open brings nothing either, so a refresh in the horde cannot rejoin armed', () => {
+    const hands = { ...emptyLoadout(), medkits: 2 };
+    const openOverrun = { simId: '', mode: 'coop', startedAt: 1 } as const;
+    expect(joinHomeFor({ ...emptySave(1), hands, openOverrun }, { highest: 3, finished: false })).toEqual({ loadout: emptyLoadout(), highest: 3 });
+  });
 });
 
 describe('at the forge', () => {

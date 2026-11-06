@@ -52,14 +52,22 @@ export function isTripReceipt(v: unknown): v is TripReceipt {
     && (v.gear === null || isLoadout(v.gear));
 }
 
-export function isOverrunReceipt(v: unknown): v is OverrunReceipt {
-  return isFields(v)
-    && typeof v.simId === 'string'
+function hasOverrunFacts(v: Fields): boolean {
+  return typeof v.simId === 'string'
     && OVERRUN_OUTCOMES.includes(v.outcome)
     && hasNumbers(v, ['serial', 'share', 'silver', 'kills', 'seconds'])
     && isJewels(v.jewels)
     && (v.chest === null || isLoadout(v.chest))
     && (v.lost === null || isLoadout(v.lost));
+}
+
+/** A died receipt carried inside a held one: one level deep, never another held. */
+const isCarriedDeath = (v: unknown): boolean => isFields(v) && v.outcome === 'died' && v.died === undefined && hasOverrunFacts(v);
+
+export function isOverrunReceipt(v: unknown): v is OverrunReceipt {
+  return isFields(v)
+    && hasOverrunFacts(v)
+    && (v.died === undefined || (v.outcome === 'held' && isCarriedDeath(v.died)));
 }
 
 export function isOverrunView(v: unknown): v is OverrunView {
@@ -76,7 +84,8 @@ export function isHomeView(v: unknown): v is HomeView {
     && (v.station === null || STATIONS.includes(v.station))
     && typeof v.ready === 'boolean'
     && (v.receipt === null || isTripReceipt(v.receipt))
-    && (v.overrun === null || isOverrunReceipt(v.overrun));
+    && (v.overrun === undefined || v.overrun === null || isOverrunReceipt(v.overrun))
+    && (v.chest === undefined || v.chest === true);
 }
 
 export function isRoomHomeView(v: unknown): v is RoomHomeView {

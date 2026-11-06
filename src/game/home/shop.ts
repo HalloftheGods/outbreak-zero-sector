@@ -54,8 +54,13 @@ const ROLL_STRIDE = 0x9e3779b1;
 
 /** The stalls the overrun emptied, which have no merchant at them until they reopen. */
 export function closedStalls(shop: ShopState): MerchantId[] {
-  return MERCHANT_IDS.filter((id) => (shop.merchants[id].closedTrips ?? 0) > 0);
+  return MERCHANT_IDS.filter((id) => stallClosed(shop, id));
 }
+
+const stallClosed = (shop: ShopState, merchant: MerchantId): boolean => (shop.merchants[merchant].closedTrips ?? 0) > 0;
+
+/** The shop's rng for the roll it is on. Casualties and the next stock draw from it, so a reload picks the same ones. */
+export const shopRng = (shop: ShopState): Rng => createRng(shop.seed ^ Math.imul(shop.rolls + 1, ROLL_STRIDE));
 
 export function emptyShop(seed: number): ShopState {
   const merchants = Object.fromEntries(MERCHANT_IDS.map((id) => [id, { items: {} }])) as Record<MerchantId, MerchantStock>;
@@ -78,12 +83,22 @@ function rollMerchant(def: MerchantDef, rng: Rng): MerchantStock {
   return { items };
 }
 
-/** Replaces all stock. Called for a new save and again for each banked trip, never for a death or a quit. */
+/** One merchant's roll after the overrun: a closed stall counts down and stays empty until the last trip, then opens with the full roll; a thin one counts down and rolls that much of it. */
+function recovered(rolled: MerchantStock, before: MerchantStock): MerchantStock {
+  const closed = before.closedTrips ?? 0;
+  const thin = Math.max(0, (before.thinTrips ?? 0) - 1);
+  if (closed > 1) return { items: {}, closedTrips: closed - 1 };
+  if (thin === 0) return rolled;
+  const items = Object.fromEntries(Object.entries(rolled.items).map(([id, count]) => [id, Math.floor(count * (1 - thin / 4))]));
+  return { items, thinTrips: thin };
+}
+
+/** Replaces all stock. Called for a new save and again for each banked trip, never for a death or a quit. Every merchant is rolled whatever its state, so the rng draws the same. */
 export function rollStock(save: HomeSave): HomeSave {
   const { seed, rolls } = save.shop;
-  const rng = createRng(seed ^ Math.imul(rolls + 1, ROLL_STRIDE));
-  const merchants = Object.fromEntries(MERCHANT_IDS.map((id) => [id, rollMerchant(MERCHANTS[id], rng)])) as Record<MerchantId, MerchantStock>;
-  return { ...save, shop: { seed, rolls: rolls + 1, merchants } };
+  const rng = shopRng(save.shop);
+  const rolled = Object.fromEntries(MERCHANT_IDS.map((id) => [id, recovered(rollMerchant(MERCHANTS[id], rng), save.shop.merchants[id])])) as Record<MerchantId, MerchantStock>;
+  return { ...save, shop: { seed, rolls: rolls + 1, merchants: rolled } };
 }
 
 /** Rounds in one box at this difficulty, as town pickups scale. */
@@ -153,13 +168,14 @@ function granted(locker: Loadout, item: ItemDef, context: ShopContext): Loadout 
 
 /** The money, the stock and the locker in one new save, or null if the sale is refused. The save in is untouched. */
 export function buy(save: HomeSave, merchant: MerchantId, item: string, context: ShopContext): HomeSave | null {
-  if (context.station !== merchant || save.openTrip) return null;
+  const nothingToBuyFrom = context.station !== merchant || save.openTrip || stallClosed(save.shop, merchant);
+  if (nothingToBuyFrom) return null;
   const def = itemOf(merchant, item);
   if (!def || !offered(save, def, context)) return null;
   if (save.silver < def.price || stockOf(save, merchant, def) < 1 || !fits(save, def, context)) return null;
   const shelf = save.shop.merchants[merchant];
   const items = def.stock.kind === 'always' ? shelf.items : { ...shelf.items, [def.id]: stockOf(save, merchant, def) - 1 };
-  const merchants = { ...save.shop.merchants, [merchant]: { items } };
+  const merchants = { ...save.shop.merchants, [merchant]: { ...shelf, items } };
   return { ...save, silver: save.silver - def.price, locker: granted(save.locker, def, context), shop: { ...save.shop, merchants } };
 }
 
@@ -172,7 +188,9 @@ export function stow(save: HomeSave, item: ItemDef, difficulty: DifficultyId): H
 
 /** What the screen lists: what is on the shelf this trip and of use to the player. Sold-out lines drop off. */
 export function shopRows(save: HomeSave, merchant: MerchantId, context: ShopContext): ShopRow[] {
+  const shuttered = stallClosed(save.shop, merchant);
   return MERCHANTS[merchant].items
+    .filter(() => !shuttered)
     .filter((item) => offered(save, item, context) && stockOf(save, merchant, item) > 0)
     .map((item) => ({ item: item.id, price: item.price, stock: stockOf(save, merchant, item) }));
 }

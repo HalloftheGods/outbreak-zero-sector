@@ -36,7 +36,9 @@ function isOpenOverrun(v: unknown): v is OpenOverrun {
   return isFields(v)
     && typeof v.simId === 'string'
     && isNumber(v.startedAt)
-    && (v.mode === 'solo' || v.mode === 'coop');
+    && (v.mode === 'solo' || v.mode === 'coop')
+    && (v.highest === undefined || isNumber(v.highest))
+    && (v.difficulty === undefined || isDifficultyId(v.difficulty));
 }
 
 const MERCHANTS: readonly unknown[] = MERCHANT_IDS;

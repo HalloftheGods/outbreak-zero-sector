@@ -22,7 +22,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import type { ArtBook } from '../art/types.ts';
 import type { HomeUi } from '../game/home-hud.ts';
-import { closeLocker, moveToHands, moveToLocker } from '../game/home-screens.ts';
+import { closeLocker, lockerGone, moveToHands, moveToLocker } from '../game/home-screens.ts';
 import type { LockerDraft } from '../game/home-screens.ts';
 import { handRows, lockerArtSize, lockerTiles } from '../game/home/locker-view.ts';
 import LockerHands from './LockerHands.vue';
@@ -38,6 +38,8 @@ const LOCKER_LINE = 'Gear in hand goes on the trip, and is lost if you die.';
 
 /** What the player is arranging. The save is only read when the locker opens, so a save landing mid-edit cannot undo a move. */
 const draft = ref<LockerDraft | null>(home.save ? { locker: home.save.locker, hands: home.save.hands } : null);
+/** The draft last put on the player, or as it opened: anything since is unsent. */
+let sent: LockerDraft | null = draft.value;
 const tiles = computed(() => (draft.value ? lockerTiles(draft.value) : []));
 const hands = computed(() => (draft.value ? handRows(draft.value) : null));
 const icons = computed(() => art?.ui ?? null);
@@ -78,7 +80,7 @@ function stow(key: string): void {
 watch(
   () => home.save,
   (save) => {
-    if (save && !draft.value) draft.value = { locker: save.locker, hands: save.hands };
+    if (save && !draft.value) draft.value = sent = { locker: save.locker, hands: save.hands };
   }
 );
 
@@ -92,13 +94,18 @@ watch(
 );
 
 function close(): void {
+  sent = draft.value;
   if (draft.value) closeLocker(draft.value, game.home);
   else game.home.closeStation();
 }
 
 /** Esc closes the locker the way Close does, or what was just moved would quietly stay where it was. */
 onMounted(() => game.home.closeWith(close));
-onBeforeUnmount(() => game.home.closeWith(null));
+/** Shut from outside, as at the breach: what was moved still goes on the player. */
+onBeforeUnmount(() => {
+  lockerGone(draft.value, sent, game.home);
+  game.home.closeWith(null);
+});
 </script>
 
 <style scoped>

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { CARTRIDGE_HEIGHT, CARTRIDGE_LABEL, CARTRIDGE_PICTURE, CARTRIDGE_WIDTH, GUIDE_PICTURES, cartridgeSrc, guideIconSrc, pictureSvg } from '../src/art/cartridge.ts';
 import { ALL_COLORS, toHex } from '../src/art/palette.ts';
@@ -127,11 +128,30 @@ describe('cartridge art', () => {
   });
 });
 
+/** The alpha of an RGBA PNG's top left pixel, read from its one IDAT chunk. */
+function cornerAlpha(file: string): number {
+  const bytes = read(file);
+  const colorType = bytes[25];
+  const RGBA = 6;
+  expect(colorType).toBe(RGBA);
+  let at = 8;
+  while (bytes.subarray(at + 4, at + 8).toString('ascii') !== 'IDAT') at += 12 + bytes.readUInt32BE(at);
+  const rows = inflateSync(bytes.subarray(at + 8, at + 8 + bytes.readUInt32BE(at)));
+  return rows[1 + 3];
+}
+
 describe('app icons', () => {
   it('are the cartridge with the game name on it, as tools/pwa-icons.ts draws them', () => {
     for (const [file, bytes] of Object.entries(iconFiles())) {
       expect(read(file).equals(bytes), `${file} is out of date: run node --experimental-strip-types tools/pwa-icons.ts`).toBe(true);
     }
+  });
+
+  it('are clear around the cartridge, except the maskable and Apple ones, which must be opaque', () => {
+    expect(cornerAlpha('public/icons/icon-192.png')).toBe(0);
+    expect(cornerAlpha('public/icons/icon-512.png')).toBe(0);
+    expect(cornerAlpha('public/icons/icon-maskable-512.png')).toBe(255);
+    expect(cornerAlpha('public/apple-touch-icon.png')).toBe(255);
   });
 
   it('keep the Install Game cartridge as it was: the icon label is its own', () => {

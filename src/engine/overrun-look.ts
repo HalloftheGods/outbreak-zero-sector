@@ -10,6 +10,11 @@ export type DoorState = 'shut' | 'buckling' | 'burst';
 const BUCKLING_WARNING = 1;
 const BUCKLING_LEFT_SEC = OVERRUN_CLOCK_SEC * OVERRUN_WARNINGS[BUCKLING_WARNING];
 
+/** The blast door is drawn only while the overrun is switched on, so a bunker without it looks as it always has. */
+export function hiddenProp(kind: string, overrunOn: boolean): boolean {
+  return kind === 'blast_door' && !overrunOn;
+}
+
 /** Shut until the second warning, buckling until the breach, then burst for as long as the overrun is on show. */
 export function doorState(overrun: OverrunView | undefined): DoorState {
   if (!overrun) return 'shut';
@@ -18,9 +23,7 @@ export function doorState(overrun: OverrunView | undefined): DoorState {
   return overrun.left <= BUCKLING_LEFT_SEC ? 'buckling' : 'shut';
 }
 
-/** The chest stands from the hold until this player opens theirs, which writes their held receipt. */
+/** The chest stands from the hold until this player opens theirs, and only for a player who has one: their own view says so, nobody else's. */
 export function chestPending(overrun: OverrunView | undefined, local: PlayerEntity | null): boolean {
-  const receipt = local?.home?.overrun;
-  const opened = receipt?.outcome === 'held';
-  return overrun?.phase === 'held' && local !== null && !opened;
+  return overrun?.phase === 'held' && local?.home?.chest === true;
 }

@@ -4,12 +4,12 @@
 import { BASELINE_DIFFICULTY } from '../../shared/difficulty.ts';
 import type { DifficultyId } from '../../shared/difficulty.ts';
 import { isBunkerSeed } from '../../shared/home-protocol.ts';
-import type { HomeAction, JoinHome, Loadout, MerchantId, StationId, TripReceipt } from '../../shared/home-protocol.ts';
+import type { HomeAction, JoinHome, Loadout, MerchantId, OverrunPhase, OverrunReceipt, StationId, TripReceipt } from '../../shared/home-protocol.ts';
 import { emptyLoadout } from '../../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { GameTransport, TransportKind } from '../network/transport.ts';
 import { shopContext } from './home-hud.ts';
-import type { HomeActions, HomeDeath, HomeFacts } from './home-hud.ts';
+import type { ChestOpened, HomeActions, HomeDeath, HomeFacts } from './home-hud.ts';
 import type { HomeStore } from './home/home-store.ts';
 import { HomeSync, joinHomeFor } from './home/home-sync.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
@@ -57,6 +57,13 @@ export class HomeLink {
   private closer: (() => void) | null = null;
   private death: HomeDeath | null = null;
   private diedAtMs = 0;
+  /** The chest just opened, until it is put away. */
+  private chest: ChestOpened | null = null;
+  /** The room's overrun phase as the last snapshot had it, and as it stood when this player's overrun receipt first showed. */
+  private phase: OverrunPhase | undefined;
+  private phaseAtReceipt: OverrunPhase | undefined;
+  private seenReceipt: OverrunReceipt | null = null;
+  private inBunker = false;
   private ending = false;
   /** The gear this trip took out, which a death takes with it. */
   private takenOut: Loadout = emptyLoadout();
@@ -77,6 +84,7 @@ export class HomeLink {
       smelt: () => {},
       buy: (merchant, item) => this.buy(merchant, item),
       wake: () => this.wake(),
+      closeChest: () => this.putChestAway(),
       continueFromEnding: () => this.continueFromEnding(),
     };
   }
@@ -91,12 +99,13 @@ export class HomeLink {
       forgeProgress: sync?.forgeProgress ?? 0,
       saveError: sync?.saveError ?? null,
       death: this.death,
+      chest: this.chest,
     };
   }
 
-  /** A station, the death summary or the ending is up, and the keys are theirs. */
+  /** A station, the death summary, the opened chest or the ending is up, and the keys are theirs. */
   get holdsControls(): boolean {
-    return this.station !== null || this.death !== null || this.ending;
+    return this.station !== null || this.death !== null || this.chest !== null || this.ending;
   }
 
   get endingShowing(): boolean {
@@ -113,6 +122,7 @@ export class HomeLink {
       sendHome: (action) => this.send(action),
       onChange: () => current() && this.host.refresh(),
       onReceipt: (receipt) => current() && this.onReceipt(receipt),
+      onOverrunReceipt: (receipt) => current() && this.onOverrunReceipt(receipt),
     });
     this.sync = sync;
     const save = await sync.open();
@@ -133,14 +143,16 @@ export class HomeLink {
     const entity = snapshot.players.find((player) => player.id === localId);
     const trip = sync.save?.openTrip ?? null;
     if (trip) this.takenOut = sync.save?.hands ?? this.takenOut;
+    this.watchOverrun(snapshot, entity);
     sync.observe(snapshot, localId);
     this.watchStation(entity?.home?.station ?? null);
     this.greet(snapshot, nowMs);
     this.sayError(nowMs);
   }
 
-  /** Esc: the same as the screen's Close button. True if a station was open. */
+  /** Esc: the same as the screen's Close button. True if a station or the chest was open. */
   closeOpenStation(): boolean {
+    if (this.chest !== null) return this.putChestAway();
     const { closer } = this;
     const screenCloses = closer !== null && this.station !== null;
     if (!screenCloses) return this.putStationAway();
@@ -158,6 +170,7 @@ export class HomeLink {
 
   /** Enter: reads the death summary, once it has been seen. True if the press was the summary's. */
   confirm(): boolean {
+    if (this.chest !== null) return this.putChestAway();
     if (!this.death) return false;
     if (inSightSince(this.diedAtMs, SUMMARY_READ_MS)) this.wake();
     return true;
@@ -175,6 +188,11 @@ export class HomeLink {
     this.station = null;
     this.closer = null;
     this.death = null;
+    this.chest = null;
+    this.phase = undefined;
+    this.phaseAtReceipt = undefined;
+    this.seenReceipt = null;
+    this.inBunker = false;
     this.ending = false;
     this.takenOut = emptyLoadout();
     this.greeted = false;
@@ -216,6 +234,59 @@ export class HomeLink {
     if (died) this.die(receipt);
     else this.bank(receipt, isNewBest);
     this.host.refresh();
+  }
+
+  /**
+   * Credited here, once. A held chest shows what it held; a fall shows the gear in hand that went. A flight shows nothing, for the stalls say it.
+   * Either card belongs to the bunker: a body written off as the van left lands in town with its receipt, which is applied and recorded there
+   * without a word, since the summary would say it stands up in the bunker.
+   */
+  private onOverrunReceipt(receipt: OverrunReceipt): void {
+    const { outcome } = receipt;
+    const chestShows = outcome === 'held' && this.inBunker;
+    if (chestShows) this.chest = { gear: receipt.chest ?? emptyLoadout(), silver: receipt.silver, jewels: receipt.jewels };
+    const fallShows = outcome === 'died' && this.inBunker;
+    if (fallShows) this.fall(receipt);
+    this.host.syncControls();
+    this.host.refresh();
+  }
+
+  private fall(receipt: OverrunReceipt): void {
+    const bunkerFell = this.phaseAtReceipt === 'lost';
+    this.death = { overrun: { bunkerFell }, lost: receipt.lost ?? emptyLoadout() };
+    this.diedAtMs = performance.now();
+  }
+
+  /** The room's phase now, and the phase at the moment this player's receipt first showed, since the save lands a little later. */
+  private watchOverrun(snapshot: SnapshotPacket, entity: PlayerEntity | undefined): void {
+    this.phase = snapshot.home?.overrun?.phase;
+    this.inBunker = isBunkerSeed(snapshot.mapSeed);
+    this.putBunkerCardsAway();
+    const receipt = entity?.home?.overrun ?? null;
+    const isNew = receipt !== null && (this.seenReceipt === null || this.seenReceipt.serial !== receipt.serial || this.seenReceipt.simId !== receipt.simId);
+    if (isNew) this.phaseAtReceipt = this.phase;
+    if (receipt !== null) this.seenReceipt = receipt;
+  }
+
+  /** The van left with a bunker card up, the fall summary or the chest: the save already has what it said, and the town is not the bunker. */
+  private putBunkerCardsAway(): void {
+    const fallUp = this.death?.overrun !== undefined;
+    const leftWithACard = !this.inBunker && (fallUp || this.chest !== null);
+    if (!leftWithACard) return;
+    if (fallUp) this.death = null;
+    this.chest = null;
+    this.host.syncControls();
+    this.host.refresh();
+  }
+
+  private putChestAway(): boolean {
+    const wasUp = this.chest !== null;
+    this.chest = null;
+    if (wasUp) {
+      this.host.syncControls();
+      this.host.refresh();
+    }
+    return wasUp;
   }
 
   private die(receipt: TripReceipt): void {

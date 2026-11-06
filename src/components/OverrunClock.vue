@@ -16,11 +16,11 @@ const line = computed(() => overrunClockLine(props.overrun));
 </script>
 
 <style scoped>
+/* No z-index: it draws over the HUD and the station screens mounted before it, and under the pause menu and the van ride after it. */
 .overrun-clock {
   position: absolute;
   top: calc(var(--u) * 5);
   left: 50%;
-  z-index: 5;
   display: flex;
   align-items: baseline;
   gap: calc(var(--u) * 3);

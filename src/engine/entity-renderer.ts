@@ -17,7 +17,7 @@ import type { ContainerArt } from '../art/containers.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
 import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
-import { chestPending, doorState } from './overrun-look.ts';
+import { chestPending, doorState, hiddenProp } from './overrun-look.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { SceneView } from './scene.ts';
 import { bodyHeight, clipFrame, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
@@ -212,7 +212,7 @@ export class EntityRenderer {
     for (const placed of this.props) {
       const onScreen = placed.x1 > left && placed.x0 < right && placed.y1 > top && placed.y0 < bottom;
       const roomClosed = placed.room !== null && placed.room.reveal === 0;
-      const shown = onScreen && !roomClosed && !this.standsDown(placed, scene);
+      const shown = onScreen && !roomClosed && !this.standsDown(placed, scene) && !hiddenProp(placed.prop.kind, scene.overrunOn === true);
       if (shown) items.push({ y: placed.prop.y, kind: 'prop', prop: placed });
     }
     const local = scene.players.find((player) => player.id === scene.localId) ?? null;

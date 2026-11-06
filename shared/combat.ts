@@ -58,7 +58,9 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
     killerId,
     points: z.points,
   });
-  maybeDropOnKill(sim, z.x, z.y, killer);
+  // The bunker's horde drops nothing: the chest is the reward. Off the overrun this rolls as it always has.
+  const bunkerHorde = z.horde && sim.overrun !== null;
+  if (!bunkerHorde) maybeDropOnKill(sim, z.x, z.y, killer);
   if (z.type === 'bloater') burst(sim, z, killerId);
 }
 

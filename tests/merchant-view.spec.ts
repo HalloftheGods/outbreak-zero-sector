@@ -10,7 +10,7 @@ function homeAt(station: HomeUi['station'], silver: number, highest = 1): HomeUi
   return {
     inBunker: true, station, stationHold: 0, shop: station === 'medic' ? 'medic' : null, ready: false,
     carried: { silver: 0, jewels: { small: 0, large: 0 } }, pickedLevel: null, roomHighest: 1, overrun: null, highest,
-    difficulty: 'lights_out', receipt: null, save, forgeProgress: 0, saveError: null, death: null,
+    difficulty: 'lights_out', receipt: null, save, forgeProgress: 0, saveError: null, death: null, chest: null,
   };
 }
 

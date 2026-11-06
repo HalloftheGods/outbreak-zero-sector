@@ -22,6 +22,7 @@ import { openGroundNear } from './sim-state.ts';
 import { buildSnapshot, playerSnapshot } from './snapshot-build.ts';
 import { updatePopulation } from './town-population.ts';
 import { enterHome, homeCommand } from './trip.ts';
+import { diedOnLeaving } from './overrun-fight.ts';
 import { arriveInRoom, keepsBodyOnLeaving, leaveRoom, updateLeftBodies } from './trip-roster.ts';
 import { updateWaves } from './waves.ts';
 import { updateZombieStatuses } from './zombie-burn.ts';
@@ -141,7 +142,11 @@ export class GameSimulation {
   removePlayer(id: string): void {
     const sim = this.sim;
     const leaving = sim.players.find((p) => p.id === id);
-    if (leaving && keepsBodyOnLeaving(sim, leaving)) rememberDeparted(sim, leaving);
+    const keptForTheTrip = leaving !== undefined && keepsBodyOnLeaving(sim, leaving);
+    if (leaving && keptForTheTrip) {
+      diedOnLeaving(sim, leaving);
+      rememberDeparted(sim, leaving);
+    }
     sim.players = sim.players.filter((p) => p.id !== id);
     if (leaving) leaveRoom(sim, leaving);
 

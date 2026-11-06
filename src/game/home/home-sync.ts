@@ -4,7 +4,7 @@ import { EXIT_RADIUS, TICK_RATE } from '../../../shared/constants.ts';
 import { BASELINE_DIFFICULTY } from '../../../shared/difficulty.ts';
 import type { DifficultyId } from '../../../shared/difficulty.ts';
 import { isBunkerSeed } from '../../../shared/home-protocol.ts';
-import type { HomeAction, HomeView, JoinHome, Loadout, MerchantId, TripReceipt } from '../../../shared/home-protocol.ts';
+import type { HomeAction, HomeView, JoinHome, Loadout, MerchantId, OverrunReceipt, OverrunView, TripReceipt } from '../../../shared/home-protocol.ts';
 import { emptyLoadout, loadoutOfEntity, validateLoadout } from '../../../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../../shared/protocol.ts';
 import type { TransportKind } from '../../network/transport.ts';
@@ -12,6 +12,8 @@ import type { LevelProgress } from '../level-progress.ts';
 import { SMELT_SECONDS, smeltTick } from './forge.ts';
 import { armedHands, settleHands } from './gear-pool.ts';
 import type { HomeSave, HomeStore, SaveResult } from './home-store.ts';
+import { applyOverrunReceipt, clearOpenOverrun, diedUnseen, openOverrunOf, overrunKey, resolveOpenOverrun, watchBreach } from './overrun-ledger.ts';
+import type { BreachWatch } from './overrun-ledger.ts';
 import { SaveQueue } from './save-queue.ts';
 import type { SaveChange } from './save-queue.ts';
 import { buy, rollStock } from './shop.ts';
@@ -39,11 +41,16 @@ export interface HomeSyncOptions {
   readonly onChange?: () => void;
   /** A receipt was credited here, once. */
   readonly onReceipt?: (receipt: TripReceipt) => void;
+  /** An overrun receipt was credited here, once. */
+  readonly onOverrunReceipt?: (receipt: OverrunReceipt) => void;
 }
 
-/** What to bring to the room. With a trip still open the gear is forfeit, and a body the room still holds keeps what it has. */
+/** A trip or a breach still on file has the gear in hand at stake: the room's body has it, or nobody does. */
+const handsAtStake = (save: HomeSave): boolean => save.openTrip !== null || save.openOverrun !== null;
+
+/** What to bring to the room. With a trip or a breach still open the gear is forfeit, and a body the room still holds keeps what it has. */
 export function joinHomeFor(save: HomeSave, { highest, finished }: LevelProgress): JoinHome {
-  return { loadout: save.openTrip ? emptyLoadout() : save.hands, highest, ...(finished ? { finished } : {}) };
+  return { loadout: handsAtStake(save) ? emptyLoadout() : save.hands, highest, ...(finished ? { finished } : {}) };
 }
 
 const firstStock: SaveChange = (save) => (save.shop.rolls === 0 ? rollStock(save) : save);
@@ -64,9 +71,9 @@ const sortedKeys = (value: unknown): unknown => {
 /** The same gear reads the same whatever order its keys were built in. */
 const textOf = (loadout: Loadout): string => JSON.stringify(sortedKeys(loadout));
 
-/** Hands the room would refuse go back in the locker before connecting, so the join brings nothing and no frame order can lose them. A trip still open keeps its forfeit. */
+/** Hands the room would refuse go back in the locker before connecting, so the join brings nothing and no frame order can lose them. A trip or a breach still open keeps its forfeit. */
 const putBackRefused: SaveChange = (save) => {
-  const refused = save.openTrip === null && validateLoadout(save.hands) === null;
+  const refused = !handsAtStake(save) && validateLoadout(save.hands) === null;
   return refused ? settleHands(save, emptyLoadout()) : save;
 };
 
@@ -80,6 +87,11 @@ export class HomeSync {
   private atVan = false;
   private arriving = false;
   private receiptInFlight: string | null = null;
+  private overrunInFlight: string | null = null;
+  /** The breach is being opened or closed in the save, so a second sight of it does not queue another write behind the first. */
+  private breachWriting = false;
+  /** The room's furthest level as last seen, which an overrun's record reads. */
+  private roomHighest = 0;
   private forgeSeconds = 0;
   private lastHeld: string | null = null;
   /** The equip or join the room has not yet answered. Its answer settles against the locker; any other change in hand is a bench action. */
@@ -120,9 +132,9 @@ export class HomeSync {
   async open(): Promise<HomeSave> {
     await this.saves.load();
     const resumed = this.options.mode === 'solo' ? false : null;
-    await this.saves.write((save) => putBackRefused(firstStock(resolveOpenTrip(save, resumed))));
+    await this.saves.write((save) => putBackRefused(firstStock(resolveOpenOverrun(resolveOpenTrip(save, resumed), resumed))));
     const save = this.saves.save as HomeSave;
-    const stillOpen = save.openTrip !== null;
+    const stillOpen = save.openTrip !== null || save.openOverrun !== null;
     if (stillOpen) this.tripWait = setTimeout(() => this.settleOpenTrip(false), OPEN_TRIP_WAIT_MS);
     return save;
   }
@@ -141,8 +153,10 @@ export class HomeSync {
     const canWatch = entity !== undefined && home !== undefined && this.saves.save !== null;
     if (!canWatch) return;
     const elapsed = this.advance(snapshot.tick);
-    const { receipt } = home;
+    const { receipt, overrun } = home;
+    this.roomHighest = snapshot.home?.roomHighest ?? this.roomHighest;
     if (receipt) this.takeReceipt(receipt);
+    if (overrun) this.takeOverrunReceipt(overrun);
     if (isBunkerSeed(snapshot.mapSeed)) this.watchBunker(snapshot, entity, home, elapsed);
     else this.watchTown(snapshot.level, receipt);
   }
@@ -209,7 +223,56 @@ export class HomeSync {
 
   private settleOpenTrip(resumed: boolean): void {
     this.clearTripWait();
-    void this.saves.write((save) => resolveOpenTrip(save, resumed));
+    void this.saves.write((save) => resolveOpenOverrun(resolveOpenTrip(save, resumed), resumed));
+  }
+
+  private isOverrunApplied(receipt: OverrunReceipt): boolean {
+    return this.saves.save?.appliedReceipts.includes(overrunKey(receipt)) ?? false;
+  }
+
+  /** The same rule as a trip's: the key goes in the same save as the credit, a failed save leaves it unapplied for the retry, and a conflict re-reads before deciding. */
+  private takeOverrunReceipt(receipt: OverrunReceipt): void {
+    const key = overrunKey(receipt);
+    const nothingToDo = this.isOverrunApplied(receipt) || this.overrunInFlight === key || this.mustWait;
+    if (nothingToDo) return;
+    this.overrunInFlight = key;
+    let credited = false;
+    const context = { highest: this.roomHighest, difficulty: this.difficulty };
+    void this.saves.write((save) => {
+      const next = applyOverrunReceipt(save, receipt, context);
+      credited = next !== save;
+      return next;
+    }).then((result) => {
+      this.overrunInFlight = null;
+      const landed = credited && result.kind === 'saved';
+      if (landed) this.options.onOverrunReceipt?.(receipt);
+    });
+  }
+
+  /** A breach is written to the save when first seen, so quitting in it is a death, and closed once it is survived or over. */
+  private watchBreach(home: HomeView, phase: OverrunView['phase'] | undefined): void {
+    const save = this.saves.save;
+    if (!save || this.mustWait || this.breachWriting) return;
+    const seen = watchBreach(save, phase, (home.overrun ?? null) !== null);
+    const change = this.breachChange(seen);
+    if (!change) return;
+    this.breachWriting = true;
+    void this.saves.write(change).then(() => {
+      this.breachWriting = false;
+    });
+  }
+
+  /** The write a breach watch asks for, or null when it asks for none. */
+  private breachChange(seen: BreachWatch): SaveChange | null {
+    const mode = this.options.mode;
+    const open = { simId: '', mode, startedAt: Date.now(), highest: this.roomHighest, difficulty: this.difficulty };
+    const changes: Record<BreachWatch, SaveChange | null> = {
+      open: (current) => openOverrunOf(current, open),
+      survived: clearOpenOverrun,
+      died: (current) => diedUnseen(current),
+      none: null,
+    };
+    return changes[seen];
   }
 
   private takeReceipt(receipt: TripReceipt): void {
@@ -231,7 +294,10 @@ export class HomeSync {
 
   private watchBunker(snapshot: SnapshotPacket, entity: PlayerEntity, home: HomeView, elapsed: number): void {
     this.watchForge(home, elapsed);
-    const receiptSettled = home.receipt === null || this.isApplied(home.receipt);
+    this.watchBreach(home, snapshot.home?.overrun?.phase);
+    const overrun = home.overrun ?? null;
+    const overrunSettled = overrun === null || this.isOverrunApplied(overrun);
+    const receiptSettled = overrunSettled && (home.receipt === null || this.isApplied(home.receipt));
     if (!receiptSettled) return;
     this.watchVan(snapshot, entity);
     this.watchHands(entity);
@@ -241,6 +307,7 @@ export class HomeSync {
     this.van = 'away';
     this.atVan = false;
     this.forgeSeconds = 0;
+    if (this.saves.save?.openOverrun && !this.mustWait) void this.saves.write(clearOpenOverrun);
     const onFile = this.saves.save?.openTrip?.level === level;
     const shouldOpen = receipt === null && !onFile && !this.arriving && !this.mustWait;
     if (shouldOpen) this.arrive(level);

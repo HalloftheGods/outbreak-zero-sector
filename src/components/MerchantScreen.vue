@@ -1,10 +1,14 @@
 <template>
   <section class="px-screen">
     <div v-if="open" class="px-panel px-frame shop" :style="{ '--bust-w': BUST_W }">
-      <MerchantCard :bust="art.merchants[open.merchant].bust" :name="open.view.name" :role="open.view.role" :greeting="open.view.greeting">
+      <MerchantCard v-if="stalled" :bust="art.merchants[open.merchant].bust" :name="open.view.name" :role="open.view.role" :greeting="open.view.greeting">
         <ShopItemPanel :line="shown" :icons="art.ui" :silver="open.view.silver" :difficulty="home.difficulty" :art-size @buy="buyChosen" />
       </MerchantCard>
-      <ShopShelf ref="shelf" :lines :chosen :icons="art.ui" :silver="open.view.silver" :art-size @choose="choose" @preview="preview" />
+      <MerchantCard v-else closed :bust="art.merchants[open.merchant].bust" name="Closed" :role="open.view.role" greeting="">
+        <p class="px-note stall-notice">{{ open.view.notice }}</p>
+      </MerchantCard>
+      <p v-if="thin" class="px-note stall-thin">{{ open.view.notice }}</p>
+      <ShopShelf v-if="stalled" ref="shelf" :lines :chosen :icons="art.ui" :silver="open.view.silver" :art-size @choose="choose" @preview="preview" />
       <footer class="shop-foot">
         <p class="px-error shop-error" role="alert">{{ home.saveError ?? '' }}</p>
         <PixelButton class="shop-close" primary silent @press="game.home.closeStation()">Close</PixelButton>
@@ -37,6 +41,9 @@ const shelf = useTemplateRef<InstanceType<typeof ShopShelf>>('shelf');
 /** Follows the open station, so the screen empties the moment the station clears. */
 const open = computed(() => (home.shop ? { merchant: home.shop, view: merchantView(home, home.shop) } : null));
 const lines = computed(() => open.value?.view.lines ?? []);
+/** Someone keeps the stall, so there is a shelf to read. A closed one shows its notice instead. */
+const stalled = computed(() => open.value?.view.stall.kind !== 'closed');
+const thin = computed(() => open.value?.view.stall.kind === 'thin');
 
 const picked = ref<string | null>(null);
 const pickedAt = ref(0);
@@ -94,6 +101,12 @@ onMounted(() => shelf.value?.focus());
   width: calc(var(--bust-px) * var(--bust-w) + var(--u) * 220);
   max-width: 100%;
   container: shop / inline-size;
+}
+
+.stall-notice {
+  align-self: center;
+  max-width: calc(var(--u) * 150);
+  color: var(--amber);
 }
 
 .shop-foot {

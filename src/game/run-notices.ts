@@ -84,22 +84,34 @@ export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   return SET_BANNERS[event.type] ?? null;
 }
 
-/** What each warning step says, from the first (2:30) to the last (0:30). */
-const OVERRUN_WARNING_TITLES: readonly string[] = ['THE DOOR IS STRAINING', 'THE DOOR IS BUCKLING', 'THE DOOR IS GOING'];
+/** One warning step's banner. A null subtitle shows the clock's own time left. */
+interface OverrunWarning {
+  readonly title: string;
+  readonly subtitle: string | null;
+  readonly tone: Banner['tone'];
+}
 
-const OVERRUN_ENDINGS: Record<OverrunEnd, Omit<Banner, 'key'>> = {
-  held: { title: 'THE DOOR HELD', subtitle: 'THE BUNKER IS YOURS', tone: 'hope' },
-  lost: { title: 'THE BUNKER FELL', subtitle: 'NOBODY LEFT STANDING', tone: 'danger' },
+/** Each warning step, from the first (2:30) to the last (0:30), when guns come free. */
+const OVERRUN_WARNING_STEPS: readonly OverrunWarning[] = [
+  { title: 'SOMETHING AT THE BLAST DOOR', subtitle: null, tone: 'quiet' },
+  { title: 'THE DOOR IS BUCKLING', subtitle: null, tone: 'danger' },
+  { title: "IT WON'T HOLD", subtitle: 'GUNS FREE', tone: 'danger' },
+];
+
+/** A fallen bunker has no banner: the death summary shows. */
+const OVERRUN_ENDINGS: Record<OverrunEnd, Omit<Banner, 'key'> | null> = {
+  held: { title: 'THE BUNKER HOLDS', subtitle: 'A CHEST BY THE DOOR', tone: 'hope' },
+  lost: null,
 };
 
-/** The banner for a warning step, the breach or the end of an overrun, or null for any other event. */
+/** The banner for a warning step, the breach or a held bunker, or null for any other event. */
 export function overrunBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   switch (event.type) {
     case 'overrun_warning': {
-      const title = OVERRUN_WARNING_TITLES[Math.min(event.step, OVERRUN_WARNING_TITLES.length - 1)];
-      return { title, subtitle: `${formatDuration(event.left)} LEFT`, tone: 'danger' };
+      const step = OVERRUN_WARNING_STEPS[Math.min(event.step, OVERRUN_WARNING_STEPS.length - 1)];
+      return { title: step.title, subtitle: step.subtitle ?? formatDuration(event.left), tone: step.tone };
     }
-    case 'overrun_breach': return { title: 'OVERRUN', subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
+    case 'overrun_breach': return { title: 'THE BLAST DOOR IS DOWN', subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
     case 'overrun_end': return OVERRUN_ENDINGS[event.outcome];
     default: return null;
   }

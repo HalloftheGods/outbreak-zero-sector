@@ -2,11 +2,16 @@
 // and a horde through it. Sim state, advanced by `step()` in the bunker, so solo and co-op run the same code.
 // The numbers are starting points for the soak (#7223). Nothing here runs while `sim.overrun` is null.
 
-import { TICK_DT } from './constants.ts';
+import { BLAST_DOOR_SPOT } from './bunker-map.ts';
+import { HORDE_SPEED_SCALE, TICK_DT, ZOMBIES, ZOMBIE_CAP } from './constants.ts';
 import type { OverrunView } from './home-protocol.ts';
 import { goneQuiet } from './level-exit.ts';
+import { FIRST_LEVEL, levelDef } from './levels.ts';
+import { countKills, diedHere, overrunHolds, standingHorde, writeDied } from './overrun-fight.ts';
 import type { OverrunState, PlayerState, SimState } from './sim-state.ts';
-import { alivePlayers, emit } from './sim-state.ts';
+import { alivePlayers, emit, openGroundNear } from './sim-state.ts';
+import { closeEveryStation } from './stations.ts';
+import { spawnZombie, waveRoster } from './waves.ts';
 
 /** Seconds from arrival to the breach at full speed. */
 export const OVERRUN_CLOCK_SEC = 300;
@@ -33,9 +38,13 @@ export const OVERRUN_CHEST_STACKS = 6;
 
 /** Seconds of slack for the sum of many small ticks, as the van's wait allows. */
 const CLOCK_EPSILON = 1e-9;
+/** How far from `BLAST_DOOR_SPOT` a zombie comes through, so a crowd does not stack on one point. Inside the hall either way. */
+const DOOR_SCATTER = 12;
 
-/** A fresh clock for an arrival in the bunker, or none: the switch is off, or the room has not yet reached `OVERRUN_FIRST_HIGHEST`. */
+/** A fresh clock for an arrival in the bunker, or none: the switch is off, or the room has not yet reached `OVERRUN_FIRST_HIGHEST`. The arrival clears the last overrun's receipts. */
 export function startOverrunClock(sim: SimState): void {
+  const homes = [...sim.players, ...sim.departed.values()].flatMap((p) => (p.home ? [p.home] : []));
+  for (const home of homes) home.overrun = null;
   const peace = !sim.overrunOn || (sim.homeRun?.roomHighest ?? 0) < OVERRUN_FIRST_HIGHEST;
   sim.overrun = peace ? null : {
     phase: 'counting',
@@ -60,11 +69,19 @@ function clockRate(sim: SimState): number {
   return inMenus ? OVERRUN_MENU_RATE : 1;
 }
 
-/** One tick of the overrun, from the bunker branch of `step()`. Filled in by #7214 and #7215. */
+/** Guns are free from the last warning until the horde is dead or the room has fallen. */
+export const gunsFree = (sim: SimState): boolean => sim.overrun?.phase === 'armed' || sim.overrun?.phase === 'breached';
+
+/** One tick of the overrun, from the bunker branch of `step()`: the clock, then the breach at zero, then the fight. */
 export function updateOverrun(sim: SimState): void {
   const overrun = sim.overrun;
-  if (!overrun || overrun.phase === 'held' || overrun.phase === 'lost') return;
-  if (overrun.total === 0 && overrun.left > 0) tickClock(sim, overrun);
+  if (!overrun) return;
+  const beforeTheBreach = overrun.phase === 'counting' || overrun.phase === 'armed';
+  if (beforeTheBreach) tickClock(sim, overrun);
+  const doorGives = beforeTheBreach && overrun.left === 0;
+  if (doorGives) breach(sim, overrun);
+  const hordeIn = overrun.phase === 'breached';
+  if (hordeIn) fight(sim, overrun);
 }
 
 /** Runs the clock down by one tick, gives each warning once and arms the guns for the last stretch. */
@@ -81,17 +98,59 @@ function tickClock(sim: SimState, overrun: OverrunState): void {
   if (overrun.phase === 'counting' && share <= OVERRUN_ARM_FRACTION + CLOCK_EPSILON) overrun.phase = 'armed';
 }
 
+/**
+ * The door bursts: the hardest horde of the furthest town the room has reached, cut to what the bunker has room for.
+ * `sim.wave` is set to match so `spawnZombie` scales health and speed as that town does, and `emptyWorld` puts it back when the van leaves.
+ */
+function breach(sim: SimState, overrun: OverrunState): void {
+  const level = levelDef(sim.homeRun?.roomHighest ?? FIRST_LEVEL);
+  const room = Math.max(0, Math.min(ZOMBIE_CAP - sim.zombies.length, OVERRUN_HORDE_MAX));
+  const roster = waveRoster(level.hordes, sim.rng, level, sim.difficulty).slice(0, room);
+  sim.wave = level.hordes;
+  overrun.phase = 'breached';
+  overrun.queue = roster.reverse();
+  overrun.total = roster.length;
+  overrun.spawnTimer = 0;
+  closeEveryStation(sim);
+  emit(sim, { type: 'overrun_breach', hostiles: overrun.total });
+}
+
+/** One a gap through the door, hunting from the moment it is in, with no give-up timer. */
+function trickle(sim: SimState, overrun: OverrunState): void {
+  overrun.spawnTimer -= TICK_DT;
+  while (overrun.spawnTimer <= 0 && overrun.queue.length > 0 && sim.zombies.length < ZOMBIE_CAP) {
+    const type = overrun.queue.pop() as OverrunState['queue'][number];
+    const spot = openGroundNear(sim, BLAST_DOOR_SPOT.x, BLAST_DOOR_SPOT.y, 0, DOOR_SCATTER, ZOMBIES[type].radius + 1);
+    spawnZombie(sim, type, spot.x, spot.y);
+    const zombie = sim.zombies[sim.zombies.length - 1];
+    zombie.horde = true;
+    zombie.mode = 'hunt';
+    zombie.speed *= HORDE_SPEED_SCALE;
+    overrun.spawnTimer += OVERRUN_SPAWN_INTERVAL_SEC;
+  }
+  overrun.spawnTimer = Math.max(0, overrun.spawnTimer);
+}
+
+/** The horde comes in, a body that dies is written off at once and stays down, and the room holds once nothing is left to come or standing. */
+function fight(sim: SimState, overrun: OverrunState): void {
+  trickle(sim, overrun);
+  countKills(sim, overrun);
+  const newlyDead = sim.players.filter((p) => p.status === 'dead' && !diedHere(p));
+  for (const p of newlyDead) writeDied(sim, p, overrun);
+  const cleared = overrun.queue.length === 0 && standingHorde(sim) === 0;
+  if (cleared) overrunHolds(sim, overrun);
+}
+
 /** The room's overrun for the snapshot, or null while there is none. Tenths of a second, as the clock is drawn. */
 export function overrunView(sim: SimState): OverrunView | null {
   const overrun = sim.overrun;
   if (!overrun) return null;
-  const standing = sim.zombies.filter((z) => z.horde && z.health > 0).length;
   const breached = overrun.total > 0;
   return {
     phase: overrun.phase,
     left: Math.round(overrun.left * 10) / 10 + 0,
     slowed: overrun.slowed,
-    hostiles: breached ? overrun.queue.length + standing : 0,
+    hostiles: breached ? overrun.queue.length + standingHorde(sim) : 0,
     total: overrun.total,
   };
 }

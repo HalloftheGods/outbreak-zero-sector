@@ -251,7 +251,7 @@ describe('the run from the bunker', () => {
       expect(screen).toBe('game');
       expect(result).toBeNull();
       expect(home?.inBunker).toBe(true);
-      expect(home?.death?.receipt.outcome).toBe('died');
+      expect(home?.death?.receipt?.outcome).toBe('died');
       expect(home?.death?.lost.guns.carbine).toBeDefined();
 
       game.home.wake();

@@ -4,6 +4,7 @@ import { FINAL_LEVEL, FIRST_LEVEL } from './levels.ts';
 import { giveReturnKit, giveStartingLoadout } from './player-health.ts';
 import type { GameOverStats, RunOutcome } from './protocol.ts';
 import type { SimState } from './sim-state.ts';
+import { overrunFalls } from './overrun-fight.ts';
 import { emit, standingPlayers } from './sim-state.ts';
 import { announceRunStart, clampLevel } from './sim-factory.ts';
 import { round2 } from './snapshot-build.ts';
@@ -29,11 +30,14 @@ function anyoneCouldStillStand(sim: SimState): boolean {
   return [...sim.departed.values()].some((p) => p.home?.leftTick != null && p.status === 'alive');
 }
 
+/** Nobody standing ends a town run, wakes a home room in the bunker, or, in the bunker against an overrun, lets the bunker fall. */
 export function checkGameOver(sim: SimState): void {
   const runActive = sim.phase !== 'gameover' && sim.players.length > 0;
   const everyoneGone = runActive && !anyoneCouldStillStand(sim);
   if (!everyoneGone) return;
-  if (sim.homeRun) wipeToBunker(sim);
+  const bunkerFalls = sim.overrun?.phase === 'breached';
+  if (bunkerFalls) overrunFalls(sim);
+  else if (sim.homeRun) wipeToBunker(sim);
   else endRun(sim, 'defeat');
 }
 

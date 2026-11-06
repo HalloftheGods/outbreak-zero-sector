@@ -9,11 +9,30 @@ import type { PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { HomeSave } from './home/home-store.ts';
 import type { ShopContext } from './home/shop.ts';
 
-/** What a death cost, held on screen until the player wakes. */
-export interface HomeDeath {
+/** What a death on a trip cost, held on screen until the player wakes. */
+export interface TripDeath {
   readonly receipt: TripReceipt;
   /** The gear that went with them. */
   readonly lost: Loadout;
+  readonly overrun?: undefined;
+}
+
+/** What going down in the bunker's overrun cost: only the gear in hand. The locker, the bank and the stock held. */
+export interface OverrunDeath {
+  /** `bunkerFell`: nobody was left standing. Otherwise this body fell while the rest held. */
+  readonly overrun: { readonly bunkerFell: boolean };
+  /** The gear in hand that went down with them. */
+  readonly lost: Loadout;
+  readonly receipt?: undefined;
+}
+
+export type HomeDeath = TripDeath | OverrunDeath;
+
+/** What the reward chest held, which is already in the locker and the bank. */
+export interface ChestOpened {
+  readonly gear: Loadout;
+  readonly silver: number;
+  readonly jewels: Jewels;
 }
 
 export interface HomeUi {
@@ -44,6 +63,8 @@ export interface HomeUi {
   /** Why the last save did not land, or null if it did. */
   readonly saveError: string | null;
   readonly death: HomeDeath | null;
+  /** The chest just opened, held on screen until the player puts it away. */
+  readonly chest: ChestOpened | null;
 }
 
 /** What the home screens can ask for. Results come back through `UiState.home`. */
@@ -57,6 +78,8 @@ export interface HomeActions {
   /** Builds its `ShopContext` from `UiState.home` with `shopContext`, so a screen never has to. */
   buy(merchant: MerchantId, item: string): void;
   wake(): void;
+  /** Puts the opened chest's card away. */
+  closeChest(): void;
   continueFromEnding(): void;
 }
 
@@ -69,6 +92,7 @@ export const NO_HOME_ACTIONS: HomeActions = {
   smelt() {},
   buy() {},
   wake() {},
+  closeChest() {},
   continueFromEnding() {},
 };
 
@@ -83,6 +107,8 @@ export interface HomeFacts {
   readonly saveError?: string | null;
   /** A death waiting to be read. Left off for none. */
   readonly death?: HomeDeath | null;
+  /** The chest just opened. Left off for none. */
+  readonly chest?: ChestOpened | null;
 }
 
 /** Outside a home session there is nothing to know. */
@@ -116,5 +142,6 @@ export function homeUi(snapshot: SnapshotPacket, local: PlayerEntity, facts: Hom
     forgeProgress: facts.forgeProgress ?? 0,
     saveError: facts.saveError ?? null,
     death: facts.death ?? null,
+    chest: facts.chest ?? null,
   };
 }

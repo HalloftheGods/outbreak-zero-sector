@@ -1,6 +1,7 @@
 /**
  * Draws the app icons from the game's cartridge (src/art/cartridge-art.ts) with the game's name on its label,
- * centred on the ink colour at a whole number of pixels per art pixel so the edges stay crisp.
+ * at a whole number of pixels per art pixel so the edges stay crisp. The ordinary icons fill their height and are
+ * clear around the cartridge, so the desktop shows through. Maskable and Apple icons must be opaque, so they sit on ink.
  * Run: node --experimental-strip-types tools/pwa-icons.ts
  * The Hall of the Gods name is not drawn on any of them. The favicon stays the zombie head: a cartridge is
  * unreadable at 16 pixels.
@@ -17,16 +18,18 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 export const ICON_WORDS: CartridgeWords = { ribbon: 'UNDEAD OF', title: 'NIGHT' };
 
 export type Rgb = readonly [number, number, number];
+/** A pixel of the cartridge, or null where it is clear. */
+export type Cell = Rgb | null;
 
 const INK: Rgb = [11, 12, 16];
 
-/** The cartridge's pixels as rows of colours, with the ink colour where it is clear. */
-export function cartridgeGrid(words: CartridgeWords = ICON_WORDS): Rgb[][] {
+/** The cartridge's pixels as rows of colours, null where it is clear. */
+export function cartridgeGrid(words: CartridgeWords = ICON_WORDS): Cell[][] {
   const art = drawCartridge(words);
   return Array.from({ length: art.h }, (_, y) =>
-    Array.from({ length: art.w }, (_, x): Rgb => {
+    Array.from({ length: art.w }, (_, x): Cell => {
       const color = art.get(x, y);
-      return color === null ? INK : [(color >> 16) & 255, (color >> 8) & 255, color & 255];
+      return color === null ? null : [(color >> 16) & 255, (color >> 8) & 255, color & 255];
     }));
 }
 
@@ -51,22 +54,26 @@ function chunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([length, body, crc]);
 }
 
-function encodePng(size: number, pixel: (x: number, y: number) => Rgb): Buffer {
-  const rows = Buffer.alloc((size * 3 + 1) * size);
+/** An RGBA PNG: a pixel that is null is fully clear. */
+function encodePng(size: number, pixel: (x: number, y: number) => Cell): Buffer {
+  const rows = Buffer.alloc((size * 4 + 1) * size);
   for (let y = 0; y < size; y += 1) {
-    const at = y * (size * 3 + 1);
-    for (let x = 0; x < size; x += 1) Buffer.from(pixel(x, y)).copy(rows, at + 1 + x * 3);
+    const at = y * (size * 4 + 1);
+    for (let x = 0; x < size; x += 1) {
+      const color = pixel(x, y);
+      if (color) Buffer.from([...color, 255]).copy(rows, at + 1 + x * 4);
+    }
   }
   const header = Buffer.alloc(13);
   header.writeUInt32BE(size, 0);
   header.writeUInt32BE(size, 4);
-  header.set([8, 2, 0, 0, 0], 8);
+  header.set([8, 6, 0, 0, 0], 8);
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
 }
 
-/** The cartridge's height fills about `fill` of the icon, centred, at a whole pixel scale. Maskable icons keep it inside the safe circle. */
-export function drawIcon(grid: Rgb[][], size: number, fill: number): Buffer {
+/** The cartridge's height fills about `fill` of the icon, centred, at a whole pixel scale, on `background` or clear when that is null. */
+export function drawIcon(grid: Cell[][], size: number, fill: number, background: Cell = null): Buffer {
   const rows = grid.length;
   const columns = grid[0].length;
   const scale = Math.max(1, Math.floor((size * fill) / rows));
@@ -76,7 +83,7 @@ export function drawIcon(grid: Rgb[][], size: number, fill: number): Buffer {
     const gx = Math.floor((x - left) / scale);
     const gy = Math.floor((y - top) / scale);
     const inside = x >= left && y >= top && gx < columns && gy < rows;
-    return inside ? grid[gy][gx] : INK;
+    return (inside ? grid[gy][gx] : null) ?? background;
   });
 }
 
@@ -84,10 +91,10 @@ export function drawIcon(grid: Rgb[][], size: number, fill: number): Buffer {
 export function iconFiles(): Readonly<Record<string, Buffer>> {
   const grid = cartridgeGrid();
   return {
-    'public/icons/icon-192.png': drawIcon(grid, 192, 0.9),
-    'public/icons/icon-512.png': drawIcon(grid, 512, 0.9),
-    'public/icons/icon-maskable-512.png': drawIcon(grid, 512, 0.6),
-    'public/apple-touch-icon.png': drawIcon(grid, 180, 0.95),
+    'public/icons/icon-192.png': drawIcon(grid, 192, 1),
+    'public/icons/icon-512.png': drawIcon(grid, 512, 1),
+    'public/icons/icon-maskable-512.png': drawIcon(grid, 512, 0.6, INK),
+    'public/apple-touch-icon.png': drawIcon(grid, 180, 1, INK),
   };
 }
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { OverrunView } from '../shared/home-protocol.ts';
 import { overrunClockLine } from '../src/game/overrun-hud.ts';
@@ -6,20 +7,22 @@ import { overrunBanner } from '../src/game/run-notices.ts';
 const view = (patch: Partial<OverrunView> = {}): OverrunView => ({ phase: 'counting', left: 300, slowed: false, hostiles: 0, total: 0, ...patch });
 
 describe('overrun banners', () => {
-  it('words each warning step with the time left', () => {
+  it('words each warning step as the design table does, the last one saying guns are free', () => {
     const steps = [150, 75, 30].map((left, step) => overrunBanner({ type: 'overrun_warning', step, left }));
-    expect(steps.map((b) => b?.subtitle)).toEqual(['2:30 LEFT', '1:15 LEFT', '0:30 LEFT']);
-    expect(new Set(steps.map((b) => b?.title)).size).toBe(3);
-    expect(steps.every((b) => b?.tone === 'danger')).toBe(true);
+    expect(steps).toEqual([
+      { title: 'SOMETHING AT THE BLAST DOOR', subtitle: '2:30', tone: 'quiet' },
+      { title: 'THE DOOR IS BUCKLING', subtitle: '1:15', tone: 'danger' },
+      { title: "IT WON'T HOLD", subtitle: 'GUNS FREE', tone: 'danger' },
+    ]);
   });
 
   it('counts the hostiles at the breach', () => {
-    expect(overrunBanner({ type: 'overrun_breach', hostiles: 12 })).toEqual({ title: 'OVERRUN', subtitle: '12 HOSTILES', tone: 'danger' });
+    expect(overrunBanner({ type: 'overrun_breach', hostiles: 12 })).toEqual({ title: 'THE BLAST DOOR IS DOWN', subtitle: '12 HOSTILES', tone: 'danger' });
   });
 
-  it('tells a held bunker from a fallen one', () => {
-    expect(overrunBanner({ type: 'overrun_end', outcome: 'held' })?.tone).toBe('hope');
-    expect(overrunBanner({ type: 'overrun_end', outcome: 'lost' })?.title).toBe('THE BUNKER FELL');
+  it('points a held bunker at its chest, and leaves a fallen one to the death summary', () => {
+    expect(overrunBanner({ type: 'overrun_end', outcome: 'held' })).toEqual({ title: 'THE BUNKER HOLDS', subtitle: 'A CHEST BY THE DOOR', tone: 'hope' });
+    expect(overrunBanner({ type: 'overrun_end', outcome: 'lost' })).toBeNull();
   });
 
   it('says nothing for other events', () => {
@@ -44,5 +47,16 @@ describe('overrun clock line', () => {
 
   it('goes quiet when the overrun is settled', () => {
     expect(overrunClockLine(view({ phase: 'held', left: 0 }))).toBeNull();
+  });
+
+  it('draws over the station screens and under the pause menu and the van ride', () => {
+    const source = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
+    const zOf = (path: string): number => Number(/z-index:\s*(\d+)/.exec(source(path))?.[1] ?? 0);
+    expect(zOf('../src/components/OverrunClock.vue')).toBeLessThan(zOf('../src/components/VanTransition.vue'));
+    expect(zOf('../src/components/OverrunClock.vue')).toBeLessThanOrEqual(zOf('../src/components/PauseMenu.vue'));
+    const app = source('../src/App.vue');
+    const at = (tag: string): number => app.indexOf(`<${tag} `);
+    for (const station of ['LockerScreen', 'MerchantScreen']) expect(at(station)).toBeLessThan(at('OverrunClock'));
+    for (const above of ['PauseMenu', 'VanTransition']) expect(at('OverrunClock')).toBeLessThan(at(above));
   });
 });

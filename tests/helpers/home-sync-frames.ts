@@ -1,7 +1,7 @@
 // A HomeSync over a store and hand-built frames, for the specs that watch what it saves and says.
 
 import { BUNKER_SEED } from '../../shared/home-protocol.ts';
-import type { HomeAction, HomeView, TripReceipt } from '../../shared/home-protocol.ts';
+import type { HomeAction, HomeView, OverrunReceipt, RoomHomeView, TripReceipt } from '../../shared/home-protocol.ts';
 import { TICK_RATE } from '../../shared/constants.ts';
 import { emptyLoadout } from '../../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
@@ -31,13 +31,15 @@ export interface FrameOptions {
   readonly picked?: number | null;
   readonly player?: Partial<PlayerEntity>;
   readonly home?: Partial<HomeView>;
+  /** The room's overrun, on the snapshot's home view. */
+  readonly overrun?: RoomHomeView['overrun'];
 }
 
-export function frame({ tick = 100, mapSeed = BUNKER_SEED, level = 0, picked = null, player, home }: FrameOptions = {}): SnapshotPacket {
+export function frame({ tick = 100, mapSeed = BUNKER_SEED, level = 0, picked = null, player, home, overrun }: FrameOptions = {}): SnapshotPacket {
   return {
     type: 'snapshot', tick, phase: 'intermission', level, mapSeed, wave: 0, intermission: 0, hostiles: 0,
     players: [entity({ ...player, home: { ...QUIET, ...home } })], zombies: [], bullets: [], pickups: [], exit: VAN,
-    openedContainers: [], events: [], gameOver: null, home: { pickedLevel: picked, roomHighest: 3 },
+    openedContainers: [], events: [], gameOver: null, home: { pickedLevel: picked, roomHighest: 3, ...(overrun ? { overrun } : {}) },
   };
 }
 
@@ -47,6 +49,10 @@ export const inTown = { mapSeed: TOWN_SEED, level: 2 };
 export const receipt = (patch: Partial<TripReceipt> = {}): TripReceipt => ({
   simId: 'sim-a', serial: 1, outcome: 'banked', level: 2, difficulty: 'stay_close', silver: 50, jewels: { small: 0, large: 0 },
   replay: false, score: 10, kills: 1, hordes: 1, seconds: 60, ending: false, gear: null, ...patch,
+});
+
+export const overrunReceipt = (patch: Partial<OverrunReceipt> = {}): OverrunReceipt => ({
+  simId: 'sim-a', serial: 2, outcome: 'died', share: 0, chest: null, silver: 0, jewels: { small: 0, large: 0 }, lost: null, kills: 4, seconds: 30, ...patch,
 });
 
 export const trip = (patch: Partial<OpenTrip> = {}): OpenTrip => ({ level: 2, mode: 'solo', difficulty: 'stay_close', startedAt: 1, ...patch });

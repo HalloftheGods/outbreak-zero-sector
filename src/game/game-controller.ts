@@ -16,6 +16,7 @@ import type { ClientWorld } from './client-world.ts';
 import { HomeLink } from './home-link.ts';
 import type { HomeLinkHost } from './home-link.ts';
 import type { HomeActions } from './home-hud.ts';
+import { overrunOn } from './home-mode.ts';
 import { createBrowserHomeStore } from './home/browser-home-store.ts';
 import type { HomeStore } from './home/home-store.ts';
 import { closedStalls } from './home/shop.ts';
@@ -77,6 +78,8 @@ export class GameController {
   private lastSnapshotMs = 0;
   private aim = 0;
   private titleTime = 0;
+  /** Read once, as the solo session reads it: the blast door is drawn only with the overrun on. */
+  private readonly overrunOn = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
 
   constructor(options: GameControllerOptions = {}) {
     const prefs = loadPrefs();
@@ -441,6 +444,7 @@ export class GameController {
     const scene: SceneView = {
       ...entities,
       closedStalls: this.closedStalls(),
+      overrunOn: this.overrunOn,
       pointerX: over || touch ? null : pointerX,
       pointerY: over || touch ? null : pointerY,
       showCrosshair: this.isPlaying() && !menuUp && !this.bench.open,

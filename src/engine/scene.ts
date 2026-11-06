@@ -46,6 +46,8 @@ export interface SceneView {
   readonly station?: StationId;
   /** The bunker's horde clock, which the door and the chest are drawn from. Absent when there is none. */
   readonly overrun?: OverrunView;
+  /** The overrun is switched on for this build, so the blast door is drawn. Absent or false, the bunker looks as it did before it. */
+  readonly overrunOn?: boolean;
   /** Stalls the overrun emptied, by this player's own save. Their merchants stand down until the stall reopens. */
   readonly closedStalls?: readonly MerchantId[];
   /** The player at this keyboard, if they exist yet. */

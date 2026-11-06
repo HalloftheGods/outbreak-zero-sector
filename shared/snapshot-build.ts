@@ -41,8 +41,9 @@ function tracksField(sim: SimState, inRange: (item: { x: number; y: number }) =>
 function playerHomeField(p: PlayerState): Pick<PlayerEntity, 'home'> {
   const { home } = p;
   if (!home) return {};
-  const { silver, jewels, station, stationHold, ready, receipt, overrun } = home;
-  return { home: { silver, jewels: { ...jewels }, station, stationHold: round2(stationHold), ready, receipt, overrun } };
+  const { silver, jewels, station, stationHold, ready, receipt, overrun, chest } = home;
+  const view = { silver, jewels: { ...jewels }, station, stationHold: round2(stationHold), ready, receipt, overrun };
+  return { home: chest ? { ...view, chest } : view };
 }
 
 /** The overrun is left off while there is none, so a room without one sends what it always did. */
