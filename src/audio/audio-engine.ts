@@ -215,6 +215,7 @@ export class AudioEngine {
         mixer.play(ALERT[e.zombieType], { x: e.x, y: e.y });
         break;
       }
+      case 'zombie_track': mixer.play('sniff', { x: e.x, y: e.y }); break;
       case 'weapon_switch': mixer.play('weapon_switch', at(e.x, e.y, e.playerId)); break;
       case 'bullet_impact': mixer.play('impact', { x: e.x, y: e.y }); break;
       case 'zombie_hit': mixer.play('flesh_hit', { x: e.x, y: e.y }); break;

@@ -66,6 +66,7 @@ export const SFX = {
   alert_bloater: def(Z.alertBloater, 0.8, { gain: 1, voices: 2, cooldown: 0.8, vary: 0.15 }),
   alert_brute: def(Z.alertBrute, 1.0, { gain: 1, voices: 1, cooldown: 1.5, vary: 0.08 }),
   scream: def(Z.scream, 1.3, { gain: 2.2, voices: 2, cooldown: 1, vary: 0.06 }),
+  sniff: def(Z.sniff, 0.8, { gain: 2, voices: 2, cooldown: 0.6, vary: 0.12 }),
   pickup_weapon: def(P.pickupWeapon, 0.6, { gain: 1.5, voices: 2, cooldown: 0.1, vary: 0.02 }),
   container_open: def(P.containerOpen, 0.25, { gain: 1.8, voices: 2, cooldown: 0.1, vary: 0.08 }),
   pickup_radio: def(P.pickupRadio, 0.7, { gain: 1.6, voices: 1, cooldown: 1, vary: 0 }),

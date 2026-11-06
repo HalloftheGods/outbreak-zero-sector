@@ -1,10 +1,22 @@
 // A mock street at game scale, so art can be judged in context rather than on a grid.
-// The night mode approximates the game's lighting pass; the client's renderer is the real one.
+// The night mode approximates the game's lighting pass (moon ambient read from the engine, the viewer's
+// aura, the haze add-back, and shadows blended the engine's way); the client's renderer is the real one,
+// and lamp pools and the beam here are still hand-placed guesses.
 
 import { TILE_SIZE } from '../shared/protocol.ts';
 import type { BuildingKind, PropKind, TileKind, WeaponId, ZombieType } from '../shared/protocol.ts';
 import type { ArtBook, PixelSprite } from '../src/art/types.ts';
+import { NIGHT_AMBIENT } from '../src/engine/lighting.ts';
 import { drawSprite, Sheet } from './sheet.ts';
+
+/** The engine's shadow: rgba(4, 5, 10, 0.42), see SHADOW_ALPHA in src/engine/entity-renderer.ts. */
+const SHADOW_ALPHA = 0.42;
+const SHADOW_RGB = [4, 5, 10] as const;
+/** The engine's HAZE in src/engine/lighting.ts: the light itself added back at this strength. */
+const HAZE = 0.11;
+/** The viewer's own glow: #b8a488 at 0.62, radius 38 (copied values, not imported). */
+const AURA = { radius: 38, r: (0xb8 / 255) * 0.62, g: (0xa4 / 255) * 0.62, b: (0x88 / 255) * 0.62 };
+const VIEWER = { x: 218, y: 186 };
 
 const WIDTH = 480;
 const HEIGHT = 270;
@@ -55,11 +67,20 @@ function place(sheet: Sheet, sprite: PixelSprite, x: number, y: number): void {
   drawSprite(sheet, sprite, x - sprite.ax, y - sprite.ay, 1);
 }
 
+/** Alpha-blends one flat colour over a pixel, like canvas source-over. */
+function blend(sheet: Sheet, x: number, y: number, rgb: readonly number[], alpha: number): void {
+  const insideSheet = x >= 0 && y >= 0 && x < sheet.w && y < sheet.h;
+  if (!insideSheet) return;
+  const i = (y * sheet.w + x) * 4;
+  for (let c = 0; c < 3; c++) sheet.data[i + c] = sheet.data[i + c] * (1 - alpha) + rgb[c] * alpha;
+}
+
 function groundShadow(sheet: Sheet, x: number, y: number, rx: number): void {
   const ry = Math.max(2, rx * 0.4);
   for (let j = -ry; j <= ry; j++) {
     for (let i = -rx; i <= rx; i++) {
-      if ((i * i) / (rx * rx) + (j * j) / (ry * ry) <= 1) sheet.tint(Math.round(x + i), Math.round(y + j), 0.55, 0.55, 0.62);
+      const insideShadow = (i * i) / (rx * rx) + (j * j) / (ry * ry) <= 1;
+      if (insideShadow) blend(sheet, Math.round(x + i), Math.round(y + j), SHADOW_RGB, SHADOW_ALPHA);
     }
   }
 }
@@ -109,7 +130,7 @@ function flashlight(x: number, y: number): number {
 
 /** Multiplies the scene by dark blue, then lifts it back inside lamp pools and the flashlight cone. */
 function nightPass(sheet: Sheet): void {
-  const ambient = { r: 0.3, g: 0.34, b: 0.54 };
+  const ambient = { r: NIGHT_AMBIENT[0] / 255, g: NIGHT_AMBIENT[1] / 255, b: NIGHT_AMBIENT[2] / 255 };
   for (let y = 0; y < sheet.h; y++) {
     for (let x = 0; x < sheet.w; x++) {
       let r = ambient.r;
@@ -125,7 +146,14 @@ function nightPass(sheet: Sheet): void {
       r = Math.max(r, beam);
       g = Math.max(g, beam * 0.96);
       b = Math.max(b, beam * 0.86);
-      sheet.tint(x, y, r, g, b);
+      const aura = band(Math.hypot(x - VIEWER.x, y - VIEWER.y) / AURA.radius);
+      r = Math.max(r, aura * AURA.r);
+      g = Math.max(g, aura * AURA.g);
+      b = Math.max(b, aura * AURA.b);
+      const at = (y * sheet.w + x) * 4;
+      sheet.data[at] = sheet.data[at] * r + 255 * r * HAZE;
+      sheet.data[at + 1] = sheet.data[at + 1] * g + 255 * g * HAZE;
+      sheet.data[at + 2] = sheet.data[at + 2] * b + 255 * b * HAZE;
     }
   }
 }
@@ -143,8 +171,11 @@ export function renderScene(book: ArtBook, scale: number, night: boolean): Sheet
   const pickups = Object.values(book.pickups);
   pickups.forEach((clip, i) => place(scene, clip.frames[0], 130 + i * 30, 234));
   const actors = buildActors(book);
-  for (const actor of actors) if (actor.shadow) groundShadow(scene, actor.x, actor.y, actor.shadow);
-  for (const actor of actors) place(scene, actor.sprite, actor.x, actor.y);
+  for (const actor of actors) {
+    const castsShadow = actor.shadow > 0;
+    if (castsShadow) groundShadow(scene, actor.x, actor.y, actor.shadow);
+    place(scene, actor.sprite, actor.x, actor.y);
+  }
   if (night) nightPass(scene);
   return scene.scaled(scale);
 }

@@ -17,7 +17,7 @@ export interface OutlineOptions {
   readonly color?: Color;
   /**
    * Selective outlining: on the lit upper-left of the silhouette the outline is a
-   * dark shade of the colour next to it rather than the outline colour.
+   * dark shade of the colour next to it rather than the outline colour (see litRim).
    */
   readonly selective?: boolean;
   /** Also fill diagonal neighbours, for a heavier outline. */
@@ -25,6 +25,17 @@ export interface OutlineOptions {
 }
 
 export type Point = readonly [number, number];
+
+/**
+ * The lit-side outline pixel next to a fill: two ramp steps darker. A fill already at
+ * the bottom of its ramp cannot go darker, so it gets a one step lighter sheen instead
+ * and keeps an edge. Shared by PixelCanvas.outline and the survivor Cell.
+ */
+export function litRim(edge: Color): Color {
+  const shade = darker(edge, 2);
+  const clamped = shade === edge;
+  return clamped ? lighter(edge, 1) : shade;
+}
 
 export class PixelCanvas {
   readonly w: number;
@@ -55,14 +66,16 @@ export class PixelCanvas {
 
   /** The colour at x,y, or null when transparent or out of bounds. */
   get(x: number, y: number): Color | null {
-    if (!this.inBounds(x, y)) return null;
+    const outside = !this.inBounds(x, y);
+    if (outside) return null;
     const i = (y * this.w + x) * 4;
-    if (this.data[i + 3] === 0) return null;
-    return (this.data[i] << 16) | (this.data[i + 1] << 8) | this.data[i + 2];
+    const transparent = this.data[i + 3] === 0;
+    return transparent ? null : (this.data[i] << 16) | (this.data[i + 1] << 8) | this.data[i + 2];
   }
 
   px(x: number, y: number, color: Color): this {
-    if (!this.inBounds(x, y)) return this;
+    const outside = !this.inBounds(x, y);
+    if (outside) return this;
     const i = (y * this.w + x) * 4;
     this.data[i] = color >> 16;
     this.data[i + 1] = (color >> 8) & 255;
@@ -72,8 +85,8 @@ export class PixelCanvas {
   }
 
   erase(x: number, y: number): this {
-    if (!this.inBounds(x, y)) return this;
-    this.data.fill(0, (y * this.w + x) * 4, (y * this.w + x) * 4 + 4);
+    const inside = this.inBounds(x, y);
+    if (inside) this.data.fill(0, (y * this.w + x) * 4, (y * this.w + x) * 4 + 4);
     return this;
   }
 
@@ -103,13 +116,16 @@ export class PixelCanvas {
     let y = y0;
     for (;;) {
       this.px(x, y, color);
-      if (x === x1 && y === y1) return this;
+      const done = x === x1 && y === y1;
+      if (done) return this;
       const e2 = 2 * err;
-      if (e2 >= dy) {
+      const stepX = e2 >= dy;
+      const stepY = e2 <= dx;
+      if (stepX) {
         err += dy;
         x += sx;
       }
-      if (e2 <= dx) {
+      if (stepY) {
         err += dx;
         y += sy;
       }
@@ -120,7 +136,8 @@ export class PixelCanvas {
   ellipse(cx: number, cy: number, rx: number, ry: number, color: Color): this {
     for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
       for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
-        if (insideEllipse(x - cx, y - cy, rx, ry)) this.px(x, y, color);
+        const inside = insideEllipse(x - cx, y - cy, rx, ry);
+        if (inside) this.px(x, y, color);
       }
     }
     return this;
@@ -130,8 +147,8 @@ export class PixelCanvas {
     const inside = (x: number, y: number) => insideEllipse(x - cx, y - cy, rx, ry);
     for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
       for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
-        if (!inside(x, y)) continue;
-        if (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1)) this.px(x, y, color);
+        const rim = inside(x, y) && !(inside(x - 1, y) && inside(x + 1, y) && inside(x, y - 1) && inside(x, y + 1));
+        if (rim) this.px(x, y, color);
       }
     }
     return this;
@@ -144,7 +161,8 @@ export class PixelCanvas {
       const crossings: number[] = [];
       points.forEach(([x0, y0], i) => {
         const [x1, y1] = points[(i + 1) % points.length];
-        if (y0 <= y + 0.5 !== y1 <= y + 0.5) crossings.push(x0 + ((y + 0.5 - y0) / (y1 - y0)) * (x1 - x0));
+        const crosses = y0 <= y + 0.5 !== y1 <= y + 0.5;
+        if (crosses) crossings.push(x0 + ((y + 0.5 - y0) / (y1 - y0)) * (x1 - x0));
       });
       crossings.sort((a, b) => a - b);
       for (let i = 0; i + 1 < crossings.length; i += 2) {
@@ -163,10 +181,13 @@ export class PixelCanvas {
     rows.forEach((row, j) => {
       for (let i = 0; i < row.length; i++) {
         const letter = row[i];
-        if (letter === '.' || letter === ' ') continue;
+        const blank = letter === '.' || letter === ' ';
+        if (blank) continue;
         const color = legend[letter];
-        if (color === undefined) throw new Error(`fromGrid: "${letter}" is not in the legend (row ${j}: ${row})`);
-        if (color !== null) this.px(x + i, y + j, color);
+        const unknown = color === undefined;
+        if (unknown) throw new Error(`fromGrid: "${letter}" is not in the legend (row ${j}: ${row})`);
+        const opaque = color !== null;
+        if (opaque) this.px(x + i, y + j, color);
       }
     });
     return this;
@@ -176,7 +197,8 @@ export class PixelCanvas {
     for (let j = 0; j < src.h; j++) {
       for (let i = 0; i < src.w; i++) {
         const color = src.get(options.flipX ? src.w - 1 - i : i, options.flipY ? src.h - 1 - j : j);
-        if (color !== null) this.px(x + i, y + j, color);
+        const opaque = color !== null;
+        if (opaque) this.px(x + i, y + j, color);
       }
     }
     return this;
@@ -199,18 +221,21 @@ export class PixelCanvas {
       : [[0, -1], [-1, 0], [1, 0], [0, 1]];
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
-        if (source.get(x, y) !== null) continue;
+        const filled = source.get(x, y) !== null;
+        if (filled) continue;
         let edge: Color | null = null;
         let shadowSide = false;
         for (const [dx, dy] of sides) {
           const neighbour = source.get(x + dx, y + dy);
-          if (neighbour === null) continue;
           edge ??= neighbour;
           // The silhouette lies up or left of here, so this pixel faces away from the light.
-          if (dx < 0 || dy < 0) shadowSide = true;
+          const awayFromLight = neighbour !== null && (dx < 0 || dy < 0);
+          shadowSide ||= awayFromLight;
         }
-        if (edge === null) continue;
-        this.px(x, y, selective && !shadowSide ? darker(edge, 2) : color);
+        const touched: Color | null = edge;
+        const touches = touched !== null;
+        const litSide = selective && !shadowSide;
+        if (touches) this.px(x, y, litSide ? litRim(touched) : color);
       }
     }
     return this;
@@ -222,7 +247,8 @@ export class PixelCanvas {
       for (let x = 0; x < this.w; x++) {
         const color = this.get(x, y);
         const next = color === null ? undefined : map.get(color);
-        if (next !== undefined) this.px(x, y, next);
+        const mapped = next !== undefined;
+        if (mapped) this.px(x, y, next);
       }
     }
     return this;
@@ -238,10 +264,13 @@ export class PixelCanvas {
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
         const color = source.get(x, y);
-        if (color === null) continue;
+        const transparent = color === null;
+        if (transparent) continue;
         const open = (dx: number, dy: number) => source.get(x + dx, y + dy) === null;
-        if (shade && (open(1, 0) || open(0, 1))) this.px(x, y, darker(color, shade));
-        else if (lit && (open(-1, 0) || open(0, -1))) this.px(x, y, lighter(color, lit));
+        const shaded = shade !== 0 && (open(1, 0) || open(0, 1));
+        const litEdge = lit !== 0 && (open(-1, 0) || open(0, -1));
+        if (shaded) this.px(x, y, darker(color, shade));
+        else if (litEdge) this.px(x, y, lighter(color, lit));
       }
     }
     return this;

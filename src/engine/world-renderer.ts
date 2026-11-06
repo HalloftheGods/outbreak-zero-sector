@@ -14,6 +14,7 @@ import { OcclusionGrid } from './occlusion.ts';
 import { OverlayRenderer } from './overlay-renderer.ts';
 import type { SceneView } from './scene.ts';
 import { ScreenEffects } from './screen-effects.ts';
+import { paintPrints, paintTrackingMarks } from './snow-prints.ts';
 import { GroundLayer } from './tile-layer.ts';
 import { computeViewport } from './viewport.ts';
 import type { Viewport } from './viewport.ts';
@@ -61,10 +62,12 @@ export class WorldRenderer {
   private ground: GroundLayer | null = null;
   private occlusion: OcclusionGrid | null = null;
   private time = 0;
+  private readonly reducedMotion: boolean;
 
   constructor(canvas: HTMLCanvasElement, art: ArtBook, reducedMotion: boolean) {
     this.canvas = canvas;
     this.art = art;
+    this.reducedMotion = reducedMotion;
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.effects = new ScreenEffects(reducedMotion);
     this.atmosphere = new Atmosphere(reducedMotion);
@@ -250,6 +253,7 @@ export class WorldRenderer {
     ctx.fillStyle = '#07080c';
     ctx.fillRect(0, 0, viewW, viewH);
     ground.draw(ctx, left, top, viewW, viewH);
+    paintPrints(ctx, scene.tracks ?? [], left, top, viewW, viewH);
     this.entities.drawWorld(ctx, scene, left, top, viewW, viewH, time, dt);
     this.fx.particles.drawLit(ctx, left, top);
 
@@ -261,6 +265,7 @@ export class WorldRenderer {
     this.atmosphere.drawWash(ctx, viewW, viewH, time, outdoors);
 
     this.entities.drawEmissive(ctx, scene, left, top, viewW, viewH, time);
+    paintTrackingMarks(ctx, scene.zombies, left, top, viewW, viewH, time, this.reducedMotion);
     this.entities.drawGlints(ctx, scene, left, top, viewW, viewH, time, lightAt);
     this.fx.particles.drawEmissive(ctx, left, top);
     this.entities.drawOccluded(ctx, scene, left, top, viewW, viewH);

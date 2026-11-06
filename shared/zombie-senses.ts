@@ -3,8 +3,9 @@ import { SCREAM_COOLDOWN_SEC, SCREAM_RADIUS, SNEAK_SIGHT_SCALE, TICK_DT, ZOMBIE_
 import type { PlayerState, SimState, ZombieMode, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 import { buildingAt, segmentHitsSolid } from './world-query.ts';
-import { trailUnder } from './snow-tracks.ts';
-import { hearingScale, sightScale } from './town-rules.ts';
+import { printUnder } from './snow-tracks.ts';
+import { hearingScale, sightScale, TRACK_REST_SEC, TRACK_SEARCH_SEC } from './town-rules.ts';
+import type { Footprint } from './town-rules.ts';
 
 /** Each zombie looks around once in this many ticks, a sixth of its body count per tick. */
 export const SIGHT_CHECK_TICKS = 6;
@@ -17,11 +18,33 @@ function notice(sim: SimState, z: ZombieState, mode: ZombieMode, interest: numbe
 }
 
 export function startHunting(sim: SimState, z: ZombieState): void {
+  delete z.trail;
   notice(sim, z, 'hunt', ZOMBIE_LOSE_INTEREST_SEC);
+}
+
+/** Puts its nose down on a print and follows that walker's trail. Only this zombie knows about it. */
+export function pickUpTrail(sim: SimState, z: ZombieState, print: Footprint): void {
+  z.mode = 'alert';
+  z.interestLeft = ZOMBIE_INVESTIGATE_SEC;
+  z.trail = { by: print.by, x: print.x, y: print.y, left: print.left };
+  emit(sim, { type: 'zombie_track', zombieId: z.id, zombieType: z.type, x: z.x, y: z.y });
+}
+
+/** The prints ran out: it casts about for a while where it stands, then gives up. */
+export function loseTrail(z: ZombieState): void {
+  const trail = z.trail;
+  if (!trail || trail.searching) return;
+  trail.searching = true;
+  z.interestLeft = TRACK_SEARCH_SEC;
+  z.wanderLeft = 0;
+  z.home = null;
 }
 
 /** Forgets everything and settles wherever it stands. */
 export function backToRoaming(sim: SimState, z: ZombieState): void {
+  const wasTracking = z.trail !== undefined;
+  if (wasTracking) z.sniffRestLeft = TRACK_REST_SEC;
+  delete z.trail;
   z.mode = 'wander';
   z.interestLeft = 0;
   z.wanderLeft = 0;
@@ -36,6 +59,8 @@ export function makeNoise(sim: SimState, x: number, y: number, radius: number): 
   for (const z of sim.zombies) {
     const heard = !z.horde && z.health > 0 && (z.x - x) ** 2 + (z.y - y) ** 2 <= radiusSquared;
     if (!heard) continue;
+    // A noise beats a nose: a bottle pulls a tracker off the trail.
+    delete z.trail;
     if (z.mode === 'hunt') z.interestLeft = ZOMBIE_LOSE_INTEREST_SEC;
     else notice(sim, z, 'alert', ZOMBIE_INVESTIGATE_SEC);
   }
@@ -80,12 +105,12 @@ export function updateAwareness(sim: SimState, z: ZombieState, prey: readonly Pl
     if (fresh) scream(sim, z, was);
     return;
   }
-  const sniffing = lookingNow && z.mode === 'wander';
-  const quarry = sniffing ? trailUnder(sim, z) : null;
-  if (quarry) {
-    // The trail leads to whoever left it, and only this zombie follows it.
-    sim.noises.push({ x: quarry.x, y: quarry.y });
-    notice(sim, z, 'alert', ZOMBIE_INVESTIGATE_SEC);
+  const resting = (z.sniffRestLeft ?? 0) > 0;
+  if (resting) z.sniffRestLeft = (z.sniffRestLeft as number) - TICK_DT;
+  const sniffing = lookingNow && z.mode === 'wander' && !resting && sim.tracks.length > 0;
+  const print = sniffing ? printUnder(sim, z) : null;
+  if (print) {
+    pickUpTrail(sim, z, print);
     return;
   }
   if (z.mode === 'wander') return;

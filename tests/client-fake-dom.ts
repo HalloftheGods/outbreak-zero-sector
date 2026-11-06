@@ -130,7 +130,7 @@ export function installFakeBrowser(): FakeBrowser {
     innerHeight: 1080,
     devicePixelRatio: 1,
     location: { hostname: 'localhost', protocol: 'http:' },
-    matchMedia: () => ({ matches: false }),
+    matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
     ...makeTarget(listeners),
   });
 

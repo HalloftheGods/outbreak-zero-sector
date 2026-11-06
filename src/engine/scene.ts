@@ -6,6 +6,7 @@ import type {
   GamePhase,
   PickupEntity,
   PlayerEntity,
+  TrackEntity,
   ZombieEntity,
 } from '../../shared/protocol.ts';
 
@@ -36,6 +37,8 @@ export interface SceneView {
   readonly exit: ExitEntity | null;
   /** Ids of the town's containers that have been opened. */
   readonly openedContainers: readonly number[];
+  /** Footprints in the snow, drawn on the ground. Absent outside a snowy town. */
+  readonly tracks?: readonly TrackEntity[];
   /** What the local player could search from where they stand, if anything. */
   readonly searchable: Container | null;
   /** The player at this keyboard, if they exist yet. */

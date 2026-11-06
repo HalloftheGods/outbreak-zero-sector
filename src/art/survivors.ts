@@ -11,7 +11,7 @@ import { KHRONUS8 } from './survivors/khronus8.ts';
 import { NIGHT } from './survivors/night.ts';
 import { portraitOf, portraitsOf } from './survivors/portrait.ts';
 import { REX } from './survivors/rex.ts';
-import { bodyDrop } from './survivors/rig.ts';
+import { gunDrop } from './survivors/rig.ts';
 import type { Person } from './survivors/rig.ts';
 import { SATORI } from './survivors/satori.ts';
 import { SOL } from './survivors/sol.ts';
@@ -66,7 +66,7 @@ function art(person: Person): SurvivorArt {
     dead: deadClip(person),
     portrait: portraitOf(person),
     portraits: portraitsOf(person, idleClips(person, 'pistol')),
-    gunDrop: bodyDrop(person),
+    gunDrop: gunDrop(person),
   };
 }
 

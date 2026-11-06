@@ -6,10 +6,16 @@ import { spriteToCanvas } from '../kit.ts';
 import { standingFrame } from './fallen.ts';
 import type { Person } from './rig.ts';
 
-const FRAME_X = 8;
-const FRAME_Y = 7;
-const FRAME_W = 24;
-const FRAME_H = 29;
+/**
+ * Where the portrait is cut from a survivor cell, in art pixels. It holds every opaque pixel of
+ * the front pose and the seven weapon-ready facings for all five skins, so no gun or tail is
+ * sheared (tests/sprite-look-7120.spec.ts keeps it so).
+ */
+export const PORTRAIT_FRAME = { x: 4, y: 7, w: 32, h: 30 } as const;
+const FRAME_X = PORTRAIT_FRAME.x;
+const FRAME_Y = PORTRAIT_FRAME.y;
+const FRAME_W = PORTRAIT_FRAME.w;
+const FRAME_H = PORTRAIT_FRAME.h;
 /** The facing that looks at the viewer, in dirFromAngle order. */
 const FRONT_FACING = 2;
 

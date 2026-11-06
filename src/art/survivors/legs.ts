@@ -3,7 +3,7 @@
 // instead of mirroring the shading, and a leg can be swapped per frame.
 //
 // Letters: r q p thigh light to dark, R Q P shin (so shorts can bare the skin),
-// g f e boot light to dark.
+// g f e boot light to dark. Boots are lit from the left in every facing, like the legs.
 
 import type { DrawnDir } from '../kit.ts';
 
@@ -20,10 +20,10 @@ export interface LegSet {
 }
 
 const FRONT: Readonly<Record<string, Strip>> = {
-  long: ['rqqp', 'rqqp', 'rqqp', 'RQQP', 'RQQP', 'RQQP', 'fggf', 'fggf', 'eeee'],
-  stand: ['rqqp', 'rqqp', 'rqqp', 'RQQP', 'RQQP', 'fggf', 'fggf', 'eeee'],
-  short: ['rqqp', 'rqqp', 'RQQP', 'RQQP', 'fggf', 'fggf', 'eeee'],
-  lifted: ['rqqp', 'rqqp', 'RQQP', 'PQQP', 'eeee', '.ee.'],
+  long: ['rqqp', 'rqqp', 'rqqp', 'RQQP', 'RQQP', 'RQQP', 'ggfe', 'ggfe', 'eeee'],
+  stand: ['rqqp', 'rqqp', 'rqqp', 'RQQP', 'RQQP', 'ggfe', 'ggfe', 'eeee'],
+  short: ['rqqp', 'rqqp', 'RQQP', 'RQQP', 'ggfe', 'ggfe', 'eeee'],
+  lifted: ['rqqp', 'rqqp', 'RQQP', 'RQQP', 'ggfe', '.ee.'],
 };
 
 const BACK: Readonly<Record<string, Strip>> = {
@@ -42,8 +42,8 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '....rqqp....',
     '....RQQP....',
     '....RQQP....',
-    '....fgggf...',
-    '....fggggf..',
+    '....ggggf...',
+    '....gggggf..',
     '....eeeeee..',
   ],
   forward: [
@@ -53,7 +53,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '.....rqqqp..',
     '......RQQP..',
     '......RQQQP.',
-    '......fgggf.',
+    '......ggggf.',
     '......eeeeee',
   ],
   under: [
@@ -63,7 +63,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '.....rqqp...',
     '.....RQQP...',
     '.....RQQP...',
-    '.....fgggf..',
+    '.....ggggf..',
     '.....eeeeee.',
   ],
   behind: [
@@ -73,7 +73,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '..rqqqp.....',
     '..RQQP......',
     '..RQQP......',
-    '..fgggf.....',
+    '..ggggf.....',
     '...eeeee....',
   ],
   trailing: [
@@ -82,7 +82,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '..rqqqp.....',
     '.rqqp.......',
     'RQQP........',
-    'fgf.........',
+    'ggf.........',
     '.ggf........',
     '..ee........',
   ],
@@ -92,7 +92,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '.....rqqqp..',
     '.....RQQP...',
     '....RQQP....',
-    '...fgggf....',
+    '...ggggf....',
     '...eeeeee...',
   ],
   reaching: [
@@ -101,7 +101,7 @@ const SIDE: Readonly<Record<string, Strip>> = {
     '.....rqqqp..',
     '.....rqqqqp.',
     '......RQQP..',
-    '......fgggf.',
+    '......ggggf.',
     '......eeeeee',
   ],
 };
@@ -115,8 +115,8 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '...rqqp...',
     '...RQQP...',
     '...RQQP...',
-    '...fgggf..',
-    '...fgggf..',
+    '...gggfe..',
+    '...gggfe..',
     '...eeeee..',
   ],
   forward: [
@@ -127,8 +127,8 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '.....RQQP.',
     '.....RQQP.',
     '.....RQQP.',
-    '.....fgggf',
-    '.....fgggf',
+    '.....gggfe',
+    '.....gggfe',
     '.....eeeee',
   ],
   under: [
@@ -138,8 +138,8 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '....RQQP..',
     '....RQQP..',
     '....RQQP..',
-    '....fgggf.',
-    '....fgggf.',
+    '....gggfe.',
+    '....gggfe.',
     '....eeeee.',
   ],
   behind: [
@@ -148,7 +148,7 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '..rqqqp...',
     '..RQQP....',
     '..RQQP....',
-    '..fgggf...',
+    '..gggfe...',
     '..eeeee...',
   ],
   trailing: [
@@ -156,7 +156,7 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '..rqqqp...',
     '..rqqp....',
     '.RQQP.....',
-    '.fgff.....',
+    '.ggfe.....',
     '.eeee.....',
   ],
   passing: [
@@ -164,7 +164,7 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '...rqqqp..',
     '....RQQP..',
     '....RQQP..',
-    '...fgggf..',
+    '...gggfe..',
     '...eeeee..',
   ],
   reaching: [
@@ -173,8 +173,8 @@ const QUARTER_FRONT: Readonly<Record<string, Strip>> = {
     '....rqqqp.',
     '.....RQQP.',
     '.....RQQP.',
-    '.....fgggf',
-    '.....fgggf',
+    '.....gggfe',
+    '.....gggfe',
     '.....eeeee',
   ],
 };

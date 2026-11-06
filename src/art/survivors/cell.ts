@@ -3,6 +3,7 @@
 // Same results: palette colours, the same selective outline, alpha 0 or 255.
 
 import type { PixelSprite } from '../types.ts';
+import { litRim } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { darker, INK } from '../palette.ts';
 import type { Color } from '../palette.ts';
@@ -35,13 +36,30 @@ function unpack(word: number): Color {
 const INK_WORD = pack(INK);
 const rimWords = new Map<number, number>();
 
+/** litRim, cached per packed colour. */
 function rimWord(word: number): number {
   let rim = rimWords.get(word);
-  if (rim === undefined) {
-    rim = pack(darker(unpack(word), 2));
+  const unseen = rim === undefined;
+  if (unseen) {
+    rim = pack(litRim(unpack(word)));
     rimWords.set(word, rim);
   }
-  return rim;
+  return rim as number;
+}
+
+/**
+ * How an overlaid part meets the body pixels it lands on. Both are given the colour
+ * already in the cell under the part.
+ */
+export interface Contact {
+  /** The contact line drawn on the body below and right of the part. */
+  readonly rim: (under: Color) => Color;
+  /** The part's own pixel where it covers the body. Left out, the part keeps its colour. */
+  readonly over?: (part: Color, under: Color) => Color;
+}
+
+function inCell(x: number, y: number): boolean {
+  return x >= 0 && y >= 0 && x < CELL_W && y < CELL_H;
 }
 
 const stamps = new WeakMap<Rows, Map<Legend, Stamp>>();
@@ -53,10 +71,13 @@ function compile(rows: Rows, legend: Legend): Stamp {
   rows.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       const letter = row[x];
-      if (letter === '.' || letter === ' ') continue;
+      const blank = letter === '.' || letter === ' ';
+      if (blank) continue;
       const color = legend[letter];
-      if (color === undefined) throw new Error(`survivor grid: "${letter}" is not in the legend (row ${y}: ${row})`);
-      if (color === null) continue;
+      const unknown = color === undefined;
+      if (unknown) throw new Error(`survivor grid: "${letter}" is not in the legend (row ${y}: ${row})`);
+      const transparent = color === null;
+      if (transparent) continue;
       xs.push(x);
       ys.push(y);
       words.push(pack(color));
@@ -86,6 +107,14 @@ function stampFor(rows: Rows, legend: Legend): Stamp {
   return stamp;
 }
 
+/** A grid as it was drawn into a cell: its rows, legend and top-left corner. */
+export interface PlacedGrid {
+  readonly rows: Rows;
+  readonly legend: Legend;
+  readonly x: number;
+  readonly y: number;
+}
+
 let overlayLayer: Cell | null = null;
 
 export class Cell {
@@ -97,26 +126,30 @@ export class Cell {
   private bottom = -1;
 
   private touch(x0: number, y0: number, x1: number, y1: number): void {
-    if (x0 < this.left) this.left = x0;
-    if (y0 < this.top) this.top = y0;
-    if (x1 > this.right) this.right = x1;
-    if (y1 > this.bottom) this.bottom = y1;
+    this.left = Math.min(this.left, x0);
+    this.top = Math.min(this.top, y0);
+    this.right = Math.max(this.right, x1);
+    this.bottom = Math.max(this.bottom, y1);
   }
 
   px(x: number, y: number, color: Color): void {
-    if (x < 0 || y < 0 || x >= CELL_W || y >= CELL_H) return;
-    this.pixels[y * CELL_W + x] = pack(color);
-    this.touch(x, y, x, y);
+    const inside = inCell(x, y);
+    if (inside) {
+      this.pixels[y * CELL_W + x] = pack(color);
+      this.touch(x, y, x, y);
+    }
   }
 
   erase(x: number, y: number): void {
-    if (x >= 0 && y >= 0 && x < CELL_W && y < CELL_H) this.pixels[y * CELL_W + x] = 0;
+    const inside = inCell(x, y);
+    if (inside) this.pixels[y * CELL_W + x] = 0;
   }
 
   grid(x: number, y: number, rows: Rows, legend: Legend): void {
     const { offsets, xs, ys, words, w, h } = stampFor(rows, legend);
     const pixels = this.pixels;
-    if (x >= 0 && y >= 0 && x + w <= CELL_W && y + h <= CELL_H) {
+    const fits = inCell(x, y) && inCell(x + w - 1, y + h - 1);
+    if (fits) {
       const base = y * CELL_W + x;
       for (let i = 0; i < words.length; i++) pixels[base + offsets[i]] = words[i];
       this.touch(x, y, x + w - 1, y + h - 1);
@@ -125,9 +158,43 @@ export class Cell {
     for (let i = 0; i < words.length; i++) {
       const px = x + xs[i];
       const py = y + ys[i];
-      if (px < 0 || py < 0 || px >= CELL_W || py >= CELL_H) continue;
-      pixels[py * CELL_W + px] = words[i];
-      this.touch(px, py, px, py);
+      const inside = inCell(px, py);
+      if (inside) {
+        pixels[py * CELL_W + px] = words[i];
+        this.touch(px, py, px, py);
+      }
+    }
+  }
+
+  /**
+   * A cast shadow: darkens by one ramp step the `depth` pixels straight below the lowest
+   * pixel of each column of the grid `part` drew. Only pixels that still show what the
+   * grid `under` drew there are touched, so whatever was painted over it since keeps its
+   * colour.
+   */
+  shadeBelow(part: PlacedGrid, under: PlacedGrid, depth: number): void {
+    const top = stampFor(part.rows, part.legend);
+    const base = stampFor(under.rows, under.legend);
+    const lowest = new Map<number, number>();
+    for (let i = 0; i < top.xs.length; i++) {
+      const x = part.x + top.xs[i];
+      const y = part.y + top.ys[i];
+      const lower = y > (lowest.get(x) ?? -1);
+      if (lower) lowest.set(x, y);
+    }
+    const underWords = new Map<number, number>();
+    for (let i = 0; i < base.xs.length; i++) {
+      const x = under.x + base.xs[i];
+      const y = under.y + base.ys[i];
+      const inside = inCell(x, y);
+      if (inside) underWords.set(y * CELL_W + x, base.words[i]);
+    }
+    for (const [x, low] of lowest) {
+      for (let y = low + 1; y <= low + depth; y++) {
+        const at = y * CELL_W + x;
+        const showsUnder = underWords.has(at) && this.pixels[at] === underWords.get(at);
+        if (showsUnder) this.pixels[at] = pack(darker(unpack(this.pixels[at]), 1));
+      }
     }
   }
 
@@ -146,13 +213,16 @@ export class Cell {
     let y = y0;
     for (;;) {
       this.px(x, y, color);
-      if (x === x1 && y === y1) return;
+      const done = x === x1 && y === y1;
+      if (done) return;
       const e2 = 2 * err;
-      if (e2 >= dy) {
+      const stepX = e2 >= dy;
+      const stepY = e2 <= dx;
+      if (stepX) {
         err += dy;
         x += sx;
       }
-      if (e2 <= dx) {
+      if (stepY) {
         err += dx;
         y += sy;
       }
@@ -160,27 +230,66 @@ export class Cell {
   }
 
   /**
-   * Draws a part on its own layer, then drops a dark contact line along its lower and
-   * right edges wherever it crosses the body, so same-coloured parts stay separate.
+   * Draws a part on its own layer, then drops a contact line along its lower and right
+   * edges wherever it crosses the body, so same-coloured parts stay separate.
+   * With a plain colour the line is that colour. With a Contact the line and the
+   * covering pixels are worked out from the body pixel under them, and a right-hand
+   * line pixel is left out where the part itself carries on below it to the right:
+   * there the lower line already follows the edge, and the right one only added lone
+   * specks along the top of a sloping part.
    */
-  overlay(draw: (layer: Cell) => void, rim: Color): void {
+  overlay(draw: (layer: Cell) => void, contact: Color | Contact): void {
     const layer = (overlayLayer ??= new Cell());
     draw(layer);
+    const plain = typeof contact === 'number';
+    if (plain) this.overlayPlain(layer, pack(contact));
+    else this.overlayContact(layer, contact);
+    this.touch(layer.left, layer.top, layer.right, layer.bottom);
+    layer.clear();
+  }
+
+  private overlayPlain(layer: Cell, rimValue: number): void {
     const from = layer.pixels;
     const to = this.pixels;
-    const rimValue = pack(rim);
     for (let y = layer.top; y <= layer.bottom; y++) {
       for (let x = layer.left; x <= layer.right; x++) {
         const at = y * CELL_W + x;
-        if (from[at] === 0) continue;
+        const empty = from[at] === 0;
+        if (empty) continue;
         to[at] = from[at];
-        const below = at + CELL_W;
-        if (y + 1 < CELL_H && from[below] === 0 && to[below] !== 0) to[below] = rimValue;
-        if (x + 1 < CELL_W && from[at + 1] === 0 && to[at + 1] !== 0) to[at + 1] = rimValue;
+        const rimBelow = y + 1 < CELL_H && from[at + CELL_W] === 0 && to[at + CELL_W] !== 0;
+        if (rimBelow) to[at + CELL_W] = rimValue;
+        const rimRight = x + 1 < CELL_W && from[at + 1] === 0 && to[at + 1] !== 0;
+        if (rimRight) to[at + 1] = rimValue;
       }
     }
-    this.touch(layer.left, layer.top, layer.right, layer.bottom);
-    layer.clear();
+  }
+
+  private overlayContact(layer: Cell, contact: Contact): void {
+    const from = layer.pixels;
+    const to = this.pixels;
+    // Read the body as it was, so a pixel two edges share is not shaded twice.
+    const body = to.slice();
+    const over = contact.over;
+    const rimAt = (at: number): void => {
+      to[at] = pack(contact.rim(unpack(body[at])));
+    };
+    for (let y = layer.top; y <= layer.bottom; y++) {
+      for (let x = layer.left; x <= layer.right; x++) {
+        const at = y * CELL_W + x;
+        const empty = from[at] === 0;
+        if (empty) continue;
+        const covers = body[at] !== 0 && over !== undefined;
+        to[at] = covers ? pack(over(unpack(from[at]), unpack(body[at]))) : from[at];
+        const hasBelow = y + 1 < CELL_H;
+        const hasRight = x + 1 < CELL_W;
+        const rimBelow = hasBelow && from[at + CELL_W] === 0 && body[at + CELL_W] !== 0;
+        if (rimBelow) rimAt(at + CELL_W);
+        const partGoesOnDownRight = hasBelow && hasRight && from[at + CELL_W + 1] !== 0;
+        const rimRight = hasRight && !partGoesOnDownRight && from[at + 1] === 0 && body[at + 1] !== 0;
+        if (rimRight) rimAt(at + 1);
+      }
+    }
   }
 
   private clear(): void {
@@ -202,17 +311,21 @@ export class Cell {
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const at = y * CELL_W + x;
-        if (from[at] !== 0) continue;
+        const filled = from[at] !== 0;
+        if (filled) continue;
         const up = y > 0 ? from[at - CELL_W] : 0;
         const left = x > 0 ? from[at - 1] : 0;
-        if (up !== 0 || left !== 0) {
+        // The silhouette lies up or left of here, so this pixel faces away from the light.
+        const shadowSide = up !== 0 || left !== 0;
+        if (shadowSide) {
           out[at] = INK_WORD;
           continue;
         }
         const right = x < CELL_W - 1 ? from[at + 1] : 0;
         const down = y < CELL_H - 1 ? from[at + CELL_W] : 0;
-        if (right !== 0) out[at] = rimWord(right);
-        else if (down !== 0) out[at] = rimWord(down);
+        const edge = right !== 0 ? right : down;
+        const touches = edge !== 0;
+        if (touches) out[at] = rimWord(edge);
       }
     }
     return { w: CELL_W, h: CELL_H, ax: ANCHOR_X, ay: ANCHOR_Y, rgba: new Uint8ClampedArray(out.buffer) };

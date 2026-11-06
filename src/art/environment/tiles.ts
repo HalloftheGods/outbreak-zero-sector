@@ -16,11 +16,16 @@ import type { Rows, Slab } from './tile-grids.ts';
 const { asphalt, concrete, grass, wood, olive, ink, bone, skinDeep } = RAMPS;
 const S = TILE_SIZE;
 
-const ROAD: Legend = { '-': asphalt[0], '+': asphalt[2], x: ink[0] };
+// The road sits one palette step above the INK outline, so a figure's edge shows against it.
+// The sidewalk seams and the curb's back groove stay on asphalt[2].
+const ROAD_BASE = asphalt[2];
+const ROAD_DARK = asphalt[1];
+const ROAD_LIGHT = concrete[0];
+const ROAD: Legend = { '-': ROAD_DARK, '+': ROAD_LIGHT, x: ink[0] };
 const WALK: Legend = { '=': asphalt[2], '+': concrete[1] };
 const LAWN: Legend = { '-': grass[1], '+': grass[2] };
 const EARTH: Legend = { '-': wood[0], '+': skinDeep[0], b: concrete[0], p: skinDeep[0], g: grass[1], G: grass[2] };
-const WORN: Legend = { '-': asphalt[1], ':': concrete[0] };
+const WORN: Legend = { '-': ROAD_BASE, ':': concrete[0] };
 
 function tile(base: Color, rows: Rows, legend: Legend): PixelCanvas {
   return new PixelCanvas(S, S).fill(base).grid(0, 0, rows, legend);
@@ -39,21 +44,21 @@ function transpose(canvas: PixelCanvas): PixelCanvas {
 
 /** Bars run along the road, four on and four off, so a crossing of any length seams. */
 function zebra(wear: Rows): PixelCanvas {
-  const canvas = new PixelCanvas(S, S).fill(asphalt[1]);
+  const canvas = new PixelCanvas(S, S).fill(ROAD_BASE);
   for (const y of [2, 10]) canvas.rect(0, y, S, 4, concrete[1]).rect(0, y, S, 1, concrete[2]);
   return canvas.grid(0, 0, wear, WORN);
 }
 
 /** The dash is one 10px stroke per tile, so the road reads as a steady 16px rhythm. */
 function laneDash(wear: Rows, base: Rows): PixelCanvas {
-  const canvas = tile(asphalt[1], base, ROAD);
+  const canvas = tile(ROAD_BASE, base, ROAD);
   canvas.rect(3, 7, 10, 2, bone[0]).rect(3, 7, 10, 1, bone[1]);
-  return canvas.grid(0, 0, wear, { '-': asphalt[1] });
+  return canvas.grid(0, 0, wear, { '-': ROAD_BASE });
 }
 
 /** A stall divider down the middle of the tile, unbroken across tiles. */
 function stallLine(base: Rows, gaps: readonly (readonly [number, number])[]): PixelCanvas {
-  const canvas = tile(asphalt[1], base, ROAD);
+  const canvas = tile(ROAD_BASE, base, ROAD);
   canvas.rect(7, 0, 2, S, concrete[1]).rect(7, 0, 1, S, concrete[2]);
   for (const [y, h] of gaps) canvas.rect(7, y, 2, h, concrete[0]);
   return canvas;
@@ -70,10 +75,10 @@ type CurbSide = 'n' | 's' | 'e' | 'w';
 
 /** Colours from the road outwards. Only a south-facing curb shows its face to the camera. */
 const CURB_PROFILE: Record<CurbSide, readonly Color[]> = {
-  n: [asphalt[0], concrete[1], concrete[2], concrete[2], concrete[1], asphalt[2]],
-  s: [asphalt[0], concrete[0], concrete[1], concrete[3], concrete[2], concrete[2], asphalt[2]],
-  e: [asphalt[0], concrete[0], concrete[1], concrete[2], concrete[2], asphalt[2]],
-  w: [asphalt[0], concrete[3], concrete[2], concrete[2], concrete[1], asphalt[2]],
+  n: [ROAD_DARK, concrete[1], concrete[2], concrete[2], concrete[1], asphalt[2]],
+  s: [ROAD_DARK, concrete[0], concrete[1], concrete[3], concrete[2], concrete[2], asphalt[2]],
+  e: [ROAD_DARK, concrete[0], concrete[1], concrete[2], concrete[2], asphalt[2]],
+  w: [ROAD_DARK, concrete[3], concrete[2], concrete[2], concrete[1], asphalt[2]],
 };
 
 /** Writes in curb space: u runs along the kerb, v counts in from the road. */
@@ -110,7 +115,7 @@ function curb(side: CurbSide, slab: Slab, damage: CurbDamage): PixelCanvas {
   // A joint per tile, so the kerb reads as long stones rather than stitching.
   for (let v = 1; v < stone; v++) put(0, v, concrete[0]);
   for (const [u, depth] of damage.chips ?? []) {
-    for (let v = 1; v <= depth; v++) put(u, v, v === depth ? concrete[1] : asphalt[1]);
+    for (let v = 1; v <= depth; v++) put(u, v, v === depth ? concrete[1] : ROAD_BASE);
   }
   if (damage.drain) {
     for (let u = 4; u < 12; u++) {
@@ -129,8 +134,8 @@ export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
   const curbs = (side: CurbSide) => CURB_DAMAGE.map((damage, i) => curb(side, SLABS[i], damage));
 
   const canvases: Record<TileKind, readonly PixelCanvas[]> = {
-    asphalt: ASPHALT.map((rows) => tile(asphalt[1], rows, ROAD)),
-    asphalt_cracked: CRACKED.map((rows) => tile(asphalt[1], rows, ROAD)),
+    asphalt: ASPHALT.map((rows) => tile(ROAD_BASE, rows, ROAD)),
+    asphalt_cracked: CRACKED.map((rows) => tile(ROAD_BASE, rows, ROAD)),
     lane_h: lanes,
     lane_v: lanes.map(transpose),
     crosswalk_h: zebras,

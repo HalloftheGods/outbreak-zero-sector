@@ -3,6 +3,11 @@
 // group: survivors | zombies | environment | containers | fx | ui | kits | all | reference | scene | scene-night | town
 // filter: keep only rows whose label contains this text, e.g. "skin0/pistol/walk".
 // For town it is a crop instead, "x,y,w,h" in town pixels.
+// ground (optional 5th argument): "flat" (default) keeps the grey sheet background 0x3a3c4c, where
+// every outline pixel is visible. "asphalt" lays the game's road tiles behind each row of the row-based
+// groups, so edges can be judged on the ground figures stand on. It does not change scene, scene-night
+// or town, which draw their own ground. Example:
+//   node --experimental-strip-types tools/contact-sheet.ts survivors out.png 4 skin0/pistol/idle asphalt
 // Each row shows a 1x strip under its label, for a read at true size.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -21,6 +26,9 @@ const DIR_NAMES = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
 const BACKGROUND = 0x3a3c4c;
 const LABEL_COLUMN = 180;
 const MAX_WIDTH = 1800;
+const TILE_PX = 16;
+
+type Ground = 'flat' | 'asphalt';
 
 interface Group {
   readonly tag: string;
@@ -181,7 +189,23 @@ function layoutRow(row: Row, scale: number): Laid {
   return { placed, tags, height: y + lineHeight + 6 };
 }
 
-function renderRows(rows: readonly Row[], scale: number): Sheet {
+/** Lays the road tiles over one row's band, at the sheet scale, never past the band. */
+function paintGround(sheet: Sheet, tiles: readonly PixelSprite[], y: number, height: number, scale: number): void {
+  const step = TILE_PX * scale;
+  for (let ty = 0; ty * step < height; ty++) {
+    for (let tx = 0; tx * step < sheet.w; tx++) {
+      const sprite = tiles[(tx * 7 + ty * 3) % tiles.length];
+      for (let j = 0; j < step && ty * step + j < height; j++) {
+        for (let i = 0; i < step && tx * step + i < sheet.w; i++) {
+          const at = (Math.floor(j / scale) * sprite.w + Math.floor(i / scale)) * 4;
+          sheet.set(tx * step + i, y + ty * step + j, (sprite.rgba[at] << 16) | (sprite.rgba[at + 1] << 8) | sprite.rgba[at + 2]);
+        }
+      }
+    }
+  }
+}
+
+function renderRows(rows: readonly Row[], scale: number, ground: Ground = 'flat', book?: ArtBook): Sheet {
   const laid = rows.map((row) => layoutRow(row, scale));
   const width = Math.max(
     LABEL_COLUMN + 40,
@@ -192,6 +216,8 @@ function renderRows(rows: readonly Row[], scale: number): Sheet {
   const sheet = new Sheet(width, heights.reduce((sum, h) => sum + h, 4), BACKGROUND);
   let y = 4;
   laid.forEach((row, i) => {
+    const paintsAsphalt = ground === 'asphalt' && book !== undefined;
+    if (paintsAsphalt) paintGround(sheet, book.environment.tiles.asphalt, y, heights[i], scale);
     drawText(sheet, rows[i].label.toUpperCase(), 4, y + 4, 0xfaf2d4);
     let strip = 4;
     for (const sprite of rows[i].groups.flatMap((group) => group.sprites)) {
@@ -208,9 +234,15 @@ function renderRows(rows: readonly Row[], scale: number): Sheet {
 }
 
 function main(): void {
-  const [group, outfile, scaleArg, filter] = process.argv.slice(2);
+  const [group, outfile, scaleArg, filter, groundArg] = process.argv.slice(2);
+  const knownGround = groundArg === undefined || groundArg === 'flat' || groundArg === 'asphalt';
+  if (!knownGround) {
+    console.error(`unknown ground "${groundArg}": use flat or asphalt`);
+    process.exit(1);
+  }
+  const ground: Ground = groundArg === 'asphalt' ? 'asphalt' : 'flat';
   if (!group || !outfile) {
-    console.error('usage: contact-sheet.ts <survivors|zombies|environment|containers|fx|ui|kits|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter]');
+    console.error('usage: contact-sheet.ts <survivors|zombies|environment|containers|fx|ui|kits|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter] [flat|asphalt]');
     process.exit(1);
   }
   const started = performance.now();
@@ -228,7 +260,7 @@ function main(): void {
   } else {
     const rows = rowsFor(group, book).filter((row) => !filter || row.label.includes(filter));
     if (rows.length === 0) throw new Error(`No rows match "${filter}"`);
-    sheet = renderRows(rows, scale);
+    sheet = renderRows(rows, scale, ground, book);
   }
   mkdirSync(dirname(outfile), { recursive: true });
   writeFileSync(outfile, encodePng(sheet.w, sheet.h, sheet.data));

@@ -5,6 +5,7 @@ import {
   NOISE_REACH_TILES,
   PLAYER_RADIUS,
   TICK_DT,
+  ZOMBIE_INVESTIGATE_SEC,
   ZOMBIE_RECOVERY_SEC,
   ZOMBIE_SLEEP_RANGE,
   ZOMBIE_WANDER_SPEED_SCALE,
@@ -16,7 +17,9 @@ import { randRange } from './rng.ts';
 import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { alivePlayers, emit, standingPlayers } from './sim-state.ts';
 import { buildingAt, segmentHitsSolid } from './world-query.ts';
-import { backToRoaming, updateAwareness } from './zombie-senses.ts';
+import { backToRoaming, loseTrail, updateAwareness } from './zombie-senses.ts';
+import { nextPrint, trailMakerAlive } from './snow-tracks.ts';
+import { TRACK_ARRIVE_PX, TRACKER_SPEED_SCALE } from './town-rules.ts';
 import { zombieSpeed } from './zombie-status.ts';
 
 /** Beyond this the flow field drives; closer in, a clear line means walking straight at the prey. */
@@ -127,8 +130,8 @@ function separation(sim: SimState, z: ZombieState): { x: number; y: number } {
   return { x, y };
 }
 
-/** One tick of purposeful walking along a heading, in step with the crowd. */
-function stride(sim: SimState, z: ZombieState, dirX: number, dirY: number): void {
+/** One tick of purposeful walking along a heading, in step with the crowd, at a share of full speed. */
+function stride(sim: SimState, z: ZombieState, dirX: number, dirY: number, pace = 1): void {
   const length = Math.hypot(dirX, dirY);
   if (length === 0) return;
   z.angle = Math.atan2(dirY, dirX);
@@ -143,14 +146,14 @@ function stride(sim: SimState, z: ZombieState, dirX: number, dirY: number): void
     z.y,
     headingX + push.x * SEPARATION_WEIGHT - headingY * slip,
     headingY + push.y * SEPARATION_WEIGHT + headingX * slip,
-    zombieSpeed(z),
+    zombieSpeed(z) * pace,
     TICK_DT,
     z.radius,
   );
   const progress = Math.hypot(moved.x - z.x, moved.y - z.y);
   z.x = moved.x;
   z.y = moved.y;
-  startSidestepIfBlocked(sim, z, progress);
+  startSidestepIfBlocked(sim, z, progress / pace);
 }
 
 function walkToward(sim: SimState, z: ZombieState, prey: PlayerState): void {
@@ -232,6 +235,33 @@ function investigate(sim: SimState, z: ZombieState): void {
   else if (!fieldPending) backToRoaming(sim, z);
 }
 
+/**
+ * Nose down, print to print toward the newer ones. Where they run out (a doorway, a stretch sneaked,
+ * snow filled in) it casts about, and awareness lets it give up when its interest runs dry.
+ */
+function track(sim: SimState, z: ZombieState): void {
+  const trail = z.trail;
+  if (!trail) return;
+  trail.left -= TICK_DT;
+  if (trail.searching) {
+    wander(sim, z);
+    return;
+  }
+  const arrived = (trail.x - z.x) ** 2 + (trail.y - z.y) ** 2 <= (z.radius + TRACK_ARRIVE_PX) ** 2;
+  if (arrived) {
+    const next = trailMakerAlive(sim, trail) ? nextPrint(sim, trail, z.x, z.y) : null;
+    if (!next) {
+      loseTrail(z);
+      return;
+    }
+    trail.x = next.x;
+    trail.y = next.y;
+    trail.left = next.left;
+    z.interestLeft = ZOMBIE_INVESTIGATE_SEC;
+  }
+  stride(sim, z, trail.x - z.x, trail.y - z.y, TRACKER_SPEED_SCALE);
+}
+
 function hunt(sim: SimState, z: ZombieState, prey: readonly PlayerState[], fallback: readonly PlayerState[]): void {
   const target = nearest(z, prey.length > 0 ? prey : fallback);
   if (!target) return;
@@ -271,6 +301,7 @@ function updateZombie(sim: SimState, z: ZombieState, prey: readonly PlayerState[
 
   updateAwareness(sim, z, prey);
   if (z.mode === 'hunt') hunt(sim, z, prey, fallback);
+  else if (z.mode === 'alert' && z.trail) track(sim, z);
   else if (z.mode === 'alert') investigate(sim, z);
   else wander(sim, z);
 }

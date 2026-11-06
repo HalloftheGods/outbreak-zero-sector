@@ -11,6 +11,7 @@ import type {
   PlayerEntity,
   ServerPacket,
   SnapshotPacket,
+  TrackEntity,
   WelcomePacket,
   ZombieEntity,
 } from '../../shared/protocol.ts';
@@ -26,7 +27,7 @@ const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'c
 const WEAPONS: readonly unknown[] = WEAPON_ORDER;
 const EFFECTS: readonly unknown[] = EFFECT_ORDER;
 const EVENT_TYPES: ReadonlySet<unknown> = new Set([
-  'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
+  'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'zombie_track', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
   'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
   'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
   'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over',
@@ -71,8 +72,13 @@ export function isZombieEntity(v: unknown): v is ZombieEntity {
     && typeof v.attacking === 'boolean'
     && isFlag(v.burning)
     && isFlag(v.slowed)
+    && isFlag(v.tracking)
     && (v.corrosion === undefined || isNumber(v.corrosion))
     && hasNumbers(v, ['x', 'y', 'angle', 'health', 'maxHealth']);
+}
+
+export function isTrackEntity(v: unknown): v is TrackEntity {
+  return isFields(v) && hasNumbers(v, ['x', 'y', 'angle', 'left']);
 }
 
 export function isBulletEntity(v: unknown): v is BulletEntity {
@@ -132,6 +138,7 @@ export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
     && (v.exit === null || isExitEntity(v.exit))
     && Array.isArray(v.openedContainers)
     && v.openedContainers.every(isNumber)
+    && (v.tracks === undefined || (Array.isArray(v.tracks) && v.tracks.every(isTrackEntity)))
     && Array.isArray(v.events) && v.events.every(isGameEvent)
     && (v.gameOver === null || isGameOverStats(v.gameOver))
     && (v.bench === undefined || isBenchView(v.bench));

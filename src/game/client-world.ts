@@ -14,7 +14,7 @@ const MAX_BULLET_LEAD_SEC = 0.1;
 
 export type WorldEntities = Pick<
   SceneView,
-  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'searchable' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
+  'players' | 'zombies' | 'bullets' | 'pickups' | 'exit' | 'openedContainers' | 'tracks' | 'searchable' | 'localId' | 'viewerId' | 'focusX' | 'focusY' | 'phase' | 'hostiles'
 >;
 
 /** What this client currently believes: buffered snapshots plus the predicted local player. */
@@ -123,6 +123,7 @@ export class ClientWorld {
       pickups: newest.snapshot.pickups,
       exit: newest.snapshot.exit,
       openedContainers: newest.snapshot.openedContainers,
+      tracks: newest.snapshot.tracks ?? [],
       searchable: this.searchableBy(shownLocal, newest.snapshot.openedContainers),
       localId: this.localId,
       viewerId: viewer?.id ?? null,

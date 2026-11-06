@@ -85,6 +85,16 @@ export interface ZombieEntity {
   corrosion?: number;
   /** Slowed by a tranq round. Left off unless true. */
   slowed?: boolean;
+  /** Following someone's prints in the snow. Left off unless true. */
+  tracking?: boolean;
+}
+
+/** A footprint in the snow, for drawing: where, which way it points, and seconds before it fills in. */
+export interface TrackEntity {
+  readonly x: number;
+  readonly y: number;
+  readonly angle: number;
+  readonly left: number;
 }
 
 export interface BulletEntity {
@@ -144,6 +154,8 @@ export type GameEvent =
   | { readonly type: 'melee'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly angle: number; readonly hit: boolean }
   | { readonly type: 'heal'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly amount: number }
   | { readonly type: 'zombie_alert'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
+  /** A roamer put its nose on someone's snow trail and started following it. */
+  | { readonly type: 'zombie_track'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
   | { readonly type: 'reload_start'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
   | { readonly type: 'reload_end'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
   | { readonly type: 'weapon_switch'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
@@ -225,6 +237,8 @@ export interface SnapshotPacket {
   readonly exit: ExitEntity | null;
   /** Ids of the town's containers that have been opened, so everyone sees them open. */
   readonly openedContainers: readonly number[];
+  /** Footprints in a snowy town near this viewer. Left off when there are none. */
+  readonly tracks?: readonly TrackEntity[];
   /** Events since the previous snapshot, in order. */
   readonly events: readonly GameEvent[];
   readonly gameOver: GameOverStats | null;

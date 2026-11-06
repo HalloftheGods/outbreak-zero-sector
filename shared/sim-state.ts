@@ -24,7 +24,7 @@ import type { GunFit } from './gun-upgrades.ts';
 import type { KitCounts } from './round-effect-data.ts';
 import type { BenchState, WorkbenchMode } from './workbench.ts';
 import type { ZombieStatus } from './zombie-status.ts';
-import type { Footprint } from './town-rules.ts';
+import type { Footprint, ZombieTrail } from './town-rules.ts';
 
 /** Rounds in the gun itself. Spare rounds live in PlayerEntity.ammoBag, gun or no gun. */
 export interface GunState {
@@ -122,6 +122,10 @@ export interface ZombieState extends ZombieEntity {
   status?: ZombieStatus;
   /** A screamer's seconds until it can call again. Absent until it first has. */
   screamLeft?: number;
+  /** The snow trail it is following. Absent unless it is tracking someone. */
+  trail?: ZombieTrail;
+  /** Seconds until it will take up a trail again after losing one. Absent until it has. */
+  sniffRestLeft?: number;
 }
 
 export interface BulletState extends BulletEntity {

@@ -155,3 +155,14 @@ export const scream: Recipe = (v) => {
   tone(v, { at: 0.5, type: 'square', f0: 1250, f1: 900, attack: 0.02, decay: 0.4, gain: 0.15, lp: 3000, vib: { rate: 40, cents: 200 } });
   noise(v, { filter: 'highpass', freq: 2200, attack: 0.05, hold: 0.4, decay: 0.5, gain: 0.08 });
 };
+
+/** A zombie putting its nose to a trail: three short wet snuffs, then a low interested grunt. */
+export const sniff: Recipe = (v) => {
+  for (let i = 0; i < 3; i++) {
+    noise(v, { at: i * 0.13, filter: 'bandpass', freq: 1500 + i * 180, q: 3, attack: 0.02, decay: 0.07, gain: 0.45 });
+  }
+  tone(v, {
+    at: 0.42, type: 'sawtooth', f0: 95, f1: 75, attack: 0.05, decay: 0.3, gain: 0.3, lp: 600,
+    formants: [[550, 5, 1]], vib: { rate: 5, cents: 30 },
+  });
+};

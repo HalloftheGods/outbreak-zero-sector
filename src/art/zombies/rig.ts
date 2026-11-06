@@ -48,7 +48,8 @@ export function bend(a: Vec, b: Vec, upper: number, lower: number, pole: Vec): V
   const axis: Vec = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
   const reach = Math.max(0.001, Math.hypot(...axis));
   const unit: Vec = [axis[0] / reach, axis[1] / reach, axis[2] / reach];
-  if (reach >= upper + lower) return lerp(a, b, upper / (upper + lower));
+  const pulledStraight = reach >= upper + lower;
+  if (pulledStraight) return lerp(a, b, upper / (upper + lower));
   const along = (reach * reach + upper * upper - lower * lower) / (2 * reach);
   const out = Math.sqrt(Math.max(0, upper * upper - along * along));
   const dot = pole[0] * unit[0] + pole[1] * unit[1] + pole[2] * unit[2];
@@ -71,17 +72,25 @@ export interface Stamp {
 export const stamp = (rows: readonly string[], px: number, py: number): Stamp => ({ rows, px, py });
 
 /**
+ * The cross-section a ribbon from a to b gets when nothing fixes it: laid across (true) when
+ * the limb runs at least as far down the screen as along it, measured between rounded ends.
+ */
+export function ribbonUpright(a: Joint, b: Joint): boolean {
+  return Math.abs(Math.round(b.y) - Math.round(a.y)) >= Math.abs(Math.round(b.x) - Math.round(a.x));
+}
+
+/**
  * A limb as a ribbon: walks the long axis from a to b and lays a painted cross-section
  * at each step. Sections run lit side to shadow side and are picked along the limb,
- * so a sleeve can end in a bare forearm.
+ * so a sleeve can end in a bare forearm. `upright` fixes which way the sections lie
+ * (true: across a limb running down the screen); left out, ribbonUpright picks it.
  */
-export function ribbon(c: PixelCanvas, a: Joint, b: Joint, sections: readonly string[], legend: Legend): void {
+export function ribbon(c: PixelCanvas, a: Joint, b: Joint, sections: readonly string[], legend: Legend, upright = ribbonUpright(a, b)): void {
   const x0 = Math.round(a.x);
   const y0 = Math.round(a.y);
   const x1 = Math.round(b.x);
   const y1 = Math.round(b.y);
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-  const upright = Math.abs(y1 - y0) >= Math.abs(x1 - x0);
   for (let i = 0; i <= steps; i++) {
     const t = steps === 0 ? 0 : i / steps;
     const section = sections[Math.min(sections.length - 1, Math.floor(t * sections.length))];
@@ -90,20 +99,39 @@ export function ribbon(c: PixelCanvas, a: Joint, b: Joint, sections: readonly st
     const start = -Math.floor(section.length / 2);
     for (let k = 0; k < section.length; k++) {
       const letter = section[k];
-      if (letter === '.') continue;
+      const gap = letter === '.';
+      if (gap) continue;
       const color = legend[letter];
-      if (color === undefined || color === null) throw new Error(`ribbon: "${letter}" is not in the legend`);
+      const unknown = color === undefined || color === null;
+      if (unknown) throw new Error(`ribbon: "${letter}" is not in the legend`);
       if (upright) c.px(x + start + k, y, color);
       else c.px(x, y + start + k, color);
     }
   }
 }
 
-/** A hand-drawn frame with no rig: grids stamped in order, then the usual outline. */
-export function flatFrame(cell: number, ox: number, oy: number, legend: Legend, parts: readonly (readonly [number, number, readonly string[]])[]): PixelSprite {
+/** A grid placed in the cell: its top-left corner, then its rows. */
+export type Placed = readonly [x: number, y: number, rows: readonly string[]];
+
+/** Something flat on the ground, such as a pool: painted under the figure, with no outline. */
+interface Decal {
+  readonly x: number;
+  readonly y: number;
+  readonly rows: readonly string[];
+  readonly legend: Legend;
+}
+
+/**
+ * A hand-drawn frame with no rig: grids stamped in order, then the usual outline.
+ * Decals (pools, splashes) are painted after the outline and only into pixels the figure and
+ * its outline left empty: they get no outline of their own, and the figure's outline stays
+ * over them. They do not change the anchor. Leaving them out draws the frame as before.
+ */
+export function flatFrame(cell: number, ox: number, oy: number, legend: Legend, parts: readonly Placed[], decals: readonly Placed[] = []): PixelSprite {
   const c = new PixelCanvas(cell, cell);
   for (const [x, y, rows] of parts) c.grid(x, y, rows, legend);
-  return outlined(c).toSprite(cell, cell, ox, oy + 1);
+  const under = decals.map(([x, y, rows]): Decal => ({ x, y, rows, legend }));
+  return underlaid(outlined(c), under).toSprite(cell, cell, ox, oy + 1);
 }
 
 /** Inclusive pixel bounds of a layer, so compositing skips the empty cell around it. */
@@ -129,6 +157,7 @@ export class Figure {
   readonly oy: number;
   readonly legend: Legend;
   private readonly layers: Layer[] = [];
+  private readonly decals: Decal[] = [];
 
   constructor(view: View, cell: number, ox: number, oy: number, legend: Legend) {
     this.view = view;
@@ -156,7 +185,8 @@ export class Figure {
     this.layer(z, (c) => c.grid(x, y, rows, this.legend), seam, box);
   }
 
-  limb(a: Joint, b: Joint, sections: readonly string[], z = (a.z + b.z) / 2, seam = true): void {
+  /** `upright` fixes the cross-sections as ribbon() describes; left out, the limb's slope picks them. */
+  limb(a: Joint, b: Joint, sections: readonly string[], z = (a.z + b.z) / 2, seam = true, upright?: boolean): void {
     const reach = Math.max(...sections.map((section) => section.length));
     const box = {
       x0: Math.round(Math.min(a.x, b.x)) - reach,
@@ -164,10 +194,18 @@ export class Figure {
       x1: Math.round(Math.max(a.x, b.x)) + reach,
       y1: Math.round(Math.max(a.y, b.y)) + reach,
     };
-    this.layer(z, (c) => ribbon(c, a, b, sections, this.legend), seam, box);
+    this.layer(z, (c) => ribbon(c, a, b, sections, this.legend, upright), seam, box);
   }
 
-  /** Composites the layers, without the outline. */
+  /**
+   * A grid flat on the ground at x, y in the cell, such as a pool. bake() paints decals after
+   * the outline and only into empty pixels, as flatFrame does, so they are never outlined.
+   */
+  decal(x: number, y: number, rows: readonly string[], legend: Legend = this.legend): void {
+    this.decals.push({ x, y, rows, legend });
+  }
+
+  /** Composites the layers, without the outline or the decals. */
   canvas(): PixelCanvas {
     const out = new PixelCanvas(this.cell, this.cell);
     const scratch = new PixelCanvas(this.cell, this.cell);
@@ -183,7 +221,7 @@ export class Figure {
   }
 
   bake(): PixelSprite {
-    return outlined(this.canvas()).toSprite(this.cell, this.cell, this.ox, this.oy + 1);
+    return underlaid(outlined(this.canvas()), this.decals).toSprite(this.cell, this.cell, this.ox, this.oy + 1);
   }
 }
 
@@ -194,20 +232,32 @@ const clip = (box: Box, cell: number): Box => ({
   y1: Math.min(cell - 1, box.y1 + 1),
 });
 
-/** The selective outline, run on just the figure rather than the whole cell. */
+/** The selective outline, run on just the figure rather than the whole cell. An empty cell stays empty. */
 function outlined(c: PixelCanvas): PixelCanvas {
   let [x0, y0, x1, y1] = [c.w, c.h, -1, -1];
   for (let y = 0; y < c.h; y++) {
     for (let x = 0; x < c.w; x++) {
-      if (c.data[(y * c.w + x) * 4 + 3] === 0) continue;
+      const clear = c.data[(y * c.w + x) * 4 + 3] === 0;
+      if (clear) continue;
       x0 = Math.min(x0, x);
       y0 = Math.min(y0, y);
       x1 = Math.max(x1, x);
       y1 = Math.max(y1, y);
     }
   }
+  const empty = x1 < 0;
+  if (empty) return c;
   const part = c.crop(x0 - 1, y0 - 1, x1 - x0 + 3, y1 - y0 + 3).outline({ selective: true });
   return new PixelCanvas(c.w, c.h).blit(part, x0 - 1, y0 - 1);
+}
+
+/** The finished figure over its decals: a decal shows only where the figure left a pixel empty. */
+function underlaid(figure: PixelCanvas, decals: readonly Decal[]): PixelCanvas {
+  const none = decals.length === 0;
+  if (none) return figure;
+  const ground = new PixelCanvas(figure.w, figure.h);
+  for (const { x, y, rows, legend } of decals) ground.grid(x, y, rows, legend);
+  return ground.blit(figure);
 }
 
 /** Moves a finished layer onto the frame and clears it for the next one. */
@@ -216,7 +266,8 @@ function lay(out: PixelCanvas, layer: PixelCanvas, box: Box): void {
   for (let y = box.y0; y <= box.y1; y++) {
     for (let x = box.x0; x <= box.x1; x++) {
       const i = (y * out.w + x) * 4;
-      if (from[i + 3] === 0) continue;
+      const clear = from[i + 3] === 0;
+      if (clear) continue;
       out.data[i] = from[i];
       out.data[i + 1] = from[i + 1];
       out.data[i + 2] = from[i + 2];
@@ -236,9 +287,11 @@ function seam(under: PixelCanvas, over: PixelCanvas, box: Box): void {
   for (let y = box.y0; y <= box.y1; y++) {
     for (let x = box.x0; x <= box.x1; x++) {
       const at = (y * w + x) * 4 + 3;
-      if (under.data[at] === 0 || over.data[at] !== 0) continue;
+      const nothingToDarken = under.data[at] === 0 || over.data[at] !== 0;
+      if (nothingToDarken) continue;
       const cast = opaque(x - 1, y) || opaque(x, y - 1);
-      if (cast || opaque(x + 1, y) || opaque(x, y + 1)) under.px(x, y, darker(under.get(x, y)!, cast ? 2 : 1));
+      const touches = cast || opaque(x + 1, y) || opaque(x, y + 1);
+      if (touches) under.px(x, y, darker(under.get(x, y)!, cast ? 2 : 1));
     }
   }
 }

@@ -108,6 +108,7 @@ onBeforeUnmount(() => spinner.stop());
   align-items: flex-end;
   min-width: 0;
   min-height: calc(var(--u) * 29);
+  container-type: inline-size;
   padding: 0;
   overflow: hidden;
   background: var(--ink-raised);
@@ -116,6 +117,8 @@ onBeforeUnmount(() => spinner.stop());
 }
 
 .character-option img {
+  /* Whole device pixels per art pixel, the most that fit the button with one art pixel of air each side. */
+  --sprite-px: max(var(--dpx, 1px), min(round(down, calc(100cqw / 34), var(--dpx, 1px)), round(down, calc(var(--u) * 2), var(--dpx, 1px))));
   flex: none;
 }
 

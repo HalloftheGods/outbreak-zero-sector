@@ -5,9 +5,10 @@
 import type { WeaponId } from '../../../shared/protocol.ts';
 import type { PixelSprite } from '../types.ts';
 import type { DrawnDir, Legend, Point } from '../kit.ts';
-import { INK_SOFT } from '../palette.ts';
+import { darker, INK_SOFT, RAMPS } from '../palette.ts';
 import type { Color } from '../palette.ts';
 import { ANCHOR_X, Cell } from './cell.ts';
+import type { Contact, PlacedGrid } from './cell.ts';
 import { LEG_SETS } from './legs.ts';
 import type { Strip } from './legs.ts';
 import { AXIS, GUN_LEGEND, GUN_LEGEND_EMPTY, GUNS, MAG_GRID, MAG_LEGEND, SHELL_GRID, SHELL_LEGEND } from './weapons.ts';
@@ -62,6 +63,15 @@ export function bodyDrop(person: Person): number {
   return legTrim(person) + (person.shorter?.torso ?? 0);
 }
 
+/**
+ * How far this person's gun sits below the standard build's. A smaller build holds it
+ * higher than its body drop by the leg trim, so the hands stay at the chest instead of
+ * covering the legs. The muzzle flash reads this through SurvivorArt.gunDrop.
+ */
+export function gunDrop(person: Person): number {
+  return bodyDrop(person) - legTrim(person);
+}
+
 /** Where a torso of this person's height ends, before the body offset moves it down. */
 export function torsoBottom(person: Person): number {
   return TORSO_BOTTOM - (person.shorter?.torso ?? 0);
@@ -71,12 +81,75 @@ export function torsoBottom(person: Person): number {
 const trimmedStrips = new WeakMap<Strip, Map<number, Strip>>();
 
 export function trimStrip(strip: Strip, rows: number): Strip {
-  if (rows === 0) return strip;
+  const untrimmed = rows === 0;
+  if (untrimmed) return strip;
   const trims = trimmedStrips.get(strip) ?? new Map<number, Strip>();
   trimmedStrips.set(strip, trims);
   const trimmed = trims.get(rows) ?? strip.slice(rows);
   trims.set(rows, trimmed);
   return trimmed;
+}
+
+/** A standing leg strip for one build, and how far it sits below the hip line. */
+interface BuiltLeg {
+  readonly rows: Strip;
+  readonly dy: number;
+}
+
+const builtLegs = new WeakMap<Strip, Map<number, BuiltLeg>>();
+
+function isBootRow(row: string): boolean {
+  return row.includes('g') || row.includes('f');
+}
+
+/**
+ * trimStrip for a standing leg. Two or more rows off the top would leave the boot as
+ * tall as the shin, so such a trim also drops the first of two or more boot rows and
+ * moves the strip down one, keeping the sole on the same floor row.
+ */
+export function legStrip(strip: Strip, trim: number): BuiltLeg {
+  const builds = builtLegs.get(strip) ?? new Map<number, BuiltLeg>();
+  builtLegs.set(strip, builds);
+  const known = builds.get(trim);
+  if (known) return known;
+  const rows = trimStrip(strip, trim);
+  const bootRows = rows.filter(isBootRow).length;
+  const dropBoot = trim >= 2 && bootRows >= 2;
+  const firstBoot = rows.findIndex(isBootRow);
+  const built: BuiltLeg = dropBoot
+    ? { rows: rows.filter((_, i) => i !== firstBoot), dy: 1 }
+    : { rows, dy: 0 };
+  builds.set(trim, built);
+  return built;
+}
+
+const INKS: ReadonlySet<Color> = new Set<Color>(RAMPS.ink);
+const LEG_LETTERS = 'rqpRQPgfe';
+const drawnFarLegends = new WeakMap<Person, Legend>();
+
+function isInk(color: Color | null | undefined): boolean {
+  return color !== null && color !== undefined && INKS.has(color);
+}
+
+/**
+ * The far leg's legend as drawn. The far leg stays a step darker than the near one,
+ * but a leg letter the far legend sets to outline ink, where the near legend does not,
+ * takes the near colour one step darker instead, so a far boot or shin never merges
+ * with the outline. Where the near leg is ink too, the far leg copies it.
+ */
+export function farLegsLegend(person: Person): Legend {
+  const known = drawnFarLegends.get(person);
+  if (known) return known;
+  const legend: Record<string, Color | null> = { ...person.farLegend };
+  for (const letter of LEG_LETTERS) {
+    const near = person.legend[letter];
+    const far = person.farLegend[letter];
+    const fixable = isInk(far) && near !== null && near !== undefined;
+    if (!fixable) continue;
+    legend[letter] = isInk(near) ? near : darker(near, 1);
+  }
+  drawnFarLegends.set(person, legend);
+  return legend;
 }
 
 /** What a frame changes. Everything is a pixel offset from the rest pose. */
@@ -164,6 +237,45 @@ function drawBand(c: Cell, elbow: Point, hand: Point, color: Color): void {
   else c.line(x, y - 1, x, y + 1, color);
 }
 
+const rampOfColor = new Map<Color, readonly Color[]>();
+for (const ramp of Object.values(RAMPS)) for (const color of ramp) rampOfColor.set(color, ramp);
+
+function sameRamp(a: Color, b: Color): boolean {
+  const ramp = rampOfColor.get(a);
+  return ramp !== undefined && ramp === rampOfColor.get(b);
+}
+
+/** A contact line two steps darker than the body under it, in its own hue; soft ink where the body is already its ramp's darkest. */
+function armRim(under: Color): Color {
+  const shade = darker(under, 2);
+  return shade === under ? INK_SOFT : shade;
+}
+
+/** A tone that can go a whole step darker without two of its shades becoming one. */
+function hasRoomBelow(tone: Tone): boolean {
+  return darker(tone[0], 1) !== tone[0];
+}
+
+const armContacts = new WeakMap<Person, Contact>();
+
+/**
+ * Where an arm crosses the body. The contact line is in the body's own hue instead of
+ * near-black specks. Where a sleeve or cuff is in the same ramp as the body under it,
+ * and its ramp has a darker colour to spare, that part of the arm goes one step darker,
+ * so it reads as a form in front of the lit chest.
+ */
+function armContact(person: Person): Contact {
+  const known = armContacts.get(person);
+  if (known) return known;
+  const darkens = new Set<Color>([person.sleeve, person.cuff].filter(hasRoomBelow).flat());
+  const contact: Contact = {
+    rim: armRim,
+    over: (part, under) => (darkens.has(part) && sameRamp(part, under) ? darker(part, 1) : part),
+  };
+  armContacts.set(person, contact);
+  return contact;
+}
+
 function drawArm(c: Cell, person: Person, shoulder: Point, bend: Point, hand: Point): void {
   const elbow: Point = [
     Math.round((shoulder[0] + hand[0]) / 2) + bend[0],
@@ -174,8 +286,10 @@ function drawArm(c: Cell, person: Person, shoulder: Point, bend: Point, hand: Po
     // A thick tube ends square; taking the outer corner off gives a deltoid.
     if (person.thick) layer.erase(shoulder[0] + (shoulder[0] < ANCHOR_X ? -1 : 2), shoulder[1]);
     limbSegment(layer, elbow, hand, person.cuff);
-    if (person.band !== undefined) drawBand(layer, elbow, hand, person.band);
-  }, INK_SOFT);
+    const band = person.band;
+    const banded = band !== undefined;
+    if (banded) drawBand(layer, elbow, hand, band);
+  }, armContact(person));
 }
 
 function drawHandOver(c: Cell, person: Person, hand: Point): void {
@@ -187,16 +301,27 @@ function drawLegs(c: Cell, person: Person, dir: DrawnDir, pose: Pose): void {
   const near = pose.near ?? set.stand[0];
   const far = pose.far ?? set.stand[1];
   const trim = legTrim(person);
-  c.grid(set.farX, HIP_Y + trim, trimStrip(set.strips[far], trim), person.farLegend);
-  c.grid(set.nearX, HIP_Y + trim, trimStrip(set.strips[near], trim), person.legend);
+  const farLeg = legStrip(set.strips[far], trim);
+  const nearLeg = legStrip(set.strips[near], trim);
+  // Light comes from the upper left, so seen from behind the shaded leg is the near one on the right.
+  const shadeNear = dir === 6;
+  const farLegs = farLegsLegend(person);
+  c.grid(set.farX, HIP_Y + trim + farLeg.dy, farLeg.rows, shadeNear ? person.legend : farLegs);
+  c.grid(set.nearX, HIP_Y + trim + nearLeg.dy, nearLeg.rows, shadeNear ? farLegs : person.legend);
 }
 
-export function placePart(c: Cell, part: Part, bottom: number, legend: Legend, dx: number, dy: number): void {
+export function placePart(c: Cell, part: Part, bottom: number, legend: Legend, dx: number, dy: number): PlacedGrid {
   const w = Math.max(...part.rows.map((row) => row.length));
   const x = Math.floor(ANCHOR_X - w / 2) + (part.dx ?? 0) + dx;
   const y = bottom - part.rows.length + (part.dy ?? 0) + dy;
   c.grid(x, y, part.rows, legend);
+  return { rows: part.rows, legend, x, y };
 }
+
+/** Facings seen from behind, where the head casts a shadow across the shoulders. */
+const COLLAR_SHADOW: ReadonlySet<DrawnDir> = new Set<DrawnDir>([6, 7]);
+/** Rows of that shadow under the head. */
+const COLLAR_DEPTH = 2;
 
 function gunPoint(view: GunView, point: Point, ox: number, oy: number): Point {
   return [view.at[0] + point[0] + ox, view.at[1] + point[1] + oy];
@@ -223,17 +348,22 @@ export function drawPose(person: Person, weapon: WeaponId, dir: DrawnDir, pose: 
   const drop = bodyDrop(person);
   const by = (pose.bodyY ?? 0) + drop;
   const gx = bx + (pose.gunX ?? 0);
-  const gy = by + (pose.gunY ?? 0);
+  const gy = (pose.bodyY ?? 0) + gunDrop(person) + (pose.gunY ?? 0);
   const grip = gunPoint(view, view.grip, gx, gy);
   const rack = pose.rack ?? 0;
   const [axisX, axisY] = AXIS[dir];
   const reached: Point | null = pose.hand ? [pose.hand[0], pose.hand[1] + drop] : null;
   const fore = reached ?? gunPoint(view, view.fore, gx - axisX * rack, gy - axisY * rack);
 
+  let torso: PlacedGrid | null = null;
   for (const layer of ORDER[dir]) {
     if (layer === 'legs') drawLegs(c, person, dir, pose);
-    else if (layer === 'torso') placePart(c, person.torsos[dir], torsoBottom(person), person.legend, bx, by);
-    else if (layer === 'head') placePart(c, person.heads[dir], HEAD_BOTTOM, person.legend, bx + (pose.headX ?? 0), by + (pose.headY ?? 0));
+    else if (layer === 'torso') torso = placePart(c, person.torsos[dir], torsoBottom(person), person.legend, bx, by);
+    else if (layer === 'head') {
+      const head = placePart(c, person.heads[dir], HEAD_BOTTOM, person.legend, bx + (pose.headX ?? 0), by + (pose.headY ?? 0));
+      const shaded = torso !== null && COLLAR_SHADOW.has(dir);
+      if (shaded) c.shadeBelow(head, torso as PlacedGrid, COLLAR_DEPTH);
+    }
     else if (layer === 'gun') drawGun(c, view, gx, gy, dir, pose);
     else if (layer === 'nearArm') drawArm(c, person, shoulderOf(body.shoulderNear, body.wideNear, person, bx, by), body.elbowNear, grip);
     else if (layer === 'nearHand') drawHandOver(c, person, grip);
@@ -243,8 +373,10 @@ export function drawPose(person: Person, weapon: WeaponId, dir: DrawnDir, pose: 
     }
     else if (person.packs?.[dir]) placePart(c, person.packs[dir], torsoBottom(person), person.legend, bx, by);
   }
-  if (pose.carrying === 'mag') c.grid(fore[0] - 1, fore[1] + 1, MAG_GRID, MAG_LEGEND);
-  if (pose.carrying === 'shell') c.grid(fore[0], fore[1] - 2, SHELL_GRID, SHELL_LEGEND);
+  const carriesMag = pose.carrying === 'mag';
+  const carriesShell = pose.carrying === 'shell';
+  if (carriesMag) c.grid(fore[0] - 1, fore[1] + 1, MAG_GRID, MAG_LEGEND);
+  if (carriesShell) c.grid(fore[0], fore[1] - 2, SHELL_GRID, SHELL_LEGEND);
   if (pose.dropped) c.grid(pose.dropped[0], Math.min(pose.dropped[1] + drop, FLOOR_Y), MAG_GRID, MAG_LEGEND);
   return c.toSprite();
 }

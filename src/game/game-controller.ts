@@ -26,7 +26,7 @@ import { pickupNote } from './run-notices.ts';
 import { DEFAULT_PREFS, loadBest, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
 import { isTouchDevice } from './touch-input.ts';
 import { touchMarks } from './touch-marks.ts';
-import { fitWindow } from './view-fit.ts';
+import { fitWindow, watchDpr } from './view-fit.ts';
 
 const GAME_OVER_BEAT_MS = 1800;
 const MAX_FRAME_DT = 0.05;
@@ -127,6 +127,7 @@ export class GameController {
     this.canvas = canvas;
     this.onResize();
     window.addEventListener('resize', this.onResize);
+    this.stopDprWatch = watchDpr(this.onResize);
     window.addEventListener('blur', this.onAway);
     document.addEventListener('visibilitychange', this.onVisibility);
     this.raf = requestAnimationFrame(this.frame);
@@ -139,6 +140,7 @@ export class GameController {
     cancelAnimationFrame(this.raf);
     if (this.artTimer) clearTimeout(this.artTimer);
     window.removeEventListener('resize', this.onResize);
+    this.stopDprWatch();
     window.removeEventListener('blur', this.onAway);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.input.dispose();
@@ -165,6 +167,8 @@ export class GameController {
   private publish(patch: Partial<UiState>): void {
     this.ui.value = { ...this.ui.value, ...patch };
   }
+
+  private stopDprWatch: () => void = () => {};
 
   private readonly onResize = (): void => {
     fitWindow(this.renderer, this.transport?.kind === 'coop', this.ui.value.touch);

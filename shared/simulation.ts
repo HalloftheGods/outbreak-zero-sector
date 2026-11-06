@@ -76,6 +76,16 @@ function roundEvent(event: GameEvent): GameEvent {
 
 const exitView = (exit: ExitEntity | null): ExitEntity | null => exit && { ...exit, progress: round2(exit.progress) };
 
+/** Snow prints near someone, whole pixels and tenths: they are drawn, not simulated, on the client. */
+function tracksField(sim: SimState, inRange: (item: { x: number; y: number }) => boolean): Pick<SnapshotPacket, 'tracks'> {
+  const shown = sim.tracks.filter(inRange);
+  if (shown.length === 0) return {};
+  const tenth = (value: number): number => Math.round(value * 10) / 10 + 0;
+  return {
+    tracks: shown.map((print) => ({ x: Math.round(print.x), y: Math.round(print.y), angle: tenth(print.angle ?? 0), left: tenth(print.left) })),
+  };
+}
+
 function magazines(p: PlayerState): Record<WeaponId, number> {
   const entries = WEAPON_ORDER.map((weapon) => [weapon, p.guns[weapon]?.ammo ?? 0]);
   return Object.fromEntries(entries) as Record<WeaponId, number>;
@@ -378,6 +388,7 @@ export class GameSimulation {
         maxHealth: z.maxHealth,
         attacking: z.attacking,
         ...statusView(z),
+        ...(z.trail && !z.trail.searching ? { tracking: true } : {}),
       })),
       bullets: sim.bullets.map((b) => ({
         id: b.id,
@@ -391,6 +402,7 @@ export class GameSimulation {
       pickups: sim.pickups.filter(inRange).map((item) => ({ id: item.id, type: item.type, x: round2(item.x), y: round2(item.y) })),
       exit: exitView(exitEntity(sim)),
       openedContainers: openedContainers(sim),
+      ...tracksField(sim, inRange),
       events,
       gameOver: sim.gameOver ? { ...sim.gameOver, players: sim.gameOver.players.map((p) => ({ ...p })) } : null,
       ...benchField(sim),
