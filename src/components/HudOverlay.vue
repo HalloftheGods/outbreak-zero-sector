@@ -34,6 +34,11 @@
           <span>{{ hud.medkits }}</span>
           <span class="hud-slot-key keys-only">H</span>
         </div>
+        <div v-if="hud.bottles > 0" class="hud-chip hud-bottles">
+          <SpriteImg :sprite="art.ui.bottle" />
+          <span>{{ hud.bottles }}</span>
+          <span class="hud-slot-key keys-only">G</span>
+        </div>
         <div v-if="hud.knife" class="hud-chip hud-knife">
           <SpriteImg :sprite="art.ui.pickupIcons.knife" />
           <span class="hud-slot-key keys-only">F</span>
@@ -58,6 +63,7 @@
           <span class="hud-ammo-mag">{{ hud.ammo }}</span>
           <span class="hud-ammo-spare">/ {{ hud.reserve }}</span>
         </div>
+        <span v-if="effect" class="hud-effect" :class="`is-${effect.effect}`">{{ effect.label }}</span>
         <div v-if="hud.reload > 0" class="px-meter hud-reload" :style="fill(hud.reload, 1)"><span /></div>
         <template v-else-if="ammo === 'empty'">
           <strong class="hud-empty">Empty</strong>
@@ -79,6 +85,8 @@ import { ammoState, gunRounds, hordeStatus, switchKey } from '../game/hud-state.
 import type { HudState, PlaceBanner } from '../game/hud-state.ts';
 import { levelGoal, levelLine } from '../game/level-hud.ts';
 import type { TransportKind } from '../network/transport.ts';
+import { effectOf } from '../../shared/gun-upgrades.ts';
+import { GUN_EFFECTS } from '../../shared/round-effect-data.ts';
 import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
 
@@ -96,6 +104,10 @@ const isLow = computed(() => hud.health / hud.maxHealth < LOW_HEALTH);
 const ammo = computed(() => ammoState(hud));
 const swapKey = computed(() => switchKey(hud));
 const horde = computed(() => hordeStatus(hud));
+const effect = computed(() => {
+  const held = effectOf(hud.gear?.fits[hud.weapon]);
+  return held === null ? null : { effect: held, label: GUN_EFFECTS[held].label };
+});
 
 function fill(value: number, max: number): Record<string, string> {
   return { '--fill': `${Math.max(0, Math.min(100, (value / max) * 100))}%` };
@@ -213,6 +225,7 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 }
 
 .hud-medkits,
+.hud-bottles,
 .hud-knife {
   flex-direction: row;
   align-items: center;
@@ -275,6 +288,26 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 }
 
 .hud-slot-rounds {
+  color: var(--bone-dim);
+}
+
+.hud-effect {
+  color: var(--amber);
+}
+
+.hud-effect.is-acid {
+  color: var(--sick);
+}
+
+.hud-effect.is-incendiary {
+  color: var(--blood-bright);
+}
+
+.hud-effect.is-piercing {
+  color: var(--bone);
+}
+
+.hud-effect.is-tranq {
   color: var(--bone-dim);
 }
 

@@ -1,6 +1,6 @@
 // Renders the art book to a PNG so it can be judged by eye.
 //   node --experimental-strip-types tools/contact-sheet.ts <group> <outfile.png> [scale] [filter]
-// group: survivors | zombies | environment | containers | fx | ui | all | reference | scene | scene-night | town
+// group: survivors | zombies | environment | containers | fx | ui | kits | all | reference | scene | scene-night | town
 // filter: keep only rows whose label contains this text, e.g. "skin0/pistol/walk".
 // For town it is a crop instead, "x,y,w,h" in town pixels.
 // Each row shows a 1x strip under its label, for a read at true size.
@@ -11,6 +11,7 @@ import { buildArtBook } from '../src/art/index.ts';
 import { referenceWalker } from '../src/art/zombies.ts';
 import type { ArtBook, Clip, DirClips, PixelSprite } from '../src/art/types.ts';
 import { WEAPON_ORDER } from '../shared/protocol.ts';
+import { KIT_ORDER } from '../shared/round-effect-data.ts';
 import { encodePng } from './png.ts';
 import { renderScene } from './scene.ts';
 import { drawSprite, drawText, Sheet } from './sheet.ts';
@@ -107,6 +108,14 @@ function uiRows(book: ArtBook): Row[] {
   ];
 }
 
+/** The four round kits as they lie on the floor and as the workbench icons draw them. */
+function kitRows(book: ArtBook): Row[] {
+  return [
+    ...KIT_ORDER.map((kit) => clipRow(`pickup/${kit}`, book.pickups[kit])),
+    spriteRow('kitIcons', KIT_ORDER.map((kit) => book.ui.pickupIcons[kit])),
+  ];
+}
+
 function referenceRows(): Row[] {
   const { idle, walk } = referenceWalker();
   return [spriteRow('walker/idle S', [idle]), spriteRow('walker/walk S', walk.frames)];
@@ -120,6 +129,7 @@ function rowsFor(group: string, book: ArtBook): Row[] {
     case 'containers': return containerRows(book);
     case 'fx': return fxRows(book);
     case 'ui': return uiRows(book);
+    case 'kits': return kitRows(book);
     case 'reference': return referenceRows();
     case 'all': return [...survivorRows(book), ...zombieRows(book), ...environmentRows(book), ...containerRows(book), ...fxRows(book), ...uiRows(book)];
     default: throw new Error(`Unknown sheet "${group}"`);
@@ -200,7 +210,7 @@ function renderRows(rows: readonly Row[], scale: number): Sheet {
 function main(): void {
   const [group, outfile, scaleArg, filter] = process.argv.slice(2);
   if (!group || !outfile) {
-    console.error('usage: contact-sheet.ts <survivors|zombies|environment|containers|fx|ui|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter]');
+    console.error('usage: contact-sheet.ts <survivors|zombies|environment|containers|fx|ui|kits|all|reference|scene|scene-night|town> <outfile.png> [scale] [filter]');
     process.exit(1);
   }
   const started = performance.now();

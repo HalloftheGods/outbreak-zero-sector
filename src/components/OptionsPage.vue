@@ -17,6 +17,17 @@
       <PixelButton class="options-mute" :aria-pressed="ui.muted" @press="game.toggleMute()">{{ muteLabel }}</PixelButton>
     </div>
 
+    <div class="options-analytics">
+      <div class="options-analytics-head">
+        <p class="px-label">Analytics</p>
+        <PixelButton class="options-mute" :disabled="consent.optedOut" :aria-pressed="analyticsOn" @press="toggleAnalytics">
+          {{ analyticsLabel }}
+        </PixelButton>
+      </div>
+      <p class="options-note">{{ analyticsNote }}</p>
+      <MenuLink class="options-privacy" @press="openPrivacy()">Privacy</MenuLink>
+    </div>
+
     <div>
       <p class="px-label">Controls</p>
       <dl class="options-keys">
@@ -31,8 +42,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { consent, openPrivacy } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { CONTROLS } from '../game/title-menu.ts';
+import MenuLink from './MenuLink.vue';
 import PixelButton from './PixelButton.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
@@ -42,6 +55,18 @@ const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 
 const muteLabel = computed(() => (ui.muted ? 'Unmute' : 'Mute'));
+const analyticsOn = computed(() => consent.allowed());
+const analyticsLabel = computed(() => (analyticsOn.value ? 'On' : 'Off'));
+const analyticsNote = computed(() =>
+  consent.optedOut
+    ? 'Your browser sends Global Privacy Control, so analytics stays off.'
+    : 'Play stats go to Google Analytics, which also receives your IP address and cookies. Turn it off any time.'
+);
+
+function toggleAnalytics(): void {
+  if (analyticsOn.value) consent.deny();
+  else consent.grant();
+}
 
 function onVolume(event: Event): void {
   game.setVolume(Number((event.target as HTMLInputElement).value));
@@ -62,6 +87,29 @@ function onVolume(event: Event): void {
 
 .options-mute {
   width: calc(var(--u) * 56);
+}
+
+.options-analytics {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 2);
+}
+
+.options-analytics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 6);
+}
+
+.options-note {
+  margin: 0;
+  color: var(--bone-dim);
+}
+
+.options-privacy {
+  align-self: flex-start;
+  padding-inline: 0;
 }
 
 .options-keys {

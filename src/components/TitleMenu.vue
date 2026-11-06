@@ -1,5 +1,5 @@
 <template>
-  <nav class="px-menu" aria-label="Main menu">
+  <nav ref="menu" class="px-menu" aria-label="Main menu">
     <button
       v-for="(item, index) in TITLE_MENU"
       :key="item.page"
@@ -12,21 +12,25 @@
       @focus="select(index)"
       @click="open(index)"
     >
-      {{ item.label }}
+      {{ menuLabel(item, unlock) }}
     </button>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
-import { isConfirmKey, menuStep, steppedIndex, TITLE_MENU } from '../game/title-menu.ts';
+import { loadSoundUnlock } from '../game/sound-unlock.ts';
+import { isConfirmKey, menuLabel, menuOwnsKey, menuStep, steppedIndex, TITLE_MENU } from '../game/title-menu.ts';
 import type { TitlePage } from '../game/title-menu.ts';
 import { useGame } from './use-game.ts';
 
 const selected = defineModel<number>({ required: true });
 const emit = defineEmits<{ open: [page: TitlePage] }>();
 const game = useGame();
+const unlock = loadSoundUnlock();
 const items = useTemplateRef<HTMLButtonElement[]>('items');
+const menu = useTemplateRef<HTMLElement>('menu');
+const CONTROLS = 'button, a[href], input, select, textarea, summary, [role="button"]';
 
 function select(index: number): void {
   const alreadyThere = index === selected.value;
@@ -55,6 +59,11 @@ function open(index: number): void {
  * down, so the key that skips the splash never opens a page behind it.
  */
 function onKey(event: KeyboardEvent): void {
+  const target = event.target instanceof Element ? event.target : null;
+  const focusInMenu = target !== null && menu.value?.contains(target) === true;
+  const focusOnControl = target !== null && target.closest(CONTROLS) !== null;
+  const otherControlHasFocus = !menuOwnsKey({ focusInMenu, focusOnControl });
+  if (otherControlHasFocus) return;
   const browserShortcut = event.ctrlKey || event.metaKey || event.altKey;
   const step = browserShortcut ? 0 : menuStep(event.code);
   const confirming = !browserShortcut && isConfirmKey(event.code);

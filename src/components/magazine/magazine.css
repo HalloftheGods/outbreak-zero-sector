@@ -1,0 +1,363 @@
+/* How to Play's printed magazine: the frame, the paper, the page turn and the nav. Blocks and layouts have their own files. */
+/* Paper and ink colours live in paper-palette.css, which the Install Game cartridge shares. */
+@import '../paper-palette.css';
+
+/* Registered so a page works out its size once and hands it down as a length. */
+@property --m {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+
+.mag-screen {
+  --edge: max(6px, 1vmin);
+  --hand: 'Marker Felt', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', cursive;
+  --chunky: 'Silkscreen', monospace;
+  --book: Georgia, 'DejaVu Serif', 'Noto Serif', 'Times New Roman', serif;
+  --turn-ms: 560ms;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--edge);
+  padding: max(var(--edge), env(safe-area-inset-top)) max(var(--edge), env(safe-area-inset-right)) max(var(--edge), env(safe-area-inset-bottom))
+    max(var(--edge), env(safe-area-inset-left));
+  background: rgba(7, 8, 12, 0.2);
+  animation: px-fade-in 120ms steps(3);
+}
+
+.mag-book {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  perspective: 2400px;
+  touch-action: none;
+  box-shadow: 0 0 0 2px var(--print), 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+.mag-open {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.mag-open.is-solo {
+  grid-template-columns: 1fr;
+}
+
+.mag-color-tomato { --band: #e4502e; --band-deep: #a8301a; --on-band: #fff6df; }
+.mag-color-teal { --band: #0f9c92; --band-deep: #0a6a64; --on-band: #fff6df; }
+.mag-color-mustard { --band: #f2b632; --band-deep: #b57f0e; --on-band: #2b2233; }
+.mag-color-violet { --band: #6a46b8; --band-deep: #442a80; --on-band: #fff6df; }
+.mag-color-pink { --band: #ea3f7f; --band-deep: #a81f55; --on-band: #fff6df; }
+.mag-color-sky { --band: #2f8fe0; --band-deep: #1a5fa0; --on-band: #fff6df; }
+.mag-color-lime { --band: #86bf2e; --band-deep: #557d17; --on-band: #2b2233; }
+
+.mag-page {
+  --m: min(calc(100cqw / 1000), calc(100cqh / 690));
+  --k: calc(var(--m) * var(--fit, 1));
+  --u: var(--k);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: calc(var(--m) * 10) calc(var(--m) * 24) calc(var(--m) * 24);
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(120, 90, 40, 0.025) 3px 4px),
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(120, 90, 40, 0.02) 5px 6px);
+  color: var(--print);
+  font-family: var(--book);
+  font-size: calc(var(--k) * 16);
+  line-height: 1.3;
+}
+
+/* The fold: each page darkens as it dips into the gutter. */
+.mag-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.mag-page.is-left::after {
+  background: linear-gradient(to left, rgba(43, 34, 51, 0.34), rgba(43, 34, 51, 0.1) 2.5%, transparent 8%);
+}
+
+.mag-page.is-right::after {
+  background: linear-gradient(to right, rgba(43, 34, 51, 0.34), rgba(43, 34, 51, 0.1) 2.5%, transparent 8%);
+}
+
+.mag-book.is-single .mag-page.is-left::after,
+.mag-book.is-single .mag-page.is-right::after {
+  background: linear-gradient(to right, rgba(43, 34, 51, 0.22), transparent 3%);
+}
+
+.mag-book.is-single .mag-page {
+  --m: min(calc(100cqw / 430), calc(100cqh / 840));
+  padding-inline: calc(var(--m) * 16);
+}
+
+.mag-running-head {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--m) * 10);
+  padding-bottom: calc(var(--m) * 3);
+  margin-bottom: calc(var(--m) * 8);
+  border-bottom: calc(var(--m) * 2) solid var(--band);
+  font-family: var(--chunky);
+  font-size: calc(var(--m) * 10.5);
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+.mag-page.is-right .mag-running-head {
+  flex-direction: row-reverse;
+}
+
+.mag-flow {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 10);
+}
+
+.mag-folio {
+  position: absolute;
+  z-index: 6;
+  bottom: 0;
+  width: calc(var(--m) * 34);
+  padding: calc(var(--m) * 4) 0 calc(var(--m) * 2);
+  background: var(--band);
+  color: var(--on-band);
+  font-family: var(--chunky);
+  font-size: calc(var(--m) * 13);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.mag-page.is-left .mag-folio {
+  left: 0;
+}
+
+.mag-page.is-right .mag-folio {
+  right: 0;
+}
+
+.mag-page.is-tight .mag-extra {
+  display: none;
+}
+
+/* The page turn. A leaf over the gutter shows the next page on its back; a whole-book leaf swings on the left edge. */
+.mag-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  animation: var(--turn-ms) cubic-bezier(0.45, 0.05, 0.4, 1) both;
+}
+
+.mag-leaf.is-right {
+  left: 50%;
+  right: 0;
+  transform-origin: left center;
+  animation-name: mag-turn-forward;
+}
+
+.mag-leaf.is-left {
+  left: 0;
+  right: 50%;
+  transform-origin: right center;
+  animation-name: mag-turn-back;
+}
+
+.mag-leaf.is-whole {
+  left: 0;
+  right: 0;
+  transform-origin: left center;
+}
+
+.mag-leaf.is-whole.is-forward {
+  animation-name: mag-swing-away;
+}
+
+.mag-leaf.is-whole.is-back {
+  animation-name: mag-swing-home;
+}
+
+.mag-leaf-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.mag-leaf-face.is-back {
+  transform: rotateY(180deg);
+}
+
+/* Light falls off the sheet as it stands up. */
+.mag-leaf-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  background: rgba(43, 34, 51, 0.45);
+  animation: mag-leaf-shade var(--turn-ms) ease-in-out both;
+}
+
+@keyframes mag-turn-forward {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(-180deg); }
+}
+
+@keyframes mag-turn-back {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(180deg); }
+}
+
+@keyframes mag-swing-away {
+  from { transform: rotateY(0deg); opacity: 1; }
+  85% { opacity: 1; }
+  to { transform: rotateY(-105deg); opacity: 0; }
+}
+
+@keyframes mag-swing-home {
+  from { transform: rotateY(-105deg); opacity: 0; }
+  15% { opacity: 1; }
+  to { transform: rotateY(0deg); opacity: 1; }
+}
+
+@keyframes mag-leaf-shade {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* A strip along the foot of the book, like a binder spine. */
+.mag-nav {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: calc(var(--u) * 2);
+  min-height: 44px;
+  color: var(--paper);
+}
+
+.mag-nav .mag-nav-link {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 calc(var(--u) * 6);
+  background: var(--print);
+  color: var(--paper);
+  font-size: max(13px, calc(var(--u) * 6.5));
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(246, 236, 212, 0.4);
+}
+
+.mag-nav .mag-nav-link.is-next {
+  background: #e4502e;
+  color: #fff6df;
+}
+
+.mag-nav .mag-nav-link:hover:not(:disabled),
+.mag-nav .mag-nav-link:focus-visible {
+  outline: 2px solid var(--note);
+  outline-offset: 0;
+}
+
+.mag-nav .mag-nav-link:disabled {
+  opacity: 0.45;
+}
+
+.mag-nav .mag-nav-link::before {
+  content: none;
+}
+
+.mag-nav-page {
+  flex: 1;
+  align-self: center;
+  min-width: 0;
+  padding: 0 calc(var(--u) * 4);
+  overflow: hidden;
+  font-size: max(12px, calc(var(--u) * 5.5));
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #000, 0 0 6px #000;
+}
+
+/* A phone on its side: the height is too precious for a strip, so the nav stands down the side and the type steps up. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mag-screen {
+    flex-direction: row;
+  }
+
+  .mag-book .mag-page {
+    --m: min(calc(100cqw / 780), calc(100cqh / 420));
+    padding-inline: calc(var(--m) * 14);
+  }
+
+  .mag-nav {
+    flex-direction: column;
+    width: 76px;
+    gap: 3px;
+  }
+
+  .mag-nav .mag-nav-link {
+    flex: 1;
+    min-width: 0;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+
+  .mag-nav-page {
+    order: -1;
+    flex: none;
+    white-space: normal;
+    padding: 0;
+    font-size: 10px;
+  }
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .mag-nav {
+    gap: 4px;
+  }
+
+  .mag-nav .mag-nav-link {
+    flex: 1;
+    min-width: 0;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+
+  .mag-nav-page {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mag-screen {
+    animation: none;
+  }
+
+  .mag-leaf {
+    display: none;
+  }
+}

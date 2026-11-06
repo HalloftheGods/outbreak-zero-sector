@@ -23,6 +23,8 @@ const HEADS: Record<ZombieType, HeadRule> = {
   runner: { up: 14, forward: 8, radius: 4.5, ...FULL_BONUS },
   bloater: { up: 27, forward: 0.5, radius: 4, ...FULL_BONUS },
   brute: { up: 26.5, forward: 6, radius: 5.5, damage: 1.5, score: 2 },
+  // Drawn on the walker's rig.
+  screamer: { up: 20.5, forward: 4, radius: 5, ...FULL_BONUS },
 };
 
 /** Slack around a drawn head for the stride bob, and for zombies being drawn a little late. */

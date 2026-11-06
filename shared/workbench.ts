@@ -4,6 +4,9 @@ import type { GunUpgrade } from './gun-upgrade-data.ts';
 import { fitUpgrade, moveUpgrade } from './gun-upgrades.ts';
 import { WEAPON_ORDER } from './protocol.ts';
 import type { EntityId, WeaponId } from './protocol.ts';
+import { EFFECT_ORDER } from './round-effect-data.ts';
+import type { GunEffect } from './round-effect-data.ts';
+import { fitEffect, moveEffect } from './round-effects.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { alivePlayers } from './sim-state.ts';
 import { syncGun } from './weapons.ts';
@@ -22,6 +25,9 @@ export interface BenchState {
 export type BenchAction =
   | { readonly kind: 'fit'; readonly weapon: WeaponId; readonly upgrade: GunUpgrade }
   | { readonly kind: 'move'; readonly upgrade: GunUpgrade; readonly from: WeaponId; readonly to: WeaponId }
+  /** Uses a kit, and replaces whatever effect the gun had. */
+  | { readonly kind: 'fit_effect'; readonly weapon: WeaponId; readonly effect: GunEffect }
+  | { readonly kind: 'move_effect'; readonly from: WeaponId; readonly to: WeaponId }
   | { readonly kind: 'ready'; readonly ready: boolean };
 
 /** The bench as clients see it. Absent from a snapshot means the run is out in a town. */
@@ -36,14 +42,17 @@ export interface BenchView {
 
 const isWeapon = (value: unknown): value is WeaponId => WEAPON_ORDER.includes(value as WeaponId);
 const isUpgrade = (value: unknown): value is GunUpgrade => UPGRADE_ORDER.includes(value as GunUpgrade);
+const isEffect = (value: unknown): value is GunEffect => EFFECT_ORDER.includes(value as GunEffect);
 
 /** True only for exactly a bench action, whatever came off the wire. */
 export function isBenchAction(value: unknown): value is BenchAction {
-  const action = value as Partial<Record<keyof BenchAction | 'weapon' | 'upgrade' | 'from' | 'to' | 'ready', unknown>> | null;
+  const action = value as Partial<Record<keyof BenchAction | 'weapon' | 'upgrade' | 'effect' | 'from' | 'to' | 'ready', unknown>> | null;
   const isFit = action?.kind === 'fit' && isWeapon(action.weapon) && isUpgrade(action.upgrade);
   const isMove = action?.kind === 'move' && isUpgrade(action.upgrade) && isWeapon(action.from) && isWeapon(action.to);
+  const isFitEffect = action?.kind === 'fit_effect' && isWeapon(action.weapon) && isEffect(action.effect);
+  const isMoveEffect = action?.kind === 'move_effect' && isWeapon(action.from) && isWeapon(action.to);
   const isReady = action?.kind === 'ready' && typeof action.ready === 'boolean';
-  return isFit || isMove || isReady;
+  return isFit || isMove || isFitEffect || isMoveEffect || isReady;
 }
 
 /** Stops the run at the bench. False when this run has none, so the van drives straight on. */
@@ -68,6 +77,7 @@ function holdPlayer(p: PlayerState): void {
   p.weaponQueued = null;
   p.meleeQueued = false;
   p.healQueued = false;
+  p.throwQueued = false;
   p.shootQueued = false;
 }
 
@@ -87,6 +97,8 @@ export function benchCommand(sim: SimState, p: PlayerState, action: BenchAction)
   if (!usable) return;
   if (action.kind === 'ready') p.benchReady = action.ready;
   else if (action.kind === 'fit') fitUpgrade(p, action.weapon, action.upgrade);
+  else if (action.kind === 'fit_effect') fitEffect(p, action.weapon, action.effect);
+  else if (action.kind === 'move_effect') moveEffect(p, action.from, action.to);
   else moveUpgrade(p, action.upgrade, action.from, action.to);
   syncGun(p);
 }

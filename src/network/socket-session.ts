@@ -2,6 +2,7 @@ import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
 import type { DifficultyId } from '../../shared/difficulty.ts';
 import type { ClientInputPacket, ClientPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
+import { tapRoomDifficulty } from '../game/analytics/event-tap.ts';
 import { parseServerPacket } from './packet-guards.ts';
 import { tabToken } from './tab-token.ts';
 import type { GameTransport } from './transport.ts';
@@ -104,6 +105,7 @@ export class SocketSession implements GameTransport {
     if (packet.type === 'welcome') {
       this.welcomed = true;
       this.clearTimeout();
+      if (packet.difficulty) tapRoomDifficulty(packet.difficulty);
       this.onWelcome(packet);
     } else if (packet.type === 'snapshot' && this.welcomed) {
       this.onSnapshot(packet);

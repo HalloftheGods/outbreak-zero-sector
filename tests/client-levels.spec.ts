@@ -83,7 +83,7 @@ describe('level wording', () => {
   });
 
   it('words a title card from the level table', () => {
-    expect(levelTitle(4)).toEqual({ heading: `Level 4 of ${FINAL_LEVEL}`, title: 'Abyssal Depths', goal: 'Survive 3 hordes, then reach the van' });
+    expect(levelTitle(4)).toEqual({ heading: `Level 4 of ${FINAL_LEVEL}`, title: 'Abyssal Depths', goal: 'Survive 3 hordes, then reach the van', rule: 'Floodwater: Wading outdoors slows you down. Buildings are dry.' });
     expect(levelTitle(FINAL_LEVEL).heading).toBe('Final level');
   });
 

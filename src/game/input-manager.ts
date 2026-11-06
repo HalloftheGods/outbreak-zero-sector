@@ -1,5 +1,5 @@
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
-import type { ClientInputPacket, WeaponId } from '../../shared/protocol.ts';
+import type { ClientInputPacket, Stance, WeaponId } from '../../shared/protocol.ts';
 import { TouchInput } from './touch-input.ts';
 
 const WHEEL_COOLDOWN_MS = 110;
@@ -19,6 +19,9 @@ const WEAPON_KEYS: Readonly<Record<string, WeaponId>> = {
 const SHOVE_CODE = 'KeyF';
 const HEAL_CODE = 'KeyH';
 const SEARCH_CODE = 'KeyE';
+const THROW_CODE = 'KeyG';
+const SNEAK_CODES = ['KeyC'];
+const SPRINT_CODES = ['ShiftLeft', 'ShiftRight'];
 const MAP_CODES: ReadonlySet<string> = new Set(['Tab', 'KeyN']);
 const LEFT_BUTTON = 0;
 const RIGHT_BUTTON = 2;
@@ -33,6 +36,9 @@ const GAME_CODES: ReadonlySet<string> = new Set([
   SHOVE_CODE,
   HEAL_CODE,
   SEARCH_CODE,
+  THROW_CODE,
+  ...SNEAK_CODES,
+  ...SPRINT_CODES,
   ...Object.keys(WEAPON_KEYS),
 ]);
 
@@ -94,6 +100,7 @@ export class InputManager {
   private fireLatch = false;
   private shoveLatch = false;
   private healLatch = false;
+  private throwLatch = false;
   private reloadLatch = false;
   private weaponLatch: WeaponId | null = null;
   private cycleLatch = 0;
@@ -154,6 +161,7 @@ export class InputManager {
     this.fireLatch = false;
     this.shoveLatch = false;
     this.healLatch = false;
+    this.throwLatch = false;
     this.reloadLatch = false;
     this.weaponLatch = null;
     this.cycleLatch = 0;
@@ -166,6 +174,12 @@ export class InputManager {
 
   get dirX(): number {
     return Math.sign(Number(this.isHeld(RIGHT)) - Number(this.isHeld(LEFT)) + this.touch.dirX);
+  }
+
+  /** Sneak wins over sprint, as it does in the sim. */
+  get stance(): Stance {
+    if (this.isHeld(SNEAK_CODES)) return 'sneak';
+    return this.isHeld(SPRINT_CODES) ? 'sprint' : 'walk';
   }
 
   get dirY(): number {
@@ -206,7 +220,10 @@ export class InputManager {
       weapon: this.weaponLatch ?? cycled,
       melee: this.shoveLatch || (this.enabled && this.shoving) || this.isHeld([SHOVE_CODE]),
       heal: this.healLatch,
+      ...(this.throwLatch ? { throw: true } : {}),
       search: this.isHeld([SEARCH_CODE]),
+      ...(this.stance === 'sneak' ? { sneak: true } : {}),
+      ...(this.stance === 'sprint' ? { sprint: true } : {}),
     };
     this.clearLatches();
     return packet;
@@ -248,6 +265,7 @@ export class InputManager {
     if (code === 'KeyQ') this.cycleLatch += 1;
     this.shoveLatch ||= code === SHOVE_CODE;
     this.healLatch ||= code === HEAL_CODE;
+    this.throwLatch ||= code === THROW_CODE;
     const weapon = WEAPON_KEYS[code];
     if (weapon) this.weaponLatch = weapon;
   }

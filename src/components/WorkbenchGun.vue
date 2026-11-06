@@ -21,6 +21,7 @@
         </PixelButton>
       </li>
     </ul>
+    <WorkbenchEffect :weapon :owned :gear :art />
   </article>
 </template>
 
@@ -37,6 +38,7 @@ import { benchRows, statLines } from '../game/bench-view.ts';
 import PixelButton from './PixelButton.vue';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
+import WorkbenchEffect from './WorkbenchEffect.vue';
 
 interface GunCardProps {
   weapon: WeaponId;

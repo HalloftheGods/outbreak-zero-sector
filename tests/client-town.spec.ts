@@ -474,4 +474,33 @@ describe('the town on screen', () => {
     expect(view.building(building.id)).toBe(building);
     expect(view.building('nope')).toBeNull();
   });
+
+  it('marks a building as cleared with an X when visited and all containers are checked', () => {
+    const view = new TownMapView(map);
+    const containers = townContainers(map).filter((c) => c.building === building.id);
+    expect(containers.length).toBeGreaterThan(0);
+
+    for (const c of containers) view.markOpened(c.id);
+    expect(view.isCleared(building.id)).toBe(false);
+
+    view.clearOpened();
+    view.markVisited(building.id);
+    expect(view.isCleared(building.id)).toBe(false);
+    view.markOpened(containers[0].id);
+    if (containers.length > 1) {
+      expect(view.isCleared(building.id)).toBe(false);
+    }
+
+    for (const c of containers) view.markOpened(c.id);
+    expect(view.isCleared(building.id)).toBe(true);
+  });
+
+  it('paints hand-drawn cross for cleared buildings without throwing', () => {
+    const view = new TownMapView(map);
+    view.markVisited(building.id);
+    const containers = townContainers(map).filter((c) => c.building === building.id);
+    const ctx = fakeCanvas().getContext() as unknown as CanvasRenderingContext2D;
+    expect(() => view.paint(ctx, [], 'me', null, containers.map((c) => c.id))).not.toThrow();
+    expect(view.isCleared(building.id)).toBe(true);
+  });
 });

@@ -10,6 +10,9 @@ export interface SplashTimings {
 /** Served from public/, relative so the build works from any folder. */
 export const BRAND_MARK = 'brand/hall-of-the-gods.webp';
 
+/** The dated line games carry on the title screen. */
+export const STUDIO_LINE = '© 2026 Hall of the Gods, Inc.';
+
 /** Add this to the address to go straight to the title. */
 const SKIP_QUERY = 'nosplash';
 

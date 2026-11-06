@@ -28,6 +28,8 @@
 
     <ConnectionLost v-else-if="ui.screen === 'lost'" :reason="ui.lostReason" />
 
+    <PrivacyPage v-if="privacyOpen" />
+
     <StudioSplash v-if="splashing" @done="splashing = false" />
   </main>
 </template>
@@ -41,6 +43,7 @@ import GameOverScreen from './components/GameOverScreen.vue';
 import HudOverlay from './components/HudOverlay.vue';
 import LevelCard from './components/LevelCard.vue';
 import PauseMenu from './components/PauseMenu.vue';
+import PrivacyPage from './components/PrivacyPage.vue';
 import StudioSplash from './components/StudioSplash.vue';
 import TitleScreen from './components/TitleScreen.vue';
 import TouchControls from './components/TouchControls.vue';
@@ -48,6 +51,7 @@ import TownMap from './components/TownMap.vue';
 import { GAME_KEY } from './components/use-game.ts';
 import WaveBanner from './components/WaveBanner.vue';
 import WorkbenchScreen from './components/WorkbenchScreen.vue';
+import { privacyOpen, startAnalytics } from './game/analytics/index.ts';
 import { GameController } from './game/game-controller.ts';
 import { shouldShowSplash } from './game/studio-splash.ts';
 
@@ -59,12 +63,18 @@ const aiming = computed(() => ui.value.screen === 'game' && !ui.value.paused && 
 
 provide(GAME_KEY, game);
 
+let stopAnalytics: (() => void) | null = null;
+
 onMounted(() => {
   if (canvasRef.value) game.mount(canvasRef.value);
   if (import.meta.env.DEV) window.__outbreak = game;
+  stopAnalytics = startAnalytics(() => ui.value);
 });
 
-onBeforeUnmount(() => game.dispose());
+onBeforeUnmount(() => {
+  stopAnalytics?.();
+  game.dispose();
+});
 </script>
 
 <style scoped>

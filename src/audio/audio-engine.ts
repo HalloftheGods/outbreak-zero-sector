@@ -1,7 +1,9 @@
 import type { GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
+import type { GunEffect } from '../../shared/round-effect-data.ts';
 import { HEARING_RANGE, Mixer } from './mixer.ts';
 import { Music, type Scene } from './music.ts';
 import { Soundtrack } from './soundtrack.ts';
+import { SFX } from './sfx-registry.ts';
 import type { SfxName } from './sfx-registry.ts';
 
 export { renderSfx } from './render.ts';
@@ -12,20 +14,22 @@ export type { Scene } from './music.ts';
 const STORE_KEY = 'outbreak-zero.audio';
 const SHOT: Record<WeaponId, SfxName> = { pistol: 'pistol', carbine: 'carbine', shotgun: 'shotgun' };
 const DEATH: Record<ZombieType, SfxName> = {
-  walker: 'die_walker', runner: 'die_runner', bloater: 'die_bloater', brute: 'die_brute',
+  walker: 'die_walker', runner: 'die_runner', bloater: 'die_bloater', brute: 'die_brute', screamer: 'die_walker',
 };
 const VOICE: Record<ZombieType, SfxName> = {
-  walker: 'groan_walker', runner: 'shriek_runner', bloater: 'gurgle_bloater', brute: 'roar_brute',
+  walker: 'groan_walker', runner: 'shriek_runner', bloater: 'gurgle_bloater', brute: 'roar_brute', screamer: 'groan_walker',
 };
 const ALERT: Record<ZombieType, SfxName> = {
-  walker: 'alert_walker', runner: 'alert_runner', bloater: 'alert_bloater', brute: 'alert_brute',
+  walker: 'alert_walker', runner: 'alert_runner', bloater: 'alert_bloater', brute: 'alert_brute', screamer: 'scream',
 };
 const PICKUP: Record<PickupType, SfxName> = {
   bandage: 'pickup_bandage', medkit: 'pickup_medkit', pistol_ammo: 'pickup_pistol_ammo',
   carbine_ammo: 'pickup_carbine_ammo', shells: 'pickup_shells', carbine: 'pickup_weapon', shotgun: 'pickup_weapon',
-  knife: 'pickup_weapon',
+  knife: 'pickup_weapon', radio: 'pickup_radio',
   barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
+  incendiary_kit: 'pickup_weapon', acid_kit: 'pickup_weapon', piercing_kit: 'pickup_weapon', tranq_kit: 'pickup_weapon',
 };
+const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrode', piercing: 'pierce', tranq: 'tranq_dart' };
 /** A can on the end of a gun: still a shot, but a dull one. */
 const SUPPRESSED_GAIN = 0.35;
 /** A pack waking at once shares this: at most one alert snarl per window. */
@@ -64,6 +68,7 @@ export class AudioEngine {
   private beatIn = 0;
   private alertIn = 0;
   private unlocking: Promise<void> | null = null;
+  private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
   async unlock(): Promise<void> {
     if (!hasWebAudio()) return;
@@ -105,6 +110,47 @@ export class AudioEngine {
 
   playUi(name: 'click' | 'hover' | 'start' | 'pause' | 'resume'): void {
     this.mixer?.play(`ui_${name}`);
+  }
+
+  /** The Sound Test opens quiet: the scene's music steps aside until leavePreview(). */
+  enterPreview(): void {
+    this.soundtrack?.hush();
+  }
+
+  /** The Sound Test plays one thing at a time through the same mixer, so volume and mute apply. False if nothing could start. */
+  previewTrack(file: string, onEnd: () => void): boolean {
+    if (!this.soundtrack) return false;
+    this.clearPreviewTimer();
+    this.soundtrack.audition(file, onEnd);
+    return true;
+  }
+
+  previewSfx(name: SfxName, onEnd: () => void): boolean {
+    if (!this.mixer) return false;
+    this.stopPreview();
+    this.mixer.play(name, { local: true });
+    this.previewTimer = setTimeout(() => {
+      this.previewTimer = null;
+      onEnd();
+    }, SFX[name].length * 1000);
+    return true;
+  }
+
+  /** Stops whatever is playing and stays quiet. */
+  stopPreview(): void {
+    this.clearPreviewTimer();
+    this.soundtrack?.silence();
+  }
+
+  /** Leaving the Sound Test: the scene's music, the title's, comes back. */
+  leavePreview(): void {
+    this.clearPreviewTimer();
+    this.soundtrack?.stopAudition();
+  }
+
+  private clearPreviewTimer(): void {
+    if (this.previewTimer) clearTimeout(this.previewTimer);
+    this.previewTimer = null;
   }
 
   /** The town being played, which picks the music between hordes. */
@@ -174,6 +220,7 @@ export class AudioEngine {
       case 'zombie_hit': mixer.play('flesh_hit', { x: e.x, y: e.y }); break;
       case 'headshot': mixer.play('headshot', at(e.x, e.y, e.playerId)); break;
       case 'zombie_die': mixer.play(DEATH[e.zombieType], { x: e.x, y: e.y }); break;
+      case 'zombie_status': mixer.play(STATUS[e.effect], { x: e.x, y: e.y }); break;
       case 'zombie_attack': mixer.play('claw', { x: e.x, y: e.y }); break;
       case 'bloater_burst': mixer.play('bloater_burst', { x: e.x, y: e.y }); break;
       case 'player_hurt': mixer.play('player_hurt', at(e.x, e.y, e.playerId)); break;
@@ -182,6 +229,8 @@ export class AudioEngine {
       case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
       case 'pickup': mixer.play(PICKUP[e.pickup], at(e.x, e.y, e.playerId)); break;
       case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
+      case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
+      case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;
       case 'wave_start': mixer.play('wave_start'); break;
       case 'wave_clear': mixer.play('wave_clear'); break;
       case 'game_over': mixer.play('game_over', { local: true }); break;
@@ -209,6 +258,7 @@ export class AudioEngine {
   }
 
   dispose(): void {
+    this.clearPreviewTimer();
     this.soundtrack?.dispose();
     this.music?.dispose();
     this.mixer?.dispose();

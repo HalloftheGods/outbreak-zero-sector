@@ -31,6 +31,7 @@ export function enterTown(sim: SimState, level: number): void {
   sim.populationTarget = levelPopulation(level);
   sim.topUpTimer = 0;
   sim.noises = [];
+  sim.tracks = [];
   sim.zombies = [];
   sim.bullets = [];
   sim.pickups = [];
@@ -56,6 +57,7 @@ export function placeAtEntry(sim: SimState, p: PlayerState): void {
   p.weaponQueued = null;
   p.meleeQueued = false;
   p.healQueued = false;
+  p.throwQueued = false;
   p.shootQueued = false;
   stopSearch(p);
 }

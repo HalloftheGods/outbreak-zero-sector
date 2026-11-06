@@ -1,370 +1,89 @@
-// Maps each How to Play section to authentic in-game pixel art sprites, badges and descriptions.
+import type { ArtBook } from '../art/types.ts';
+import type { GalleryCard } from './magazine-types.ts';
 
-import type { ArtBook, PixelSprite } from '../art/types.ts';
+/** The game's own pictures for each How to Play section. The captions are the magazine's voice, never new rules. */
+type CardList = (art: ArtBook) => readonly GalleryCard[];
 
-export interface VisualCard {
-  readonly id: string;
-  readonly title: string;
-  readonly sprite: PixelSprite;
-  readonly scale?: number;
-  readonly subtitle?: string;
-  readonly badge?: string;
+const SOUTH = 2;
+
+const zombieFront = (art: ArtBook, type: keyof ArtBook['zombies']) => art.zombies[type].walk[SOUTH].frames[0];
+
+const supplies: CardList = (art) => [
+  { id: 'pistol-ammo', title: 'Pistol rounds', sprite: art.ui.pickupIcons.pistol_ammo, scale: 4, tag: 'No. 101', caption: 'For the pistol. Only the pistol.' },
+  { id: 'carbine-ammo', title: 'Carbine rounds', sprite: art.ui.pickupIcons.carbine_ammo, scale: 4, tag: 'No. 102', caption: 'Will not fit the pistol. We asked.' },
+  { id: 'shells', title: 'Shotgun shells', sprite: art.ui.pickupIcons.shells, scale: 4, tag: 'No. 103', caption: 'Bulky, loud and worth it.' },
+  { id: 'medkit', title: 'Medkit', sprite: art.ui.pickupIcons.medkit, scale: 4, tag: 'No. 201', caption: 'Press H. Feel better.' },
+  { id: 'bandage', title: 'Bandage', sprite: art.ui.pickupIcons.bandage, scale: 4, tag: 'No. 202', caption: 'For when a medkit feels like showing off.' },
+];
+
+const searching: CardList = (art) => [
+  { id: 'fridge', title: 'Fridge', sprite: art.containers.fridge.closed, scale: 1.5, tag: 'Kitchen', caption: 'Cold, dark, one careful owner.' },
+  { id: 'car', title: 'Car', sprite: art.containers.car.closed, scale: 1.25, tag: 'Street', caption: 'Low mileage. Nobody is coming back for it.' },
+  { id: 'locker', title: 'Locker', sprite: art.containers.locker.closed, scale: 1.5, tag: 'Secure', caption: 'Lockable. Not locked.' },
+  { id: 'shelf', title: 'Shelf', sprite: art.containers.shelf.closed, scale: 1.5, tag: 'Retail', caption: 'Generous storage, sadly unattended.' },
+  { id: 'box', title: 'Box', sprite: art.containers.box.closed, scale: 1.25, tag: 'Bargain', caption: 'Contents unknown. Seller unavailable.' },
+  { id: 'drawer', title: 'Drawer', sprite: art.containers.drawer.closed, scale: 1.1, tag: 'Bedroom', caption: 'Sleeps one. Asks no questions.' },
+];
+
+const hordes: CardList = (art) => [
+  { id: 'walker', title: 'Walker', sprite: zombieFront(art, 'walker'), scale: 3, tag: 'Common', caption: 'The town\'s main residents. They walk.' },
+  { id: 'runner', title: 'Runner', sprite: zombieFront(art, 'runner'), scale: 3, tag: 'Brisk', caption: 'As described.' },
+  { id: 'bloater', title: 'Bloater', sprite: zombieFront(art, 'bloater'), scale: 2.6, tag: 'Pops', caption: 'Bursts. Admire from a distance.' },
+  { id: 'brute', title: 'Brute', sprite: zombieFront(art, 'brute'), scale: 2, tag: 'Large', caption: 'A disappointing thing to shove.' },
+  { id: 'screamer', title: 'Screamer', sprite: zombieFront(art, 'screamer'), scale: 3, tag: 'Loud', caption: 'If it sees you, everyone hears about it.' },
+];
+
+const survivors: CardList = (art) =>
+  ['Night', 'Khronus8', 'Satori', 'Rex', 'Sol'].map((name, index) => ({
+    id: name.toLowerCase(),
+    title: name,
+    sprite: art.survivors[index].portrait,
+    scale: 3.4,
+    tag: `Visa ${index + 1}`,
+  }));
+
+const noise: CardList = (art) => [
+  { id: 'gunshot', title: 'Gunshot', sprite: art.ui.weaponIcons.pistol, scale: 1.6, tag: 'Loud', caption: 'Carries.' },
+  { id: 'search', title: 'Searching', sprite: art.containers.box.closed, scale: 0.8, tag: 'Maybe', caption: 'Depends on your luck.' },
+  { id: 'shove', title: 'Shove', sprite: art.ui.pickupIcons.knife, scale: 2, tag: 'Silent', caption: 'Rude, but quiet.' },
+];
+
+const difficulty: CardList = (art) =>
+  ['Mild', 'Fair', 'Stormy', 'Do not travel'].map((tag, index) => {
+    const friendly = index < 2;
+    return { id: `outlook-${index}`, title: tag, sprite: friendly ? art.ui.heart : art.ui.skull, scale: 3 };
+  });
+
+const rounds: CardList = (art) => [
+  { id: 'incendiary', title: 'Flame rounds', sprite: art.ui.pickupIcons.incendiary_kit, scale: 3, tag: 'Hot', caption: 'Loud, bright and very sorry.' },
+  { id: 'acid', title: 'Acid rounds', sprite: art.ui.pickupIcons.acid_kit, scale: 3, tag: 'Sour', caption: 'Brutes take it personally.' },
+  { id: 'piercing', title: 'Piercing rounds', sprite: art.ui.pickupIcons.piercing_kit, scale: 3, tag: 'Sharp', caption: 'Two for the price of one.' },
+  { id: 'tranq', title: 'Tranq rounds', sprite: art.ui.pickupIcons.tranq_kit, scale: 3, tag: 'Calm', caption: 'Slower, if not quite sorry.' },
+];
+
+const SECTION_CARDS: Readonly<Record<string, CardList>> = {
+  supplies,
+  searching,
+  hordes,
+  survivors,
+  noise,
+  difficulty,
+  goal: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],
+  controls: (art) => [{ id: 'crosshair', title: 'Crosshair', sprite: art.ui.crosshair, scale: 2 }],
+  melee: (art) => [{ id: 'knife', title: 'Knife', sprite: art.ui.pickupIcons.knife, scale: 2 }],
+  van: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],
+  workbench: (art) => [{ id: 'toolkit', title: 'Toolkit', sprite: art.ui.pickupIcons.toolkit, scale: 2 }],
+  rounds,
+  coop: (art) => [{ id: 'team', title: 'Night', sprite: art.survivors[0].portrait, scale: 1 }],
+};
+
+/** The pictures for a section. A section with none of its own yet returns an empty list. */
+export function getSectionVisuals(sectionId: string, art: ArtBook): readonly GalleryCard[] {
+  return SECTION_CARDS[sectionId]?.(art) ?? [];
 }
 
-/** Returns visual cards for a given How to Play section ID. */
-export function getSectionVisuals(sectionId: string, art: ArtBook): readonly VisualCard[] {
-  switch (sectionId) {
-    case 'goal':
-      return [
-        {
-          id: 'van',
-          title: 'Escape Van',
-          sprite: art.environment.escapeVan,
-          scale: 1.5,
-          subtitle: 'Wait 2 seconds beside the van to exit',
-          badge: 'TARGET',
-        },
-        {
-          id: 'hordes',
-          title: '10 Rounds',
-          sprite: art.ui.skull,
-          scale: 2,
-          subtitle: 'Survive all waves to open the exit',
-          badge: 'SURVIVE',
-        },
-      ];
-
-    case 'controls':
-      return [
-        {
-          id: 'survivor',
-          title: 'Survivor',
-          sprite: art.survivors[0].portrait,
-          scale: 1.5,
-          subtitle: 'Move: WASD keys',
-          badge: 'MOVE',
-        },
-        {
-          id: 'crosshair',
-          title: 'Crosshair',
-          sprite: art.ui.crosshair,
-          scale: 2,
-          subtitle: 'Aim: Mouse | Hold to fire',
-          badge: 'AIM',
-        },
-        {
-          id: 'headshot',
-          title: 'Headshot',
-          sprite: art.ui.crosshairHead,
-          scale: 2,
-          subtitle: 'Turns red on head: bonus dmg',
-          badge: 'CRIT',
-        },
-      ];
-
-    case 'noise':
-      return [
-        {
-          id: 'gunfire',
-          title: 'Gunfire',
-          sprite: art.ui.weaponIcons.pistol,
-          scale: 1.5,
-          subtitle: 'Gunshots carry across the town',
-          badge: 'LOUD',
-        },
-        {
-          id: 'silent-melee',
-          title: 'Shove & Melee',
-          sprite: art.ui.pickupIcons.knife,
-          scale: 2,
-          subtitle: 'Shoving & knife stabs make 0 noise',
-          badge: 'SILENT',
-        },
-      ];
-
-    case 'supplies':
-      return [
-        {
-          id: 'pistol-ammo',
-          title: '9mm Ammo',
-          sprite: art.ui.pickupIcons.pistol_ammo,
-          scale: 2,
-          subtitle: 'Standard sidearm ammunition',
-        },
-        {
-          id: 'carbine-ammo',
-          title: '5.56 Ammo',
-          sprite: art.ui.pickupIcons.carbine_ammo,
-          scale: 2,
-          subtitle: 'Rifle high-capacity ammunition',
-        },
-        {
-          id: 'shells',
-          title: 'Shotgun Shells',
-          sprite: art.ui.pickupIcons.shells,
-          scale: 2,
-          subtitle: 'Heavy close-range buckshot',
-        },
-        {
-          id: 'medkit',
-          title: 'Medkit',
-          sprite: art.ui.pickupIcons.medkit,
-          scale: 2,
-          subtitle: 'Restores a large amount of health',
-          badge: 'HEAL',
-        },
-        {
-          id: 'bandage',
-          title: 'Bandage',
-          sprite: art.ui.pickupIcons.bandage,
-          scale: 2,
-          subtitle: 'Quick patch for minor injuries',
-        },
-      ];
-
-    case 'searching':
-      return [
-        {
-          id: 'car',
-          title: 'Street Cars',
-          sprite: art.containers.car.closed,
-          scale: 1.5,
-          subtitle: 'Search sedans and wrecks outdoors',
-        },
-        {
-          id: 'box',
-          title: 'Boxes & Crates',
-          sprite: art.containers.box.closed,
-          scale: 2,
-          subtitle: 'Search cardboard boxes in alleys',
-        },
-        {
-          id: 'shelf',
-          title: 'Metal Shelves',
-          sprite: art.containers.shelf.closed,
-          scale: 2,
-          subtitle: 'Search grocery and garage shelves',
-        },
-        {
-          id: 'drawer',
-          title: 'Drawers',
-          sprite: art.containers.drawer.closed,
-          scale: 2,
-          subtitle: 'Search dressers and office desks',
-        },
-        {
-          id: 'locker',
-          title: 'Lockers',
-          sprite: art.containers.locker.closed,
-          scale: 1.5,
-          subtitle: 'Search gun shop and clinic lockers',
-        },
-        {
-          id: 'fridge',
-          title: 'Fridge',
-          sprite: art.containers.fridge.closed,
-          scale: 1.5,
-          subtitle: 'Search residential refrigerators',
-        },
-      ];
-
-    case 'melee':
-      return [
-        {
-          id: 'knife',
-          title: 'Hunting Knife',
-          sprite: art.ui.pickupIcons.knife,
-          scale: 2,
-          subtitle: 'Shove & Stab deals 4x silent damage',
-          badge: '4X DMG',
-        },
-      ];
-
-    case 'hordes':
-      return [
-        {
-          id: 'walker',
-          title: 'Walker',
-          sprite: art.zombies.walker.walk[2].frames[0],
-          scale: 2,
-          subtitle: 'Slow roamers; dangerous in swarms',
-          badge: 'SLOW',
-        },
-        {
-          id: 'runner',
-          title: 'Runner',
-          sprite: art.zombies.runner.walk[2].frames[0],
-          scale: 2,
-          subtitle: 'Sprints directly at survivors on sight',
-          badge: 'FAST',
-        },
-        {
-          id: 'bloater',
-          title: 'Bloater',
-          sprite: art.zombies.bloater.walk[2].frames[0],
-          scale: 2,
-          subtitle: 'Detonates in a lethal toxic acid cloud',
-          badge: 'ACID',
-        },
-        {
-          id: 'brute',
-          title: 'Brute',
-          sprite: art.zombies.brute.walk[2].frames[0],
-          scale: 2,
-          subtitle: 'Huge armored tank with high damage',
-          badge: 'TANK',
-        },
-      ];
-
-    case 'van':
-      return [
-        {
-          id: 'escape-van',
-          title: 'The Escape Van',
-          sprite: art.environment.escapeVan,
-          scale: 1.5,
-          subtitle: 'Blocks bullets and zombies; hold 2s to leave',
-          badge: 'SHIELD',
-        },
-      ];
-
-    case 'workbench':
-      return [
-        {
-          id: 'barrel',
-          title: 'Extended Barrel',
-          sprite: art.ui.pickupIcons.barrel,
-          scale: 2,
-          subtitle: 'Increases bullet damage and range',
-          badge: 'BARREL',
-        },
-        {
-          id: 'grip',
-          title: 'Tactical Grip',
-          sprite: art.ui.pickupIcons.grip,
-          scale: 2,
-          subtitle: 'Improves fire rate and recoil',
-          badge: 'GRIP',
-        },
-        {
-          id: 'magazine',
-          title: 'Mag Extension',
-          sprite: art.ui.pickupIcons.magazine,
-          scale: 2,
-          subtitle: 'More rounds before needing reload',
-          badge: 'MAG',
-        },
-        {
-          id: 'suppressor',
-          title: 'Suppressor',
-          sprite: art.ui.pickupIcons.suppressor,
-          scale: 2,
-          subtitle: 'Silences gunfire to avoid hordes',
-          badge: 'SILENT',
-        },
-        {
-          id: 'toolkit',
-          title: 'Gunsmith Tools',
-          sprite: art.ui.pickupIcons.toolkit,
-          scale: 2,
-          subtitle: 'Fit parts to weapons at workbench',
-          badge: 'CRAFT',
-        },
-      ];
-
-    case 'survivors':
-      return [
-        {
-          id: 'night',
-          title: 'Night',
-          sprite: art.survivors[0].portrait,
-          scale: 1.5,
-          subtitle: 'Moves quietly: 25% lower detection',
-          badge: 'STEALTH',
-        },
-        {
-          id: 'khronus8',
-          title: 'Khronus8',
-          sprite: art.survivors[1].portrait,
-          scale: 1.5,
-          subtitle: 'Fast hands: 25% faster reload',
-          badge: 'RELOAD',
-        },
-        {
-          id: 'satori',
-          title: 'Satori',
-          sprite: art.survivors[2].portrait,
-          scale: 1.5,
-          subtitle: 'Speed demon: 12% faster sprint',
-          badge: 'SPEED',
-        },
-        {
-          id: 'rex',
-          title: 'Rex',
-          sprite: art.survivors[3].portrait,
-          scale: 1.5,
-          subtitle: 'Brawler: shoves 50% farther back',
-          badge: 'FORCE',
-        },
-        {
-          id: 'sol',
-          title: 'Sol',
-          sprite: art.survivors[4].portrait,
-          scale: 1.5,
-          subtitle: 'Lucky scavenger: 2x drops & search luck',
-          badge: 'LUCK',
-        },
-      ];
-
-    case 'difficulty':
-      return [
-        {
-          id: 'diff-easy',
-          title: 'Night Light On',
-          sprite: art.ui.heart,
-          scale: 2,
-          subtitle: 'Plentiful ammo, slower zombies',
-          badge: 'EASY',
-        },
-        {
-          id: 'diff-normal',
-          title: 'Lights Out',
-          sprite: art.ui.skull,
-          scale: 2,
-          subtitle: 'Standard balanced survival mode',
-          badge: 'NORMAL',
-        },
-        {
-          id: 'diff-hard',
-          title: 'Undead Tired',
-          sprite: art.ui.skull,
-          scale: 2,
-          subtitle: 'Scarce ammo, fast zombies, huge hordes',
-          badge: 'HARDCORE',
-        },
-      ];
-
-    case 'coop':
-      return [
-        {
-          id: 'coop-team',
-          title: 'Multiplayer Co-op',
-          sprite: art.survivors[0].portrait,
-          scale: 1.5,
-          subtitle: 'Share one town and coordinate fire',
-          badge: 'TEAM',
-        },
-        {
-          id: 'coop-threat',
-          title: 'Shared Threat',
-          sprite: art.zombies.walker.walk[2].frames[0],
-          scale: 2,
-          subtitle: 'Noise from any player draws zombies to all',
-          badge: 'ALERT',
-        },
-      ];
-
-    default:
-      return [];
-  }
-}
+/** The crosshair and the crosshair over a head, side by side. */
+export const crosshairCards: CardList = (art) => [
+  { id: 'crosshair', title: 'Not a head', sprite: art.ui.crosshair, scale: 3.5 },
+  { id: 'crosshair-head', title: 'A head', sprite: art.ui.crosshairHead, scale: 3.5 },
+];

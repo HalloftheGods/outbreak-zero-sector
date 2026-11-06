@@ -17,6 +17,7 @@ import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { alivePlayers, emit, standingPlayers } from './sim-state.ts';
 import { buildingAt, segmentHitsSolid } from './world-query.ts';
 import { backToRoaming, updateAwareness } from './zombie-senses.ts';
+import { zombieSpeed } from './zombie-status.ts';
 
 /** Beyond this the flow field drives; closer in, a clear line means walking straight at the prey. */
 const DIRECT_CHASE_RANGE = 140;
@@ -142,7 +143,7 @@ function stride(sim: SimState, z: ZombieState, dirX: number, dirY: number): void
     z.y,
     headingX + push.x * SEPARATION_WEIGHT - headingY * slip,
     headingY + push.y * SEPARATION_WEIGHT + headingX * slip,
-    z.speed,
+    zombieSpeed(z),
     TICK_DT,
     z.radius,
   );
@@ -157,7 +158,9 @@ function walkToward(sim: SimState, z: ZombieState, prey: PlayerState): void {
   let dirY = prey.y - z.y;
   const distance = Math.hypot(dirX, dirY);
   const pointBlank = distance < POINT_BLANK_RANGE && !segmentHitsSolid(sim.map, z.x, z.y, prey.x, prey.y);
-  const straightShot = pointBlank || (distance < DIRECT_CHASE_RANGE && hasClearLane(sim, z, prey));
+  // The field has no tile under a body in a part-blocked tile and would walk it back out, away from prey it can see.
+  const offTheField = distance < DIRECT_CHASE_RANGE && sim.flow.distanceAt(z.x, z.y) === Infinity && canSee(sim, z, prey);
+  const straightShot = pointBlank || offTheField || (distance < DIRECT_CHASE_RANGE && hasClearLane(sim, z, prey));
   if (!straightShot) {
     const waypoint = sim.flow.nextWaypoint(z.x, z.y, z.radius);
     if (waypoint) {
@@ -170,7 +173,7 @@ function walkToward(sim: SimState, z: ZombieState, prey: PlayerState): void {
 
 /** A dead-on heading gives per-axis sliding nothing to slide along, so step off to one side. */
 function startSidestepIfBlocked(sim: SimState, z: ZombieState, progress: number): void {
-  const blocked = progress < z.speed * TICK_DT * BLOCKED_PROGRESS;
+  const blocked = progress < zombieSpeed(z) * TICK_DT * BLOCKED_PROGRESS;
   if (!blocked || z.sidestepLeft > 0) return;
   z.sidestepLeft = SIDESTEP_SEC;
   z.sidestepSide = sim.rng() < 0.5 ? -1 : 1;
@@ -206,7 +209,7 @@ function wander(sim: SimState, z: ZombieState): void {
   const standingStill = z.wanderX === 0 && z.wanderY === 0;
   if (standingStill) return;
 
-  const speed = z.speed * ZOMBIE_WANDER_SPEED_SCALE;
+  const speed = zombieSpeed(z) * ZOMBIE_WANDER_SPEED_SCALE;
   const moved = stepMovement(sim.map, z.x, z.y, z.wanderX, z.wanderY, speed, TICK_DT, z.radius);
   const leavesHome = z.home !== null && buildingAt(sim.map, moved.x, moved.y)?.id !== z.home;
   const bumped = Math.hypot(moved.x - z.x, moved.y - z.y) < speed * TICK_DT * BLOCKED_PROGRESS;
@@ -223,8 +226,10 @@ function wander(sim: SimState, z: ZombieState): void {
 /** Heads for the latest noise; at the end of the field there is nothing left to find. */
 function investigate(sim: SimState, z: ZombieState): void {
   const waypoint = sim.noiseFlow.ready ? sim.noiseFlow.nextWaypoint(z.x, z.y, z.radius) : null;
+  // A scream earlier this tick has no field yet: listen, and walk to it next tick.
+  const fieldPending = sim.noises.length > 0;
   if (waypoint) stride(sim, z, waypoint.x - z.x, waypoint.y - z.y);
-  else backToRoaming(sim, z);
+  else if (!fieldPending) backToRoaming(sim, z);
 }
 
 function hunt(sim: SimState, z: ZombieState, prey: readonly PlayerState[], fallback: readonly PlayerState[]): void {

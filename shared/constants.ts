@@ -10,6 +10,14 @@ export const DEFAULT_SERVER_PORT = typeof __ZOMBIE_SERVER_PORT__ === 'number' ? 
 
 export const PLAYER_RADIUS = 6;
 export const PLAYER_SPEED = 84;
+/** Walking speed scaled by stance. */
+export const SNEAK_SPEED_SCALE = 0.55;
+export const SPRINT_SPEED_SCALE = 1.4;
+/** A sneaking survivor is spotted from this share of the usual sight range. */
+export const SNEAK_SIGHT_SCALE = 0.6;
+/** Sprinting footsteps carry this far, once every interval while moving. */
+export const SPRINT_NOISE_RADIUS = 110;
+export const SPRINT_NOISE_INTERVAL_SEC = 0.5;
 export const PLAYER_MAX_HEALTH = 100;
 /** Distance from the player's centre to the barrel tip, reported on shot events. */
 export const MUZZLE_OFFSET = 11;
@@ -74,7 +82,16 @@ export const ZOMBIES: Record<ZombieType, ZombieStats> = {
   runner: { radius: 5, speed: 68, health: 32, damage: 7, points: 15, reach: 5, windupSec: 0.28, cooldownSec: 0.6 },
   bloater: { radius: 9, speed: 22, health: 150, damage: 12, points: 25, reach: 6, windupSec: 0.5, cooldownSec: 1 },
   brute: { radius: 11, speed: 36, health: 520, damage: 26, points: 120, reach: 9, windupSec: 0.6, cooldownSec: 1.1 },
+  screamer: { radius: 6, speed: 32, health: 45, damage: 6, points: 30, reach: 6, windupSec: 0.4, cooldownSec: 0.8 },
 };
+
+/** A screamer that spots someone calls every zombie this close, then needs this long before it can again. */
+export const SCREAM_RADIUS = 300;
+export const SCREAM_COOLDOWN_SEC = 10;
+/** Share of roamers that are screamers from this level on, growing a little each level after. */
+export const SCREAMER_FROM_LEVEL = 3;
+export const SCREAMER_SHARE = 0.03;
+export const SCREAMER_SHARE_PER_LEVEL = 0.005;
 
 /** The attack stays in its swing pose this long after the wind-up resolves. */
 export const ZOMBIE_RECOVERY_SEC = 0.22;

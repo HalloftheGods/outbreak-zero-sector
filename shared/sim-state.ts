@@ -7,6 +7,7 @@ import type {
   GamePhase,
   PickupEntity,
   PlayerEntity,
+  Stance,
   WeaponId,
   WorldMap,
   ZombieEntity,
@@ -20,7 +21,10 @@ import type { SpatialHashGrid } from './spatial-grid.ts';
 import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
 import type { GunQuirk, PartCounts } from './gun-upgrade-data.ts';
 import type { GunFit } from './gun-upgrades.ts';
+import type { KitCounts } from './round-effect-data.ts';
 import type { BenchState, WorkbenchMode } from './workbench.ts';
+import type { ZombieStatus } from './zombie-status.ts';
+import type { Footprint } from './town-rules.ts';
 
 /** Rounds in the gun itself. Spare rounds live in PlayerEntity.ammoBag, gun or no gun. */
 export interface GunState {
@@ -30,8 +34,13 @@ export interface GunState {
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles'> {
+  bottles: number;
+  /** A throw asked for and not yet made. */
+  throwQueued: boolean;
+  throwCooldown: number;
   parts: PartCounts;
+  kits: KitCounts;
   /** Said so at the current workbench. */
   benchReady: boolean;
   /** Reconnect token, or null when nobody can come back as this player. Never sent to clients. */
@@ -69,6 +78,10 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear'> {
   searchLeft: number;
   /** Health at the last tick, so a hit shows up as a drop. */
   searchHealth: number;
+  /** Sneaking, walking or sprinting, from the held keys. */
+  stance: Stance;
+  /** Seconds until the next loud footstep while sprinting. */
+  stepNoiseLeft: number;
 }
 
 /** Unaware, walking to a noise, or after a player. */
@@ -105,13 +118,21 @@ export interface ZombieState extends ZombieEntity {
   home: string | null;
   /** Spreads sight checks over the ticks. */
   senseOffset: number;
+  /** What rounds have left on it. Absent until one does. */
+  status?: ZombieStatus;
+  /** A screamer's seconds until it can call again. Absent until it first has. */
+  screamLeft?: number;
 }
 
 export interface BulletState extends BulletEntity {
   damage: number;
   rangeLeft: number;
+  /** Which pull of the trigger fired it: pellets of one blast share it. */
+  volley?: string;
   /** The zombie whose head was under the crosshair when this was fired. */
   headTarget?: ZombieState | null;
+  /** The body a piercing round has gone through. It only does that once. */
+  passed?: ZombieState;
 }
 
 export interface PickupState extends PickupEntity {
@@ -165,6 +186,8 @@ export interface SimState {
   topUpTimer: number;
   /** Noises since the noise field last refreshed. */
   noises: Point[];
+  /** Footprints in a snowy town, oldest first. */
+  tracks: Footprint[];
   players: PlayerState[];
   /** Who left this run, by reconnect token, as they stood when they went. */
   departed: Map<string, PlayerState>;

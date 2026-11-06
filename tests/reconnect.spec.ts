@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BLEEDOUT_SEC, START_SPARE_ROUNDS, VIEWER_RANGE, WEAPONS } from '../shared/constants.ts';
 import { hurtPlayer, returnDeadPlayers } from '../shared/player-health.ts';
 import type { SimState } from '../shared/sim-state.ts';
+import { igniteZombie } from '../shared/zombie-status.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import { viewFor } from '../shared/snapshot-view.ts';
 import { addZombie, input, quietSim, steps } from './helpers/sim-harness.ts';
@@ -123,6 +124,21 @@ describe('coming back to a run', () => {
     expect(back?.lastInputSeq).toBe(1);
     expect(back?.moving).toBe(true);
     expect(back?.reload).toBe(0);
+  });
+
+  it('keeps a kill a fire lands while they are away', () => {
+    const { sim, state, b } = room();
+    const z = addZombie(state, 'walker', b.x + 400, b.y);
+    z.speed = 0;
+    z.health = 1;
+    igniteZombie(state, z, b.id);
+    const { points } = z;
+    const { score, kills } = b;
+    sim.removePlayer('b');
+    steps(sim, 30);
+    expect(z.health).toBe(0);
+    const back = sim.addPlayer('b2', 'Bea', TOKEN);
+    expect(back).toMatchObject({ score: score + points, kills: kills + 1 });
   });
 
   it('works once: a token cannot be spent twice', () => {

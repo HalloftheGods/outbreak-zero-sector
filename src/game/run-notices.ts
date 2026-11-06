@@ -12,6 +12,7 @@ import type {
 } from '../../shared/protocol.ts';
 import type { Banner, LevelCard, PlaceBanner, UiState } from './hud-state.ts';
 import { levelTitle } from './level-hud.ts';
+import { isRadioFound } from './sound-unlock.ts';
 
 const BANNER_MS = 2600;
 const PLACE_BANNER_MS = 2200;
@@ -79,6 +80,11 @@ export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   const hordeCame = event.type === 'wave_start';
   if (hordeCame) return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
   return SET_BANNERS[event.type] ?? null;
+}
+
+/** The find banner for a Radio, shown to everyone in the run, or null for anything else. */
+export function radioBanner(event: GameEvent): Omit<Banner, 'key'> | null {
+  return isRadioFound(event) ? { title: 'A RADIO', subtitle: 'SOUND TEST UNLOCKED', tone: 'hope' } : null;
 }
 
 /** Banners, place labels and the words over the player's head: timing and wording, no drawing. */

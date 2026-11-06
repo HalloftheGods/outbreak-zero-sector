@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { titleUnit } from '../src/engine/viewport.ts';
 import {
   isConfirmKey,
+  menuLabel,
+  menuOwnsKey,
   menuStep,
   recordRows,
   recordStats,
@@ -24,7 +26,13 @@ describe('title scale', () => {
 
 describe('title menu', () => {
   it('runs in the agreed order, with Play first so it is the default', () => {
-    expect(TITLE_MENU.map((item) => item.label)).toEqual(['Play', 'Levels', 'How to Play', 'Records', 'Options']);
+    expect(TITLE_MENU.map((item) => item.label)).toEqual(['Play', 'Levels', 'How to Play', 'Records', 'Sound Test', 'Options']);
+  });
+
+  it('shows the Sound Test as ??? until a Radio is found, and no other item', () => {
+    const labels = (radio: boolean) => TITLE_MENU.map((item) => menuLabel(item, { radio }));
+    expect(labels(false)).toEqual(['Play', 'Levels', 'How to Play', 'Records', '???', 'Options']);
+    expect(labels(true)).toEqual(TITLE_MENU.map((item) => item.label));
   });
 
   it('has no Co-op item, since Multiplayer is chosen inside Play', () => {
@@ -44,6 +52,12 @@ describe('title menu', () => {
     ['Enter', 0],
   ])('reads %s as a step of %i', (code, step) => {
     expect(menuStep(code)).toBe(step);
+  });
+
+  it('leaves a key alone when focus sits on a control outside the menu, such as the Install cartridge', () => {
+    expect(menuOwnsKey({ focusInMenu: false, focusOnControl: true })).toBe(false);
+    expect(menuOwnsKey({ focusInMenu: true, focusOnControl: true })).toBe(true);
+    expect(menuOwnsKey({ focusInMenu: false, focusOnControl: false })).toBe(true);
   });
 
   it('wraps at both ends', () => {

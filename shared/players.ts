@@ -1,19 +1,55 @@
 import { characterOf } from './characters.ts';
-import { PLAYER_RADIUS, PLAYER_SPEED, TICK_DT } from './constants.ts';
+import {
+  PLAYER_RADIUS,
+  PLAYER_SPEED,
+  SNEAK_SPEED_SCALE,
+  SPRINT_NOISE_INTERVAL_SEC,
+  SPRINT_NOISE_RADIUS,
+  SPRINT_SPEED_SCALE,
+  TICK_DT,
+} from './constants.ts';
 import { stopSearch, updateSearch } from './container-search.ts';
 import { updateMelee } from './melee.ts';
 import { stepMovement } from './movement.ts';
 import { useMedkit } from './player-health.ts';
-import type { ClientInputPacket } from './protocol.ts';
+import { updateThrow } from './bottles.ts';
+import type { ClientInputPacket, Stance } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { updateWeapons } from './weapons.ts';
 import { buildingAt } from './world-query.ts';
+import { leaveFootprint } from './snow-tracks.ts';
+import { groundSpeedScale } from './town-rules.ts';
+import { makeNoise } from './zombie-senses.ts';
 
 const FULL_TURN = Math.PI * 2;
 
+const STANCE_SPEED: Record<Stance, number> = { walk: 1, sneak: SNEAK_SPEED_SCALE, sprint: SPRINT_SPEED_SCALE };
+
 /** Shared with the client, whose prediction has to walk at the speed the sim does. */
-export function playerSpeed(skin: number): number {
-  return PLAYER_SPEED * characterOf(skin).moveSpeed;
+export function playerSpeed(skin: number, stance: Stance = 'walk'): number {
+  return PLAYER_SPEED * characterOf(skin).moveSpeed * STANCE_SPEED[stance];
+}
+
+/** Sneak wins over sprint, so holding both is the quiet choice. */
+export function stanceOf(input: Pick<ClientInputPacket, 'sneak' | 'sprint'>): Stance {
+  const sneaking = input.sneak === true;
+  const sprinting = input.sprint === true;
+  if (sneaking) return 'sneak';
+  return sprinting ? 'sprint' : 'walk';
+}
+
+/** A sprinter's feet are heard every so often; anyone else moves silently. */
+function footsteps(sim: SimState, p: PlayerState): void {
+  const loud = p.moving && p.stance === 'sprint';
+  if (!loud) {
+    p.stepNoiseLeft = 0;
+    return;
+  }
+  p.stepNoiseLeft -= TICK_DT;
+  const stepDue = p.stepNoiseLeft <= 0;
+  if (!stepDue) return;
+  p.stepNoiseLeft = SPRINT_NOISE_INTERVAL_SEC;
+  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS);
 }
 
 /** Stores the newest input. One-shot requests latch until a tick consumes them. */
@@ -37,7 +73,9 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   if (input.reload === true) p.reloadQueued = true;
   if (input.melee === true) p.meleeQueued = true;
   if (input.heal === true) p.healQueued = true;
+  p.throwQueued ||= input.throw === true;
   p.searchHeld = input.search === true;
+  p.stance = stanceOf(input);
   if (input.weapon) p.weaponQueued = input.weapon;
 }
 
@@ -51,6 +89,7 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
     p.meleeQueued = false;
     p.healQueued = false;
     p.shootQueued = false;
+    p.throwQueued = false;
     stopSearch(p);
     return;
   }
@@ -58,13 +97,17 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   const dirY = Number(p.down) - Number(p.up);
   p.moving = dirX !== 0 || dirY !== 0;
   if (p.moving) {
-    const moved = stepMovement(sim.map, p.x, p.y, dirX, dirY, playerSpeed(p.skin), TICK_DT, PLAYER_RADIUS);
+    const speed = playerSpeed(p.skin, p.stance) * groundSpeedScale(sim.level, sim.map, p.x, p.y);
+    const moved = stepMovement(sim.map, p.x, p.y, dirX, dirY, speed, TICK_DT, PLAYER_RADIUS);
     p.x = moved.x;
     p.y = moved.y;
   }
+  footsteps(sim, p);
   p.indoors = buildingAt(sim.map, p.x, p.y)?.id ?? null;
+  leaveFootprint(sim, p);
   updateWeapons(sim, p);
   updateMelee(sim, p);
   useMedkit(sim, p);
+  updateThrow(sim, p);
   updateSearch(sim, p);
 }

@@ -5,11 +5,11 @@ import type { WeaponId } from '../../shared/protocol.ts';
 import type { SurvivorArt, SurvivorWeaponArt } from './types.ts';
 import type { DrawnDir } from './kit.ts';
 import { ANCHOR_X, ANCHOR_Y } from './survivors/cell.ts';
-import { weaponClips } from './survivors/clips.ts';
+import { idleClips, weaponClips } from './survivors/clips.ts';
 import { deadClip, downedClip } from './survivors/fallen.ts';
 import { KHRONUS8 } from './survivors/khronus8.ts';
 import { NIGHT } from './survivors/night.ts';
-import { portraitOf } from './survivors/portrait.ts';
+import { portraitOf, portraitsOf } from './survivors/portrait.ts';
 import { REX } from './survivors/rex.ts';
 import { bodyDrop } from './survivors/rig.ts';
 import type { Person } from './survivors/rig.ts';
@@ -65,6 +65,7 @@ function art(person: Person): SurvivorArt {
     downed: downedClip(person),
     dead: deadClip(person),
     portrait: portraitOf(person),
+    portraits: portraitsOf(person, idleClips(person, 'pistol')),
     gunDrop: bodyDrop(person),
   };
 }

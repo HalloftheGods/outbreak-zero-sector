@@ -1,3 +1,4 @@
+import { townContainers } from '../../shared/containers.ts';
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
@@ -67,7 +68,8 @@ export const TOWN_LEGEND: readonly (readonly [string, string])[] = [
 const EDGE_COLOR = '#0b0c10';
 const DISTRICT_COLOR = '#938d7a';
 const LABEL_COLOR = '#e4dcc3';
-const TICK_COLOR = '#b6e04a';
+export const TICK_COLOR = '#b6e04a';
+export const CROSS_COLOR = '#e0463a';
 const SELF_COLOR = '#ffffff';
 const TEAM_COLOR = '#e8a33d';
 const DOWNED_COLOR = '#e0463a';
@@ -104,6 +106,38 @@ function footprint(building: BuildingInstance): LabelBox {
   const x0 = Math.round(building.x / WORLD_PER_PX);
   const y0 = Math.round(building.y / WORLD_PER_PX);
   return { x0, y0, x1: x0 + Math.round(w / WORLD_PER_PX), y1: y0 + Math.round(h / WORLD_PER_PX) };
+}
+
+function drawPixelLine(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  color: string,
+): void {
+  ctx.fillStyle = color;
+  let cx = x0;
+  let cy = y0;
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  while (true) {
+    ctx.fillRect(cx, cy, 1, 1);
+    if (cx === x1 && cy === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      cx += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      cy += sy;
+    }
+  }
 }
 
 function paintBuildings(ctx: CanvasRenderingContext2D, map: WorldMap): void {
@@ -146,6 +180,8 @@ export class TownMapView {
   private readonly map: WorldMap;
   private readonly base: HTMLCanvasElement;
   private readonly visited = new Set<string>();
+  private readonly opened = new Set<number>();
+  private readonly buildingContainers = new Map<string, number[]>();
 
   constructor(map: WorldMap) {
     this.map = map;
@@ -154,6 +190,15 @@ export class TownMapView {
     this.base = document.createElement('canvas');
     this.base.width = this.width;
     this.base.height = this.height;
+    for (const container of townContainers(map)) {
+      if (!container.building) continue;
+      const list = this.buildingContainers.get(container.building);
+      if (list) {
+        list.push(container.id);
+      } else {
+        this.buildingContainers.set(container.building, [container.id]);
+      }
+    }
     this.paintBase();
   }
 
@@ -185,6 +230,27 @@ export class TownMapView {
     return this.visited.has(id);
   }
 
+  markOpened(id: number): void {
+    this.opened.add(id);
+  }
+
+  syncOpened(ids: readonly number[]): void {
+    for (const id of ids) this.opened.add(id);
+  }
+
+  clearOpened(): void {
+    this.opened.clear();
+  }
+
+  isCleared(id: string): boolean {
+    const beenInside = this.visited.has(id);
+    if (!beenInside) return false;
+    const containers = this.buildingContainers.get(id);
+    const hasContainers = containers !== undefined && containers.length > 0;
+    if (!hasContainers) return false;
+    return containers.every((containerId) => this.opened.has(containerId));
+  }
+
   building(id: string): BuildingInstance | null {
     return this.map.buildings.find((building) => building.id === id) ?? null;
   }
@@ -197,6 +263,26 @@ export class TownMapView {
     ctx.fillRect(x - 1, y - 1, 7, 6);
     ctx.fillStyle = TICK_COLOR;
     for (const [dx, dy] of TICK_PIXELS) ctx.fillRect(x + dx, y + dy, 1, 1);
+  }
+
+  private drawCross(ctx: CanvasRenderingContext2D, building: BuildingInstance): void {
+    const box = footprint(building);
+    const left = box.x0;
+    const right = box.x1 - 1;
+    const top = box.y0;
+    const bottom = box.y1 - 1;
+    const seed = (Math.round(building.x) ^ Math.round(building.y)) & 1;
+
+    drawPixelLine(ctx, left, top + 1, right, bottom + 1, EDGE_COLOR);
+    drawPixelLine(ctx, right, top + 1, left, bottom + 1, EDGE_COLOR);
+
+    drawPixelLine(ctx, left - seed, top, right + seed, bottom, CROSS_COLOR);
+    drawPixelLine(ctx, right + seed, top, left - seed, bottom, CROSS_COLOR);
+
+    const midX = Math.round((left + right) / 2);
+    const midY = Math.round((top + bottom) / 2);
+    ctx.fillStyle = CROSS_COLOR;
+    ctx.fillRect(midX, midY, 2, 2);
   }
 
   private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerEntity, isLocal: boolean): void {
@@ -222,11 +308,20 @@ export class TownMapView {
     drawOutlinedText(ctx, 'VAN', x, y - 4 - FONT_HEIGHT, EXIT_COLOR);
   }
 
-  paint(ctx: CanvasRenderingContext2D, players: readonly PlayerEntity[], localId: EntityId | null, exit: ExitEntity | null = null): void {
+  paint(
+    ctx: CanvasRenderingContext2D,
+    players: readonly PlayerEntity[],
+    localId: EntityId | null,
+    exit: ExitEntity | null = null,
+    openedContainers: readonly number[] = [],
+  ): void {
+    if (openedContainers.length > 0) this.syncOpened(openedContainers);
     ctx.drawImage(this.base, 0, 0);
     for (const id of this.visited) {
       const building = this.building(id);
-      if (building) this.drawTick(ctx, building);
+      if (!building) continue;
+      if (this.isCleared(id)) this.drawCross(ctx, building);
+      this.drawTick(ctx, building);
     }
     if (exit) this.drawExit(ctx, exit);
     for (const player of players) {

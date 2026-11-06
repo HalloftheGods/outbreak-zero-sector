@@ -1,6 +1,9 @@
 import {
   POPULATION_TOPUP_SEC,
   ROAMER_MIX,
+  SCREAMER_FROM_LEVEL,
+  SCREAMER_SHARE,
+  SCREAMER_SHARE_PER_LEVEL,
   SPAWN_SAFE_RADIUS,
   TICK_DT,
   TOPUP_MIN_DISTANCE,
@@ -27,6 +30,12 @@ const BRUTE_SHARE = 0.03;
 /** Places worth raiding start with something in the way. */
 const GUARDS: Partial<Record<BuildingKind, number>> = { police: 4, gun_shop: 3, clinic: 2, pharmacy: 2 };
 
+/** Share of a level's roamers that are screamers. */
+export function screamerShare(level: number): number {
+  const early = level < SCREAMER_FROM_LEVEL;
+  return early ? 0 : SCREAMER_SHARE + SCREAMER_SHARE_PER_LEVEL * (level - SCREAMER_FROM_LEVEL);
+}
+
 function rollType(sim: SimState): ZombieType {
   const { mix } = levelDef(sim.level);
   const roll = sim.rng();
@@ -35,7 +44,11 @@ function rollType(sim: SimState): ZombieType {
   if (roll < bloatersEnd) return 'bloater';
   if (roll < runnersEnd) return 'runner';
   const bruteShare = mix.brute + (sim.wave >= BRUTE_FROM_WAVE ? BRUTE_SHARE : 0);
-  return roll < runnersEnd + bruteShare ? 'brute' : 'walker';
+  const brutesEnd = runnersEnd + bruteShare;
+  const screamersEnd = brutesEnd + screamerShare(sim.level);
+  const bruteRolled = roll < brutesEnd;
+  if (bruteRolled) return 'brute';
+  return roll < screamersEnd ? 'screamer' : 'walker';
 }
 
 const clearFor = (sim: SimState, type: ZombieType, spot: Point): boolean =>

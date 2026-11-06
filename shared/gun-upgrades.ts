@@ -3,22 +3,29 @@ import type { WeaponStats } from './constants.ts';
 import { GUN_POWER_CAP, GUN_QUIRKS, GUN_SLOTS, PART_CARRY_CAP, PART_ORDER, UPGRADES } from './gun-upgrade-data.ts';
 import type { GunQuirk, GunUpgrade, PartCounts, PartId, QuirkDef } from './gun-upgrade-data.ts';
 import type { PickupType, WeaponId } from './protocol.ts';
+import { EFFECT_ORDER, GUN_EFFECTS } from './round-effect-data.ts';
+import type { EffectDef, GunEffect, KitCounts } from './round-effect-data.ts';
 import type { PickupState, PlayerState } from './sim-state.ts';
 
 /** What has been done to one gun. Replaced whole, so a snapshot can hold on to it. */
 export interface GunFit {
   readonly ranks: Readonly<Partial<Record<GunUpgrade, number>>>;
   readonly quirk: GunQuirk | null;
+  /** What its rounds do, apart from its slots. Left off for plain rounds. */
+  readonly effect?: GunEffect;
 }
 
 /** A player's parts and work, for snapshots. A gun with no entry is stock. */
 export interface PlayerGear {
   readonly parts: Readonly<PartCounts>;
   readonly fits: Readonly<Partial<Record<WeaponId, GunFit>>>;
+  /** Round kits carried, by the effect each fits. Left off with none. */
+  readonly kits?: Readonly<KitCounts>;
 }
 
-const STOCK_FIT: GunFit = { ranks: {}, quirk: null };
+export const STOCK_FIT: GunFit = { ranks: {}, quirk: null };
 const NO_QUIRK: QuirkDef = { label: '', note: '' };
+const NO_EFFECT: Pick<EffectDef, 'damage' | 'power'> = { power: 0 };
 
 export const noParts = (): PartCounts => ({ barrel: 0, grip: 0, magazine: 0, suppressor: 0, toolkit: 0 });
 
@@ -26,22 +33,26 @@ export const isPartPickup = (type: PickupType): type is PartId => PART_ORDER.inc
 
 export const rankOf = (fit: GunFit | undefined, upgrade: GunUpgrade): number => fit?.ranks[upgrade] ?? 0;
 
+export const effectOf = (fit: GunFit | undefined): GunEffect | null => fit?.effect ?? null;
+
 export function slotsUsed(fit: GunFit | undefined): number {
   return Object.values(fit?.ranks ?? {}).reduce((sum, rank) => sum + rank, 0);
 }
 
-/** The stats a gun fires with: stock, then its quirk and upgrades, held under the power cap. */
+/** The stats a gun fires with: stock, then its quirk, upgrades and effect, held under the power cap with the effect counted in. */
 export function gunStats(weapon: WeaponId, fit: GunFit | undefined): WeaponStats {
   const stock = WEAPONS[weapon];
   if (!fit) return stock;
   const quirk = fit.quirk ? GUN_QUIRKS[fit.quirk] : NO_QUIRK;
+  const effect = fit.effect ? GUN_EFFECTS[fit.effect] : NO_EFFECT;
   const gain = (upgrade: GunUpgrade): number => rankOf(fit, upgrade) * UPGRADES[upgrade].gain;
-  const damage = stock.damage * (1 + gain('damage')) * (quirk.damage ?? 1);
+  const damage = stock.damage * (1 + gain('damage')) * (quirk.damage ?? 1) * (effect.damage ?? 1);
   const fireIntervalMs = (stock.fireIntervalMs * (quirk.fireInterval ?? 1)) / (1 + gain('fireRate'));
   const power = (damage / stock.damage) * (stock.fireIntervalMs / fireIntervalMs);
+  const cap = GUN_POWER_CAP / (1 + effect.power);
   return {
     ...stock,
-    damage: power > GUN_POWER_CAP ? (damage * GUN_POWER_CAP) / power : damage,
+    damage: power > cap ? (damage * cap) / power : damage,
     fireIntervalMs,
     magSize: Math.max(1, Math.round(stock.magSize * (1 + gain('magazine')) * (quirk.magSize ?? 1))),
     reloadMs: stock.reloadMs * (1 - gain('reload')) * (quirk.reload ?? 1),
@@ -76,8 +87,8 @@ export function canMove(
 }
 
 function withRank(fit: GunFit | undefined, upgrade: GunUpgrade, change: number): GunFit {
-  const { ranks, quirk } = fit ?? STOCK_FIT;
-  return { quirk, ranks: { ...ranks, [upgrade]: rankOf(fit, upgrade) + change } };
+  const base = fit ?? STOCK_FIT;
+  return { ...base, ranks: { ...base.ranks, [upgrade]: rankOf(fit, upgrade) + change } };
 }
 
 /** A magazine that shrank hands its extra rounds back to the bag. */
@@ -124,11 +135,12 @@ export function foundGunFit(item: PickupState): GunFit | undefined {
   return item.quirk ? { ranks: {}, quirk: item.quirk } : undefined;
 }
 
-/** The field for a player's snapshot, left off for someone with no parts and only stock guns. */
+/** The field for a player's snapshot, left off for someone with no parts or kits and only stock guns. */
 export function gearField(p: PlayerState): { gear?: PlayerGear } {
   const worked = Object.entries(p.guns).filter(([, gun]) => gun.fit);
-  const hasGear = worked.length > 0 || PART_ORDER.some((part) => p.parts[part] > 0);
+  const hasKits = EFFECT_ORDER.some((effect) => p.kits[effect] > 0);
+  const hasGear = worked.length > 0 || hasKits || PART_ORDER.some((part) => p.parts[part] > 0);
   if (!hasGear) return {};
   const fits = Object.fromEntries(worked.map(([weapon, gun]) => [weapon, gun.fit]));
-  return { gear: { parts: { ...p.parts }, fits } };
+  return { gear: { parts: { ...p.parts }, fits, ...(hasKits ? { kits: { ...p.kits } } : {}) } };
 }

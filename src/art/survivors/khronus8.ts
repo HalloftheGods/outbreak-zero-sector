@@ -1,35 +1,35 @@
-// Skin 1, Khronus8: an older teen headed for the Marines. Recruit haircut, olive tee with
-// pack straps and dog tags, coyote trousers, boots and a daypack. The tallest of the cast.
+// Skin 1, Khronus8: an older teen about to join the Marines. A plain red shirt tucked into
+// olive recruit trousers, a dark belt and boots, dog tags on a chain and a high and tight
+// haircut with the sides faded to skin. No insignia, logos or text. The tallest of the cast.
 
 import { RAMPS } from '../palette.ts';
 import type { Person } from './rig.ts';
 
-const { ink, metal, olive, skin, wood } = RAMPS;
+const { blood, ink, metal, olive, skin, wood } = RAMPS;
 
 const legend = {
   k: ink[0], K: ink[1],
   a: skin[0], b: skin[1], c: skin[2], d: skin[3],
   h: wood[0], i: wood[1],
-  t: olive[0], u: olive[1], v: olive[2],
+  t: blood[1], u: blood[2], v: blood[3],
   w: ink[1], s: metal[3], S: metal[2],
-  B: wood[1], C: wood[2],
-  r: wood[3], q: wood[2], p: wood[1], R: wood[3], Q: wood[2], P: wood[1],
+  r: olive[2], q: olive[1], p: olive[0], R: olive[2], Q: olive[1], P: olive[0],
   e: ink[1], f: wood[0], g: wood[1],
 };
 
 export const KHRONUS8: Person = {
   legend,
   spread: 0,
-  farLegend: { ...legend, r: wood[2], q: wood[1], p: wood[0], R: wood[2], Q: wood[1], P: wood[0], g: wood[0], f: ink[1], e: ink[0] },
-  sleeve: [olive[0], olive[1], olive[2]],
+  farLegend: { ...legend, r: olive[1], q: olive[0], p: ink[1], R: olive[1], Q: olive[0], P: ink[1], g: wood[0], f: ink[1], e: ink[0] },
+  sleeve: [blood[1], blood[2], blood[3]],
   cuff: [skin[1], skin[2], skin[3]],
   hand: [skin[1], skin[2], skin[3]],
   heads: {
     0: { dx: 1, rows: [
       '...hiiih..',
       '..hiiiiih.',
-      '.hhiiiiiih',
-      '.hhhcdddcc',
+      '.bhiiiiiih',
+      '.bbhcdddcc',
       '.bhcccdkdc',
       '.bbccccccc',
       '..bbcccbcc',
@@ -39,8 +39,8 @@ export const KHRONUS8: Person = {
     1: { rows: [
       '...hiiiih.',
       '..hiiiiiih',
-      '.hhiiiiiih',
-      '.hhcdddcdc',
+      '.bhiiiiiih',
+      '.bbcdddcdc',
       '.bbcdkdcdk',
       '.bccccccdc',
       '.abcccbccb',
@@ -50,8 +50,8 @@ export const KHRONUS8: Person = {
     2: { rows: [
       '...hiiih..',
       '..hiiiiih.',
-      '.hhiiiiihh',
-      '.bhcddddhb',
+      '.bhiiiiihb',
+      '.bbcddddbb',
       '.bcddddcbb',
       '.bckdcdkba',
       '.bcccccbba',
@@ -61,10 +61,10 @@ export const KHRONUS8: Person = {
     6: { rows: [
       '...hiiih..',
       '..hiiiiih.',
-      '.hhiiiiihh',
-      '.hhhiiihhh',
-      '.bhhhhhhhb',
+      '.bhiiiiihb',
+      '.bbhiiihbb',
       '.bbhhhhhbb',
+      '.bbbhhhbbb',
       '.abbbbbbba',
       '..abbbbba.',
       '...abbba..',
@@ -72,77 +72,48 @@ export const KHRONUS8: Person = {
     7: { rows: [
       '...hiiiih.',
       '..hiiiiiih',
-      '.hhiiiiihh',
-      '.hhhiiihhc',
-      '.bhhhhhhcc',
-      '.bbhhhhccc',
+      '.bhiiiiihb',
+      '.bbhiiihbc',
+      '.bbhhhhhcc',
+      '.bbbhhhccc',
       '.abbbbbccb',
       '..abbbbcb.',
       '...abbbb..',
     ] },
   },
-  packs: {
-    0: { dx: -6, dy: -1, rows: [
-      'CB..',
-      'CBvu',
-      'BBvu',
-      '.vuu',
-      '.vuu',
-      '.uut',
-      '.ttt',
-    ] },
-    6: { dy: -1, rows: [
-      'CCCCCCCCCB',
-      'BBBBBBBBBh',
-      '.vuuuuuut.',
-      '.vuuuuuut.',
-      '.uuttttut.',
-      '.uuuuuutt.',
-      '.tttttttt.',
-    ] },
-    7: { dx: -1, dy: -1, rows: [
-      'CCCCCCCCCB',
-      'BBBBBBBBBh',
-      '.vuuuuuut.',
-      '.vuuuuuut.',
-      '.uuttttut.',
-      '.uuuuuutt.',
-      '.tttttttt.',
-    ] },
-  },
   torsos: {
     0: { rows: [
       '...vuuuu..',
-      '..vvuwuut.',
-      '.vvuuwuuut',
-      '.vuuuwuuut',
-      '.vuuuwuuut',
+      '..vvuuuut.',
+      '.vvuuuuuut',
+      '.vuuuuuuut',
+      '.vuuuuuuut',
       '.uuuuuuutt',
       '.uuuuuuutt',
       '.uuuuuuttt',
-      '..hiiiihh.',
+      '..wwwwwww.',
     ] },
     1: { rows: [
       '...vvuuuu..',
-      '.vvvwuuuwuu',
-      'vvuuwuSuwut',
-      'vuuuwusuwut',
-      'vuuuwuuuwut',
+      '.vvvSuuuSuu',
+      'vvuuuSuSuut',
+      'vuuuuuSuuut',
+      'vuuuuusuuut',
       'uuuuuuuutut',
       'uuuuuuuutut',
       'uuuuuuuttut',
-      '.hiiiiiiih.',
+      '.wwwwwwwww.',
     ] },
     2: { rows: [
       '...vuuuuuu..',
-      '.vvuwuuuwuu.',
-      'vvuuwuSuwuut',
-      'vuuuwusuwutt',
-      'vuuuwuuuwutt',
+      '.vvuSuuuSuu.',
+      'vvuuuSuSuuut',
+      'vuuuuuSuuutt',
+      'vuuuuusuuutt',
       'uuuuuuuuuutt',
       'uuuuuuuuuttt',
       'uuuuuuuuuttt',
-      '.hiiiiiiiih.',
+      '.wwwwwwwwww.',
     ] },
     6: { rows: [
       '...vuuuuuu..',
@@ -153,7 +124,7 @@ export const KHRONUS8: Person = {
       'vuuuuuuuuutt',
       'uuuuuuuuuutt',
       'uuuuuuuuuttt',
-      '.hiiiiiiiih.',
+      '.wwwwwwwwww.',
     ] },
     7: { rows: [
       '...vuuuuu..',
@@ -164,7 +135,7 @@ export const KHRONUS8: Person = {
       'vuuuuuuuutt',
       'uuuuuuuuttt',
       'uuuuuuuuttt',
-      '.hiiiiiiih.',
+      '.wwwwwwwww.',
     ] },
   },
 };

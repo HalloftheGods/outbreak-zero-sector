@@ -17,7 +17,7 @@ import type { RunResult, UiState } from './hud-state.ts';
 import { loadCharacter } from './character-pref.ts';
 import { loadDifficulty } from './difficulty-pref.ts';
 import { InputManager } from './input-manager.ts';
-import { continueLevel, loadLevelProgress, recordGameFinished, recordLevelReached } from './level-progress.ts';
+import { continueLevel, loadLevelProgress, recordGameFinished, recordLevelReached, soloStartLevel } from './level-progress.ts';
 import { InputSender } from './input-sender.ts';
 import { tickRunAudio } from './run-audio.ts';
 import { deathFade, finishRun, healthFraction, NO_RUN_UI, RunHud } from './run-hud.ts';
@@ -50,7 +50,7 @@ export class GameController {
 
   /** The touch buttons press through this. */
   readonly input: InputManager;
-  private readonly audio = new AudioEngine();
+  readonly audio = new AudioEngine();
   private readonly inputs: InputSender;
   private readonly runHud: RunHud;
   private readonly stage: RunStage;
@@ -231,9 +231,9 @@ export class GameController {
     this.beginSession(new LocalSession(), fromLevel);
   }
 
-  /** Solo from the furthest level reached. Does nothing until a level past the first has been reached. */
-  continueSolo(): void {
-    const level = continueLevel(loadLevelProgress());
+  /** Solo from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
+  continueSolo(chosen?: number): void {
+    const level = soloStartLevel(chosen, loadLevelProgress());
     if (level !== null) this.startSolo(level);
   }
 
@@ -472,6 +472,7 @@ export class GameController {
     }
     const aim = this.aim;
     const delay = transport?.interpolationDelayMs ?? 0;
+    world.setStance(menuUp ? 'walk' : this.input.stance);
     const entities = world.advance(ms, delay, dirX, dirY, aim, dt);
     if (!entities) return;
 

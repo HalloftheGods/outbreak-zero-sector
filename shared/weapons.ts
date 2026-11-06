@@ -1,6 +1,6 @@
 import { characterOf } from './characters.ts';
 import { DRY_FIRE_INTERVAL_SEC, MUZZLE_OFFSET, TICK_DT, WEAPON_SWITCH_DELAY_SEC } from './constants.ts';
-import { heldStats, rankOf } from './gun-upgrades.ts';
+import { effectOf, heldStats, rankOf } from './gun-upgrades.ts';
 import { headUnderAim } from './headshots.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit, entityId } from './sim-state.ts';
@@ -65,8 +65,11 @@ function advanceReload(sim: SimState, p: PlayerState): void {
 
 function fire(sim: SimState, p: PlayerState): void {
   const stats = heldStats(p);
+  const effect = effectOf(p.guns[p.weapon]?.fit);
+  const carried = effect ? { effect } : {};
   // Pellets scatter past the crosshair, so a spread gun never claims a head.
   const headTarget = stats.pellets === 1 ? headUnderAim(sim, p, stats.range) : null;
+  const volley = entityId(sim, 'v');
   for (let i = 0; i < stats.pellets; i++) {
     const angle = p.angle + (sim.rng() * 2 - 1) * stats.spreadRad;
     // Bullets leave from the body centre so the first sweep covers what is touching the player.
@@ -80,6 +83,8 @@ function fire(sim: SimState, p: PlayerState): void {
       damage: stats.damage,
       rangeLeft: stats.range,
       headTarget,
+      volley,
+      ...carried,
     });
   }
   emit(sim, {
@@ -90,6 +95,7 @@ function fire(sim: SimState, p: PlayerState): void {
     y: p.y + Math.sin(p.angle) * MUZZLE_OFFSET,
     angle: p.angle,
     suppressed: rankOf(p.guns[p.weapon]?.fit, 'suppressor') > 0,
+    ...carried,
   });
   makeNoise(sim, p.x, p.y, stats.noiseRadius);
 }

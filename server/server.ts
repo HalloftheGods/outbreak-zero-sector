@@ -134,7 +134,7 @@ export function startGameServer(options: GameServerOptions): Promise<RunningGame
     sim.addPlayer(id, name, token, character);
     client.playerId = id;
     clearTimeout(client.joinDeadline);
-    send(client, { type: 'welcome', yourId: id, tickRate: TICK_RATE, mapSeed: sim.map.seed });
+    send(client, { type: 'welcome', yourId: id, tickRate: TICK_RATE, mapSeed: sim.map.seed, difficulty: sim.difficulty });
     stale?.socket.terminate();
     startTicking();
   }

@@ -5,7 +5,9 @@ import type { WorldRenderer } from '../engine/world-renderer.ts';
 import type { ClientWorld } from './client-world.ts';
 import { buildHud } from './hud-state.ts';
 import type { RunResult, UiState } from './hud-state.ts';
-import { hordeBanner, isLandmark, RunNotices } from './run-notices.ts';
+import { hordeBanner, isLandmark, radioBanner, RunNotices } from './run-notices.ts';
+import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
+import { isRadioFound, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
 import { TownMapView } from './town-map.ts';
 
@@ -83,6 +85,7 @@ export class RunHud {
   reset(): void {
     this.notices.reset();
     this.town?.clearVisited();
+    this.town?.clearOpened();
   }
 
   /** The map screen hands over its canvas when it opens, and null when it closes. */
@@ -101,11 +104,13 @@ export class RunHud {
     const ctx = this.townCanvas?.getContext('2d') ?? null;
     const scene = this.lastScene;
     const canPaint = ctx !== null && scene !== null;
-    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit);
+    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers);
   }
 
   onEvent(event: GameEvent, now: number): void {
-    const banner = hordeBanner(event);
+    tapGameEvent(event);
+    if (isRadioFound(event)) recordRadioFound();
+    const banner = hordeBanner(event) ?? radioBanner(event);
     if (banner) this.publish({ banner: this.notices.banner(banner, now) });
   }
 
@@ -140,6 +145,7 @@ export class RunHud {
     const local = world.localPlayer;
     const hasRun = snapshot !== null && local !== null;
     if (!hasRun) return;
+    tapLocalPlayer(local.id);
     const viewer = scene.viewerId === local.id ? null : scene.players.find((player) => player.id === scene.viewerId);
     this.publish({
       hud: buildHud(snapshot, local, viewer?.name ?? null),

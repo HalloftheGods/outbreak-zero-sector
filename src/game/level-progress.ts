@@ -1,5 +1,5 @@
 /** How far the player has got, kept apart from the best run so old saves load untouched. */
-import { FINAL_LEVEL, FIRST_LEVEL } from '../../shared/levels.ts';
+import { FINAL_LEVEL, FIRST_LEVEL, LEVELS } from '../../shared/levels.ts';
 
 const PROGRESS_KEY = 'outbreak.level-progress';
 
@@ -72,3 +72,16 @@ export function continueLevel(progress: LevelProgress): number | null {
 }
 
 export const isLevelUnlocked = (level: number, progress: LevelProgress): boolean => level <= progress.highest;
+
+/** The level a run should start at, or null when it is a normal new run: level 1, unknown, or not unlocked (a stale or edited value cannot skip ahead). */
+export function chosenStartLevel(level: number, progress: LevelProgress): number | null {
+  const isWhole = Number.isInteger(level);
+  const isLater = level > FIRST_LEVEL;
+  const isAllowed = isWhole && isLater && isLevelUnlocked(level, progress);
+  return isAllowed && LEVELS.some((entry) => entry.number === level) ? level : null;
+}
+
+/** A chosen level when there is one, otherwise the furthest reached (null while that is still the first). */
+export function soloStartLevel(chosen: number | undefined, progress: LevelProgress): number | null {
+  return chosen === undefined ? continueLevel(progress) : chosenStartLevel(chosen, progress);
+}

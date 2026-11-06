@@ -28,6 +28,8 @@ export class Soundtrack {
   private scene: Scene = 'menu';
   private level = 1;
   private current: Track | null = null;
+  /** Set while the Sound Test is playing one track on its own. */
+  private auditionEnd: (() => void) | null = null;
   private readonly listening = new AbortController();
 
   constructor(
@@ -48,7 +50,41 @@ export class Soundtrack {
     this.retune();
   }
 
+  /** Steps the scene's music aside, so the Sound Test starts quiet and plays only what is chosen. */
+  hush(): void {
+    this.auditionEnd ??= () => undefined;
+    this.fadeOut(this.current);
+    this.current = null;
+  }
+
+  /** Plays one file by itself, in place of any other. onEnd runs if it plays out. */
+  audition(file: string, onEnd: () => void): void {
+    this.hush();
+    this.auditionEnd = onEnd;
+    const track = this.trackFor(file);
+    track.element.currentTime = 0;
+    this.current = track;
+    this.start(track);
+  }
+
+  /** Stops what is auditioning and stays quiet. */
+  silence(): void {
+    if (this.auditionEnd) this.auditionEnd = () => undefined;
+    this.hush();
+  }
+
+  /** Ends the Sound Test's hold and brings the scene's music back. */
+  stopAudition(): void {
+    if (!this.auditionEnd) return;
+    this.auditionEnd = null;
+    this.fadeOut(this.current);
+    this.current = null;
+    this.playlist = null;
+    this.retune();
+  }
+
   private retune(): void {
+    if (this.auditionEnd) return;
     const playlist = playlistFor(this.scene, this.level);
     const unchanged = playlist === this.playlist;
     if (unchanged) return;
@@ -72,6 +108,7 @@ export class Soundtrack {
     }
     this.tracks.clear();
     this.current = null;
+    this.auditionEnd = null;
     this.playlist = null;
   }
 
@@ -108,6 +145,12 @@ export class Soundtrack {
   private onEnded(track: Track): void {
     const stillOurs = track === this.current;
     if (!stillOurs) return;
+    const playedOut = this.auditionEnd;
+    if (playedOut) {
+      this.silence();
+      playedOut();
+      return;
+    }
     track.element.currentTime = 0;
     this.playNext();
   }

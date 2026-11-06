@@ -14,9 +14,11 @@ import { settleContainerAmmo, stockContainers, stockEmptyHomes } from './contain
 import type { Point } from './flow-field.ts';
 import { difficultyDef, scaleRounds } from './difficulty.ts';
 import type { DifficultyId } from './difficulty.ts';
+import { placeTownKits } from './kit-loot.ts';
 import { levelDef } from './levels.ts';
 import { placeTownParts } from './part-loot.ts';
 import { isAmmoPickup, spawnPickup } from './pickups.ts';
+import { placeRadio } from './radio.ts';
 import { BUILDING_DEFS, TILE_SIZE } from './protocol.ts';
 import type { BuildingInstance, BuildingKind, PickupType, WeaponId, WorldMap } from './protocol.ts';
 import { pickWeighted, randInt, shuffle } from './rng.ts';
@@ -189,7 +191,9 @@ export function placeTownLoot(sim: SimState): void {
   const onFloors = settleFloorAmmo(sim, budget * AMMO_FLOOR_SHARE);
   settleContainerAmmo(sim, budget - onFloors, damageOf);
   stockEmptyHomes(sim);
+  placeRadio(sim);
   placeTownParts(sim, (building) => lootSpots(sim.map, building));
+  placeTownKits(sim, (building) => lootSpots(sim.map, building));
 }
 
 function gunsMissing(sim: SimState): Set<string> {

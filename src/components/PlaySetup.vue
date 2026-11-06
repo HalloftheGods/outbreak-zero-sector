@@ -58,6 +58,8 @@
       </div>
 
       <DifficultyPicker />
+      <p v-if="startLine" class="px-label setup-start-at">{{ startLine }}</p>
+      <p v-if="coopNote" class="px-label setup-start-at">{{ coopNote }}</p>
       <p v-if="failure" class="px-error" role="alert">{{ failure }}</p>
     </template>
 
@@ -76,10 +78,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
+import { trackTitlePage } from '../game/analytics/index.ts';
 import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { buildInviteLink } from '../game/invite-link.ts';
-import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
+import { chosenStartLevel, continueLevel, isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
+import { COOP_LEVEL_NOTE, startAtLabel } from '../game/level-select.ts';
 import { advance, chooseMode, PLAY_JOIN, PLAY_START, playHeading, retreat, showsServer } from '../game/play-flow.ts';
 import type { PlayMode } from '../game/play-flow.ts';
 import { setupActionLabel } from '../game/title-menu.ts';
@@ -90,7 +94,7 @@ import PixelButton from './PixelButton.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
 
-const { ui, join = false } = defineProps<{ ui: UiState; join?: boolean }>();
+const { ui, join = false, level = null } = defineProps<{ ui: UiState; join?: boolean; level?: number | null }>();
 const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 const callsign = useTemplateRef<HTMLInputElement>('callsign');
@@ -99,6 +103,11 @@ const copied = ref<'idle' | 'done' | 'failed'>('idle');
 
 /** Read when the page opens: a run cannot be under way while the setup is showing. */
 const resumeAt = continueLevel(loadLevelProgress());
+/** The level picked on the Levels page, kept only while it is still unlocked and past the first. */
+const chosen = level === null ? null : chosenStartLevel(level, loadLevelProgress());
+const isChosenUnlocked = level !== null && isLevelUnlocked(level, loadLevelProgress());
+const startLine = computed(() => (!multi.value && isChosenUnlocked ? startAtLabel(level) : null));
+const coopNote = computed(() => (multi.value && chosen !== null ? COOP_LEVEL_NOTE : null));
 const heading = computed(() => playHeading(flow.value));
 const multi = computed(() => showsServer(flow.value));
 const ready = computed(() => ui.art !== null && !ui.connecting);
@@ -130,6 +139,7 @@ function pick(mode: PlayMode): void {
 
 function start(): void {
   if (multi.value) game.startCoop();
+  else if (chosen !== null) game.continueSolo(chosen);
   else game.startSolo();
 }
 
@@ -151,7 +161,10 @@ function back(): void {
   emit('close');
 }
 
-onMounted(() => callsign.value?.focus());
+onMounted(() => {
+  callsign.value?.focus();
+  trackTitlePage('play');
+});
 </script>
 
 <style scoped>
@@ -163,6 +176,10 @@ onMounted(() => callsign.value?.focus());
 .setup-invite {
   align-self: flex-start;
   margin-top: calc(var(--u) * 2);
+}
+
+.setup-start-at {
+  margin: calc(var(--u) * 2) 0 0;
 }
 
 .setup-modes {

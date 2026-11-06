@@ -7,7 +7,8 @@
         <li v-for="[color, label] in TOWN_LEGEND" :key="label">
           <span class="town-swatch" :style="{ '--swatch': color }" />{{ label }}
         </li>
-        <li class="town-tick">Tick: been inside</li>
+        <li class="town-tick">Check: been inside</li>
+        <li class="town-cross">X: cleared & searched</li>
       </ul>
       <p class="px-note">{{ mode === 'solo' ? 'Paused.' : 'The town does not wait.' }} <span class="keys-only">Tab to close</span></p>
       <MenuLink class="touch-only town-close" @press="game.toggleMap()">Close</MenuLink>
@@ -102,5 +103,9 @@ onBeforeUnmount(() => {
 
 .town-tick {
   color: var(--sick);
+}
+
+.town-cross {
+  color: var(--blood-bright);
 }
 </style>

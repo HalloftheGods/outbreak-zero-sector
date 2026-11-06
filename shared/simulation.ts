@@ -34,9 +34,12 @@ import { emit, openGroundNear, standingPlayers } from './sim-state.ts';
 import { SpatialHashGrid } from './spatial-grid.ts';
 import { seedPopulation, updatePopulation } from './town-population.ts';
 import { hordeHostiles, hordesSurvivedHere, updateWaves } from './waves.ts';
+import { updateZombieStatuses } from './zombie-burn.ts';
+import { statusView } from './zombie-status.ts';
 import { benchCommand, benchField, openBench, updateBench } from './workbench.ts';
 import type { BenchAction, WorkbenchMode } from './workbench.ts';
 import { generateWorldMap } from './world-map.ts';
+import { ageFootprints } from './snow-tracks.ts';
 import { rebuildZombieGrid, removeDeadZombies, updateZombies } from './zombies.ts';
 
 export interface SimulationOptions {
@@ -99,6 +102,7 @@ function playerSnapshot(p: PlayerState): PlayerEntity {
     mags: magazines(p),
     medkits: p.medkits,
     knife: p.knife,
+    ...(p.bottles > 0 ? { bottles: p.bottles } : {}),
     search: round2(p.search),
     indoors: p.indoors,
     reload: round2(p.reload),
@@ -144,6 +148,7 @@ export class GameSimulation {
       populationTarget: levelPopulation(startLevel),
       topUpTimer: 0,
       noises: [],
+      tracks: [],
       players: [],
       departed: new Map(),
       zombies: [],
@@ -269,7 +274,9 @@ export class GameSimulation {
     }
     rebuildZombieGrid(sim);
     for (const p of sim.players) updatePlayer(sim, p);
+    ageFootprints(sim);
     updateBullets(sim);
+    updateZombieStatuses(sim);
     updateZombies(sim);
     removeDeadZombies(sim);
     updatePickups(sim);
@@ -370,6 +377,7 @@ export class GameSimulation {
         health: round2(z.health),
         maxHealth: z.maxHealth,
         attacking: z.attacking,
+        ...statusView(z),
       })),
       bullets: sim.bullets.map((b) => ({
         id: b.id,
@@ -378,6 +386,7 @@ export class GameSimulation {
         y: round2(b.y),
         vx: round2(b.vx),
         vy: round2(b.vy),
+        ...(b.effect ? { effect: b.effect } : {}),
       })),
       pickups: sim.pickups.filter(inRange).map((item) => ({ id: item.id, type: item.type, x: round2(item.x), y: round2(item.y) })),
       exit: exitView(exitEntity(sim)),

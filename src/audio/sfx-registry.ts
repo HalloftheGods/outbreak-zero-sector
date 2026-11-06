@@ -3,6 +3,7 @@ import * as W from './sfx-weapons.ts';
 import * as Z from './sfx-zombies.ts';
 import * as P from './sfx-player.ts';
 import * as U from './sfx-ui.ts';
+import * as FX from './sfx-effects.ts';
 
 export interface SfxDef {
   readonly play: Recipe;
@@ -64,8 +65,16 @@ export const SFX = {
   alert_runner: def(Z.alertRunner, 0.6, { gain: 2.5, voices: 2, cooldown: 0.6, vary: 0.12 }),
   alert_bloater: def(Z.alertBloater, 0.8, { gain: 1, voices: 2, cooldown: 0.8, vary: 0.15 }),
   alert_brute: def(Z.alertBrute, 1.0, { gain: 1, voices: 1, cooldown: 1.5, vary: 0.08 }),
+  scream: def(Z.scream, 1.3, { gain: 2.2, voices: 2, cooldown: 1, vary: 0.06 }),
   pickup_weapon: def(P.pickupWeapon, 0.6, { gain: 1.5, voices: 2, cooldown: 0.1, vary: 0.02 }),
   container_open: def(P.containerOpen, 0.25, { gain: 1.8, voices: 2, cooldown: 0.1, vary: 0.08 }),
+  pickup_radio: def(P.pickupRadio, 0.7, { gain: 1.6, voices: 1, cooldown: 1, vary: 0 }),
+  ignite: def(FX.ignite, 0.6, { gain: 1.2, voices: 4, cooldown: 0.08, vary: 0.08 }),
+  corrode: def(FX.corrode, 0.4, { gain: 1.2, voices: 4, cooldown: 0.08, vary: 0.08 }),
+  pierce: def(FX.pierce, 0.3, { gain: 1.2, voices: 4, cooldown: 0.05, vary: 0.08 }),
+  tranq_dart: def(FX.tranq, 0.5, { gain: 1.2, voices: 3, cooldown: 0.1, vary: 0.06 }),
+  glass_smash: def(FX.glassSmash, 0.45, { gain: 1.6, voices: 3, cooldown: 0.1, vary: 0.1 }),
+  car_alarm: def(FX.carAlarm, 2.1, { gain: 1.2, voices: 1, cooldown: 2, vary: 0 }),
   clatter: def(P.clatter, 0.55, { gain: 1.6, voices: 2, cooldown: 0.2, vary: 0.08 }),
   wave_start: def(P.waveStart, 5.0, { gain: 1.1, voices: 1, cooldown: 2, vary: 0 }),
   wave_clear: def(P.waveClear, 2.0, { gain: 2, voices: 1, cooldown: 2, vary: 0 }),

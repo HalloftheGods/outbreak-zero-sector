@@ -147,3 +147,11 @@ export const distantCrash: Recipe = (v) => {
   tone(v, { type: 'sine', f0: 80, f1: 35, decay: 0.4, gain: 0.5 });
   noise(v, { at: 0.12, filter: 'bandpass', freq: 1800, q: 4, decay: 0.3, gain: 0.08 });
 };
+
+/** The screamer's call: a long rising wail that cracks at the top, meant to carry. */
+export const scream: Recipe = (v) => {
+  const formants = [[900, 5, 1], [2400, 7, 0.8]] as const;
+  tone(v, { type: 'sawtooth', f0: 380, f1: 1250, attack: 0.05, hold: 0.45, decay: 0.5, release: 0.2, gain: 0.4, formants, vib: { rate: 22, cents: 140 } });
+  tone(v, { at: 0.5, type: 'square', f0: 1250, f1: 900, attack: 0.02, decay: 0.4, gain: 0.15, lp: 3000, vib: { rate: 40, cents: 200 } });
+  noise(v, { filter: 'highpass', freq: 2200, attack: 0.05, hold: 0.4, decay: 0.5, gain: 0.08 });
+};

@@ -6,11 +6,12 @@ import type { ZombieArt } from './types.ts';
 import { buildBloater } from './zombies/bloater.ts';
 import { buildBrute } from './zombies/brute.ts';
 import { buildRunner } from './zombies/runner.ts';
+import { buildScreamer } from './zombies/screamer.ts';
 import { buildWalker } from './zombies/walker.ts';
 
 export { referenceWalker } from './zombies/walker.ts';
 
 export function buildZombies(): Record<ZombieType, ZombieArt> {
   const walker = buildWalker();
-  return { walker, runner: buildRunner(), bloater: buildBloater(), brute: buildBrute() };
+  return { walker, runner: buildRunner(), bloater: buildBloater(), brute: buildBrute(), screamer: buildScreamer() };
 }

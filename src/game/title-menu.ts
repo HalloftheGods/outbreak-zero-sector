@@ -1,12 +1,21 @@
 import { formatDuration } from './hud-state.ts';
+import type { SoundUnlock } from './sound-unlock.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 /** The title's menu, what each item opens, and the words its pages show. The components only lay these out. */
-export type TitlePage = 'play' | 'levels' | 'howto' | 'records' | 'options';
+export type TitlePage = 'play' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
 
 export interface TitleMenuItem {
   readonly page: TitlePage;
   readonly label: string;
+  /** Shows as ??? until the player has found this. */
+  readonly needs?: 'radio';
+}
+
+/** What an item reads as: its name, or ??? while what it needs has not been found. */
+export function menuLabel(item: TitleMenuItem, unlock: SoundUnlock): string {
+  const hidden = item.needs === 'radio' && !unlock.radio;
+  return hidden ? '???' : item.label;
 }
 
 export const TITLE_MENU: readonly TitleMenuItem[] = [
@@ -14,6 +23,7 @@ export const TITLE_MENU: readonly TitleMenuItem[] = [
   { page: 'levels', label: 'Levels' },
   { page: 'howto', label: 'How to Play' },
   { page: 'records', label: 'Records' },
+  { page: 'sound', label: 'Sound Test', needs: 'radio' },
   { page: 'options', label: 'Options' },
 ];
 
@@ -46,6 +56,16 @@ export function menuStep(code: string): number {
 export function steppedIndex(index: number, step: number): number {
   const count = TITLE_MENU.length;
   return (index + step + count) % count;
+}
+
+export interface KeyFocus {
+  readonly focusInMenu: boolean;
+  readonly focusOnControl: boolean;
+}
+
+/** The menu answers keys unless focus is on some other control, which then answers its own Enter. */
+export function menuOwnsKey(focus: KeyFocus): boolean {
+  return focus.focusInMenu || !focus.focusOnControl;
 }
 
 export function isConfirmKey(code: string): boolean {

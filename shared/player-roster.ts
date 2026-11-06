@@ -1,7 +1,9 @@
 import { PLAYER_MAX_HEALTH } from './constants.ts';
 import { noParts } from './gun-upgrades.ts';
 import { giveStartingLoadout } from './player-health.ts';
+import { noKits } from './round-effects.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
+import { moveBurnCredit } from './zombie-status.ts';
 
 /** Records kept per run, so a client churning through tokens cannot grow the list for ever. */
 const DEPARTED_LIMIT = 32;
@@ -35,6 +37,10 @@ const FRESH_CONNECTION = {
   searchingId: null,
   searchLeft: 0,
   searchHealth: 0,
+  stance: 'walk',
+  stepNoiseLeft: 0,
+  throwQueued: false,
+  throwCooldown: 0,
 } as const;
 
 export interface Arrival {
@@ -62,12 +68,14 @@ export function createPlayer(arrival: Arrival, spot: { x: number; y: number }): 
     ammoBag: { pistol: 0, carbine: 0, shotgun: 0 },
     medkits: 0,
     knife: false,
+    bottles: 0,
     indoors: null,
     bleedout: 0,
     score: 0,
     kills: 0,
     guns: {},
     parts: noParts(),
+    kits: noKits(),
     benchReady: false,
   };
   giveStartingLoadout(player);
@@ -84,8 +92,9 @@ export function rememberDeparted(sim: SimState, p: PlayerState): void {
   if (overLimit) sim.departed.delete(oldest);
 }
 
-/** The results screen finds a player by id, and a new connection has a new one. */
+/** The results screen and a body still on fire find a player by id, and a new connection has a new one. */
 function renameInResults(sim: SimState, from: string, to: string): void {
+  moveBurnCredit(sim, from, to);
   if (!sim.gameOver) return;
   const players = sim.gameOver.players.map((p) => (p.id === from ? { ...p, id: to } : p));
   sim.gameOver = { ...sim.gameOver, players };

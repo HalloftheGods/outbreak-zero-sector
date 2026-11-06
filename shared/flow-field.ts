@@ -52,7 +52,8 @@ export class FlowField {
     const col = Math.floor(point.x / TILE_SIZE);
     const row = Math.floor(point.y / TILE_SIZE);
     let queued = tail;
-    for (let ring = 0; ring <= 3 && queued === tail; ring++) {
+    let found = false;
+    for (let ring = 0; ring <= 3 && !found; ring++) {
       for (let dr = -ring; dr <= ring; dr++) {
         for (let dc = -ring; dc <= ring; dc++) {
           if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
@@ -60,7 +61,11 @@ export class FlowField {
           const r = row + dr;
           if (c < 0 || r < 0 || c >= this.cols || r >= this.rows) continue;
           const index = r * this.cols + c;
-          if (this.blocked[index] || this.distance[index] === 0 || !this.inSight(point, c, r)) continue;
+          if (this.blocked[index] || !this.inSight(point, c, r)) continue;
+          // A tile another seed already took still ends the search, or a crowd in one corner would spread a ring per player.
+          found = true;
+          const alreadySeeded = this.distance[index] === 0;
+          if (alreadySeeded) continue;
           this.distance[index] = 0;
           this.queue[queued++] = index;
         }

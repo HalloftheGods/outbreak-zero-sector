@@ -1,6 +1,7 @@
 import { isDifficultyId } from '../../shared/difficulty.ts';
 import { PART_ORDER } from '../../shared/gun-upgrade-data.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
+import { EFFECT_ORDER, KIT_ORDER } from '../../shared/round-effect-data.ts';
 import type {
   BulletEntity,
   ExitEntity,
@@ -20,19 +21,21 @@ type Fields = Record<string, unknown>;
 const STATUSES: readonly unknown[] = ['alive', 'downed', 'dead'];
 const PHASES: readonly unknown[] = ['intermission', 'wave', 'gameover'];
 const OUTCOMES: readonly unknown[] = ['defeat', 'victory'];
-const ZOMBIE_TYPES: readonly unknown[] = ['walker', 'runner', 'bloater', 'brute'];
-const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', ...PART_ORDER];
+const ZOMBIE_TYPES: readonly unknown[] = ['walker', 'runner', 'bloater', 'brute', 'screamer'];
+const PICKUP_TYPES: readonly unknown[] = ['bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', 'radio', ...PART_ORDER, ...KIT_ORDER];
 const WEAPONS: readonly unknown[] = WEAPON_ORDER;
+const EFFECTS: readonly unknown[] = EFFECT_ORDER;
 const EVENT_TYPES: ReadonlySet<unknown> = new Set([
   'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
-  'zombie_hit', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
-  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'wave_intermission',
+  'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
+  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
   'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over',
 ]);
 
 const isFields = (v: unknown): v is Fields => typeof v === 'object' && v !== null;
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isString = (v: unknown): v is string => typeof v === 'string';
+const isFlag = (v: unknown): boolean => v === undefined || typeof v === 'boolean';
 
 function hasNumbers(v: Fields, keys: readonly string[]): boolean {
   return keys.every((key) => isNumber(v[key]));
@@ -54,6 +57,7 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && hasNumbers(v.mags, WEAPON_ORDER)
     && (v.indoors === null || isString(v.indoors))
     && (v.gear === undefined || isPlayerGear(v.gear))
+    && (v.bottles === undefined || isNumber(v.bottles))
     && hasNumbers(v, [
       'skin', 'x', 'y', 'angle', 'health', 'maxHealth', 'ammo', 'magSize', 'reserve', 'medkits',
       'reload', 'search', 'bleedout', 'revive', 'score', 'kills', 'lastInputSeq',
@@ -65,6 +69,9 @@ export function isZombieEntity(v: unknown): v is ZombieEntity {
     && isString(v.id)
     && ZOMBIE_TYPES.includes(v.type)
     && typeof v.attacking === 'boolean'
+    && isFlag(v.burning)
+    && isFlag(v.slowed)
+    && (v.corrosion === undefined || isNumber(v.corrosion))
     && hasNumbers(v, ['x', 'y', 'angle', 'health', 'maxHealth']);
 }
 
@@ -72,6 +79,7 @@ export function isBulletEntity(v: unknown): v is BulletEntity {
   return isFields(v)
     && isString(v.id)
     && isString(v.shooterId)
+    && (v.effect === undefined || EFFECTS.includes(v.effect))
     && hasNumbers(v, ['x', 'y', 'vx', 'vy']);
 }
 
@@ -108,7 +116,8 @@ export function isWelcomePacket(v: unknown): v is WelcomePacket {
   return isFields(v)
     && v.type === 'welcome'
     && isString(v.yourId)
-    && hasNumbers(v, ['tickRate', 'mapSeed']);
+    && hasNumbers(v, ['tickRate', 'mapSeed'])
+    && (v.difficulty === undefined || isDifficultyId(v.difficulty));
 }
 
 export function isSnapshotPacket(v: unknown): v is SnapshotPacket {

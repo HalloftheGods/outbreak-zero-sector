@@ -32,7 +32,7 @@ function rollPart(rng: Rng, odds: Partial<Record<PartId, number>>): PartId {
   return entries[0][0];
 }
 
-function freeSpot(sim: SimState, spots: readonly Point[]): Point | null {
+export function freeSpot(sim: SimState, spots: readonly Point[]): Point | null {
   const clear = (spot: Point): boolean => sim.pickups.every((item) => Math.hypot(item.x - spot.x, item.y - spot.y) >= SPOT_GAP);
   return spots.find(clear) ?? null;
 }

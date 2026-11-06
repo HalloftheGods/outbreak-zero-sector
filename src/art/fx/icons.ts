@@ -6,6 +6,7 @@ import type { PixelSprite } from '../types.ts';
 import { PixelCanvas } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
+import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
 import { gridSprite } from './shared.ts';
 import type { Grid } from './shared.ts';
@@ -153,6 +154,22 @@ const HEART: Grid = [
   '.....ss......',
 ];
 
+/** An empty green bottle with a cork. */
+const BOTTLE: Grid = [
+  '..x..',
+  '..y..',
+  '.aba.',
+  '.abc.',
+  '.abc.',
+  'abbcc',
+  'abbec',
+  'abbec',
+  'abbcc',
+  'abbcc',
+  'abbcc',
+  '.aaa.',
+];
+
 const SKULL: Grid = [
   '...eeeeeee...',
   '.eeeeeeeeeff.',
@@ -166,6 +183,20 @@ const SKULL: Grid = [
   '...efffffg...',
   '...ekekekg...',
   '...fkfkfkg...',
+];
+
+const RADIO_SMALL: Grid = [
+  '.........p...',
+  '........p....',
+  '.ccccccccccc.',
+  'cbbbbbbbbbbba',
+  'cbmnmbeeeeeba',
+  'cbnmnbefrfeba',
+  'cbmnmbeeeeeba',
+  'cbnmnbbbbbbba',
+  'cbmnmbbpbpbba',
+  'cbbbbbbbbbbba',
+  'aaaaaaaaaaaaa',
 ];
 
 /** Centres a body grid in a fixed cell, leaving room for the outline. */
@@ -199,16 +230,25 @@ export function buildPickupIcons(): Record<PickupType, PixelSprite> {
     carbine: outlined(CARBINE_SMALL, 15, 15),
     shotgun: outlined(SHOTGUN_SMALL, 15, 15),
     knife: outlined(KNIFE_SMALL, 15, 15),
+    radio: outlined(RADIO_SMALL, 15, 15),
     barrel: outlined(PART_ART.barrel.rows, 15, 15),
     grip: outlined(PART_ART.grip.rows, 15, 15),
     magazine: outlined(PART_ART.magazine.rows, 15, 15),
     suppressor: outlined(PART_ART.suppressor.rows, 15, 15),
     toolkit: outlined(PART_ART.toolkit.rows, 15, 15),
+    incendiary_kit: outlined(KIT_ART.incendiary_kit.rows, 15, 15),
+    acid_kit: outlined(KIT_ART.acid_kit.rows, 15, 15),
+    piercing_kit: outlined(KIT_ART.piercing_kit.rows, 15, 15),
+    tranq_kit: outlined(KIT_ART.tranq_kit.rows, 15, 15),
   };
 }
 
 export function buildHeart(): PixelSprite {
   return outlined(HEART, 15, 12);
+}
+
+export function buildBottle(): PixelSprite {
+  return outlined(BOTTLE, 15, 14);
 }
 
 export function buildSkull(): PixelSprite {

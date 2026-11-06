@@ -29,7 +29,7 @@ function endlessCounts(wave: number): Record<ZombieType, number> {
   const brute = wave % 5 === 0 ? wave / 5 : 0;
   const bloater = wave >= 3 ? Math.min(8, 1 + Math.floor((wave - 3) / 2)) : 0;
   const runner = wave >= 2 ? Math.floor(total * Math.min(0.4, 0.14 + (wave - 2) * 0.04)) : 0;
-  return { walker: total - runner - bloater - brute, runner, bloater, brute };
+  return { walker: total - runner - bloater - brute, runner, bloater, brute, screamer: 0 };
 }
 
 describe('the level table', () => {

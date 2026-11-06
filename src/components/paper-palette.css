@@ -1,0 +1,9 @@
+/* The survival magazine's paper and ink, shared by its pages and anything printed to match, such as the Install Game cartridge label. */
+:root {
+  --paper: #f6ecd4;
+  --paper-deep: #eadcbb;
+  --print: #2b2233;
+  --print-soft: #5b4f60;
+  --marker: #dc2237;
+  --note: #ffe45c;
+}

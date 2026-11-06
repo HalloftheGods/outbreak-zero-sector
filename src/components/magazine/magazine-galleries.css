@@ -1,0 +1,252 @@
+/* Each style of gallery: the loudness chart, the catalogue, the small ads, the spotter list, the permits and the forecast. */
+
+.mag-gallery.is-meter .mag-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: calc(var(--k) * 8);
+}
+
+.mag-gallery.is-meter .mag-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--k) * 2);
+  padding: calc(var(--k) * 6);
+  background: var(--paper);
+  color: var(--print);
+  text-align: center;
+}
+
+.mag-gallery.is-meter .mag-card-picture {
+  height: calc(var(--k) * 34);
+}
+
+.mag-gallery.is-meter .mag-card-tag {
+  align-self: stretch;
+  padding: calc(var(--k) * 2);
+  background: var(--band);
+  color: var(--on-band);
+  font-size: calc(var(--k) * 11.5);
+}
+
+.mag-gallery.is-catalog .mag-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: calc(var(--k) * 7);
+}
+
+.mag-gallery.is-catalog .mag-card {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 66) 1fr;
+  gap: calc(var(--k) * 6);
+  align-items: center;
+  padding: calc(var(--k) * 6);
+  background: #fffdf5;
+  border: calc(var(--k) * 2) solid var(--print);
+}
+
+.mag-gallery.is-catalog .mag-card-tag {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 calc(var(--k) * 4);
+  background: var(--band);
+  color: var(--on-band);
+  font-size: calc(var(--k) * 9.5);
+}
+
+.mag-gallery.is-catalog .mag-card:last-child {
+  grid-column: 1 / -1;
+}
+
+.mag-gallery.is-pair .mag-cards {
+  display: flex;
+  justify-content: center;
+  gap: calc(var(--k) * 26);
+}
+
+.mag-gallery.is-pair .mag-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--k) * 3);
+  padding: calc(var(--k) * 8) calc(var(--k) * 14);
+  background: var(--print);
+  color: var(--paper);
+}
+
+.mag-gallery.is-classifieds .mag-gallery-title {
+  padding: calc(var(--k) * 4) calc(var(--k) * 8);
+  border-top: calc(var(--k) * 4) double var(--print);
+  border-bottom: calc(var(--k) * 4) double var(--print);
+  font-size: calc(var(--k) * 26);
+  text-align: center;
+  color: var(--print);
+}
+
+.mag-gallery.is-classifieds .mag-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: calc(var(--k) * 6);
+}
+
+.mag-gallery.is-classifieds .mag-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--k) * 3);
+  padding: calc(var(--k) * 8) calc(var(--k) * 6);
+  border: calc(var(--k) * 1.5) solid var(--print);
+  background: #f4efe0;
+  text-align: center;
+}
+
+.mag-gallery.is-classifieds .mag-card-tag {
+  color: var(--band-deep);
+}
+
+.mag-gallery.is-spotter .mag-gallery-title {
+  font-size: calc(var(--k) * 24);
+}
+
+.mag-gallery.is-spotter .mag-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: calc(var(--k) * 6);
+}
+
+.mag-gallery.is-spotter .mag-card {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 110) 1fr;
+  align-items: center;
+  gap: calc(var(--k) * 10);
+  padding-right: calc(var(--k) * 28);
+  border-bottom: calc(var(--k) * 2) dashed var(--band-deep);
+}
+
+.mag-gallery.is-spotter .mag-card-title {
+  font-size: calc(var(--k) * 19);
+}
+
+.mag-gallery.is-spotter .mag-card-tag {
+  position: absolute;
+  left: 0;
+  top: calc(var(--k) * 2);
+  padding: 0 calc(var(--k) * 4);
+  background: var(--band);
+  color: var(--on-band);
+}
+
+/* The tick box a spotter fills in. */
+.mag-gallery.is-spotter .mag-card::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: calc(var(--k) * 18);
+  height: calc(var(--k) * 18);
+  translate: 0 -50%;
+  border: calc(var(--k) * 2) solid var(--print);
+  background: #fffdf5;
+}
+
+.mag-gallery.is-passport .mag-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: calc(var(--k) * 12);
+}
+
+.mag-gallery.is-passport .mag-card {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 112) 1fr;
+  grid-template-rows: auto 1fr;
+  align-items: center;
+  column-gap: calc(var(--k) * 12);
+  row-gap: calc(var(--k) * 6);
+  padding: 0 calc(var(--k) * 12) calc(var(--k) * 8);
+  background: var(--paper);
+  box-shadow: calc(var(--k) * 4) calc(var(--k) * 4) 0 var(--print);
+}
+
+/* The permit's printed header. */
+.mag-gallery.is-passport .mag-card::before {
+  content: 'Town Survival Bureau travel permit';
+  grid-column: 1 / -1;
+  margin: 0 calc(var(--k) * -12);
+  padding: calc(var(--k) * 2) calc(var(--k) * 12);
+  background: var(--print);
+  color: var(--paper);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 10.5);
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.mag-gallery.is-passport .mag-card:nth-child(odd) { rotate: -1.2deg; }
+.mag-gallery.is-passport .mag-card:nth-child(even) { rotate: 1deg; }
+
+.mag-gallery.is-passport .mag-card-picture {
+  background: #cfe0e6;
+  border: calc(var(--k) * 3) solid #fffdf5;
+  padding: calc(var(--k) * 4) 0;
+}
+
+.mag-gallery.is-passport .mag-card-title {
+  font-size: calc(var(--k) * 27);
+  line-height: 1;
+}
+
+.mag-gallery.is-passport .mag-card-point {
+  margin-top: calc(var(--k) * 6);
+  font-size: calc(var(--k) * 18);
+  line-height: 1.2;
+}
+
+.mag-gallery.is-passport .mag-card-tag {
+  position: absolute;
+  right: calc(var(--k) * 8);
+  bottom: calc(var(--k) * 8);
+  padding: calc(var(--k) * 1) calc(var(--k) * 6);
+  border: calc(var(--k) * 2) solid var(--marker);
+  color: var(--marker);
+  font-size: calc(var(--k) * 12);
+  rotate: -6deg;
+}
+
+.mag-gallery.is-forecast .mag-gallery-title {
+  font-size: calc(var(--k) * 24);
+}
+
+.mag-gallery.is-forecast .mag-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: calc(var(--k) * 6);
+}
+
+.mag-gallery.is-forecast .mag-card {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 64) 1fr;
+  align-items: center;
+  gap: calc(var(--k) * 8);
+  padding: calc(var(--k) * 6) calc(var(--k) * 10);
+  background: #fffdf5;
+  border-left: calc(var(--k) * 8) solid var(--band);
+}
+
+.mag-gallery.is-forecast .mag-card:nth-child(3) { border-left-color: #e4502e; }
+.mag-gallery.is-forecast .mag-card:nth-child(4) { border-left-color: var(--print); }
+
+.mag-gallery.is-forecast .mag-card-point {
+  font-size: calc(var(--k) * 15);
+  line-height: 1.2;
+}

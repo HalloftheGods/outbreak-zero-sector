@@ -10,12 +10,13 @@ import { buildBloater } from '../src/art/zombies/bloater.ts';
 import { buildBrute } from '../src/art/zombies/brute.ts';
 import { Figure } from '../src/art/zombies/rig.ts';
 import { buildRunner } from '../src/art/zombies/runner.ts';
+import { buildScreamer } from '../src/art/zombies/screamer.ts';
 import { buildWalker } from '../src/art/zombies/walker.ts';
 import { onSeenHead } from '../src/engine/overlay-renderer.ts';
 import { InputSender } from '../src/game/input-sender.ts';
 import { addRoamer, eventsOf, input, quietSim, steps } from './helpers/sim-harness.ts';
 
-const BUILDERS: Record<ZombieType, () => unknown> = { walker: buildWalker, runner: buildRunner, bloater: buildBloater, brute: buildBrute };
+const BUILDERS: Record<ZombieType, () => unknown> = { walker: buildWalker, runner: buildRunner, bloater: buildBloater, brute: buildBrute, screamer: buildScreamer };
 const ZOMBIE_TYPES = Object.keys(BUILDERS) as ZombieType[];
 /** Close enough that the pistol's spread stays inside a head. */
 const RANGE = 60;

@@ -19,11 +19,13 @@ import type { ArtBook, PixelSprite } from '../art/types.ts';
 import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { SceneView } from './scene.ts';
-import { clipDuration, clipFrame, clipFrameAt, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
+import { bodyHeight, clipDuration, clipFrame, clipFrameAt, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
+import { beginStatusFrame, paintBurn, paintEffectTrail, paintTint } from './status-fx.ts';
 import { trackWalking } from './visuals.ts';
 import type { VisualStore } from './visuals.ts';
 
 const CULL_MARGIN = 40;
+const DEFAULT_BODY_HEIGHT = 24;
 const CORPSE_BAKE_SEC = 24;
 const MAX_CORPSES = 28;
 const KILLED_MEMORY_SEC = 2;
@@ -334,7 +336,10 @@ export class EntityRenderer {
     const y = Math.round(zombie.y) - top;
     drawShadow(ctx, x, y, ZOMBIES[zombie.type].radius * 2 + 2);
     if (time < visual.flashUntil) drawSilhouette(ctx, sprite, x, y);
-    else drawSprite(ctx, sprite, x, y);
+    else {
+      drawSprite(ctx, sprite, x, y);
+      paintTint(ctx, zombie, sprite, x, y, time, this.reducedMotion);
+    }
   }
 
   private drawPickup(ctx: CanvasRenderingContext2D, pickup: PickupEntity, left: number, top: number, time: number): void {
@@ -345,6 +350,12 @@ export class EntityRenderer {
   }
 
   /** Flames and tracers light themselves, so they go on after the lightmap. */
+  /** How tall the zombie was last drawn, for putting flames at its chest. */
+  private bodyHeightOf(id: EntityId): number {
+    const sprite = this.visuals.get(id)?.sprite;
+    return sprite ? bodyHeight(sprite) : DEFAULT_BODY_HEIGHT;
+  }
+
   drawEmissive(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number, time: number): void {
     const flames = this.art.environment.barrelFire;
     for (const fire of this.fires) {
@@ -355,9 +366,17 @@ export class EntityRenderer {
       const lamps = clipFrame(this.art.environment.escapeVanLights, this.reducedMotion ? 0 : time);
       drawSprite(ctx, lamps, Math.round(scene.exit.x) - left, Math.round(scene.exit.y) - top);
     }
+    beginStatusFrame();
+    for (const zombie of scene.zombies) {
+      const onScreen = zombie.burning && zombie.x > left - CULL_MARGIN && zombie.x < left + viewW + CULL_MARGIN && zombie.y > top && zombie.y < top + viewH + CULL_MARGIN;
+      if (onScreen) paintBurn(ctx, zombie, Math.round(zombie.x) - left, Math.round(zombie.y) - top, this.bodyHeightOf(zombie.id), time, this.reducedMotion);
+    }
     for (const bullet of scene.bullets) {
       const clip = this.art.fx.tracer[dirFromAngle(Math.atan2(bullet.vy, bullet.vx))];
-      drawSprite(ctx, clipFrame(clip, time), Math.round(bullet.x) - left, Math.round(bullet.y) - CHEST_HEIGHT - top);
+      const bx = Math.round(bullet.x) - left;
+      const by = Math.round(bullet.y) - CHEST_HEIGHT - top;
+      drawSprite(ctx, clipFrame(clip, time), bx, by);
+      paintEffectTrail(ctx, bullet, bx, by);
     }
   }
 

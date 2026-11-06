@@ -41,6 +41,8 @@ export interface SurvivorArt {
   readonly dead: Clip;
   /** The figure the title screen shows. */
   readonly portrait: PixelSprite;
+  /** The same figure at the portrait's crop, one frame per facing in dirFromAngle order. */
+  readonly portraits: readonly PixelSprite[];
   /** Pixels this survivor's gun sits below the standard build's, for the muzzle flash. */
   readonly gunDrop: number;
 }
@@ -94,6 +96,8 @@ export interface UiArt {
   readonly weaponIcons: Record<WeaponId, PixelSprite>;
   readonly pickupIcons: Record<PickupType, PixelSprite>;
   readonly heart: PixelSprite;
+  /** The HUD's count of bottles to throw. */
+  readonly bottle: PixelSprite;
   readonly skull: PixelSprite;
   /** Title lockup for the menu and game over screens. */
   readonly logo: PixelSprite;

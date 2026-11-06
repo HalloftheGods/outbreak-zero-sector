@@ -16,6 +16,7 @@ import {
 import { damageZombie } from '../shared/combat.ts';
 import { containerLoot } from '../shared/container-loot.ts';
 import { isPartPickup } from '../shared/gun-upgrades.ts';
+import { isKitPickup } from '../shared/round-effects.ts';
 import { LOOT_RULES, ammoKillShare, lootSpots, restockLoot } from '../shared/loot.ts';
 import { BUILDING_DEFS, BUILDING_KINDS } from '../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, PickupType } from '../shared/protocol.ts';
@@ -379,7 +380,7 @@ describe('town loot', () => {
     for (const [building, items] of inBuilding) {
       const rule = LOOT_RULES[building.kind];
       const allowed = [...Object.keys(rule.table), ...(rule.fixed ?? [])];
-      const ownLoot = items.filter((item) => !isPartPickup(item.type));
+      const ownLoot = items.filter((item) => !isPartPickup(item.type) && !isKitPickup(item.type));
       for (const item of ownLoot) expect(allowed).toContain(item.type);
       expect(ownLoot.length).toBeLessThanOrEqual(rule.items[1] + (rule.fixed?.length ?? 0));
     }
@@ -399,7 +400,7 @@ describe('town loot', () => {
       const { inBuilding } = stocked(seed);
       for (const [building, items] of inBuilding) {
         const count = tally.get(building.kind) ?? { heal: 0, ammo: 0 };
-        for (const item of items) {
+        for (const item of items.filter((each) => !isKitPickup(each.type))) {
           const heals = item.type === 'bandage' || item.type === 'medkit';
           if (heals) count.heal += 1;
           else count.ammo += 1;

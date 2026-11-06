@@ -11,10 +11,13 @@
         role="radio"
         :aria-checked="index === chosen"
         :aria-label="`${each.name}: ${each.trait}`"
-        @mouseenter="game.playUi('hover')"
+        @mouseenter="hear(index)"
+        @mouseleave="release"
+        @focus="spinOn(index)"
+        @blur="release"
         @click="choose(index)"
       >
-        <SpriteImg v-if="art" :sprite="art.survivors[index].portrait" />
+        <SpriteImg v-if="art" :sprite="shownFor(art.survivors[index], index)" />
       </button>
     </div>
     <p class="character-name">{{ picked.name }}</p>
@@ -23,10 +26,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { characterOf, CHARACTERS } from '../../shared/characters.ts';
-import type { ArtBook } from '../art/types.ts';
+import type { ArtBook, SurvivorArt } from '../art/types.ts';
 import { loadCharacter, saveCharacter } from '../game/character-pref.ts';
+import { createSpinner, FRONT_FACING } from '../game/survivor-spin.ts';
+import { isTouchDevice } from '../game/touch-input.ts';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
 
@@ -36,11 +41,49 @@ const game = useGame();
 const chosen = ref(loadCharacter());
 const picked = computed(() => characterOf(chosen.value));
 
+const spinning = ref<number | null>(null);
+const facing = ref(FRONT_FACING);
+const spinner = createSpinner((next) => {
+  facing.value = next;
+});
+const wantsCalm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const touchOnly = isTouchDevice();
+
+function shownFor(survivor: SurvivorArt, index: number) {
+  const turning = index === spinning.value;
+  return turning ? survivor.portraits[facing.value] : survivor.portrait;
+}
+
+/** Turns one survivor in place. Reduced motion keeps the front view. */
+function spinOn(index: number): void {
+  if (wantsCalm) return;
+  spinning.value = index;
+  spinner.start();
+}
+
+function release(): void {
+  spinner.stop();
+  spinning.value = null;
+  // A touch screen has no hover, so the chosen survivor keeps turning.
+  if (touchOnly) spinOn(chosen.value);
+}
+
+function hear(index: number): void {
+  game.playUi('hover');
+  spinOn(index);
+}
+
 function choose(index: number): void {
   game.playUi('click');
   chosen.value = index;
   saveCharacter(index);
+  if (touchOnly) spinOn(index);
 }
+
+onMounted(() => {
+  if (touchOnly) spinOn(chosen.value);
+});
+onBeforeUnmount(() => spinner.stop());
 </script>
 
 <style scoped>

@@ -3,6 +3,7 @@
     <i v-for="pip in ranks" :key="pip" class="fit-pip" />
     <i v-if="suppressed" class="fit-pip is-suppressed" />
     <i v-if="fit.quirk" class="fit-pip is-quirk" />
+    <i v-if="fit.effect" class="fit-pip is-effect" :class="`is-${fit.effect}`" />
   </span>
 </template>
 
@@ -37,5 +38,22 @@ const ranks = computed(() => slotsUsed(fit) - rankOf(fit, 'suppressor'));
 
 .fit-pip.is-quirk {
   background: var(--sick);
+}
+
+.fit-pip.is-effect {
+  background: var(--blood-bright);
+  outline: calc(var(--u) * 0.5) solid var(--ink-line);
+}
+
+.fit-pip.is-acid {
+  background: var(--sick);
+}
+
+.fit-pip.is-piercing {
+  background: var(--bone);
+}
+
+.fit-pip.is-tranq {
+  background: var(--bone-dim);
 }
 </style>

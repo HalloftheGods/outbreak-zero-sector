@@ -86,10 +86,14 @@ body {
 
 .px-sheet.is-wide {
   width: min(calc(var(--u) * 460), 94vw);
+  padding: calc(var(--u) * 4) calc(var(--u) * 6);
+  gap: calc(var(--u) * 3);
 }
 
 .px-sheet.is-extra-wide {
   width: min(calc(var(--u) * 540), 96vw);
+  padding: calc(var(--u) * 4) calc(var(--u) * 6);
+  gap: calc(var(--u) * 3);
 }
 
 .px-sheet-heading {

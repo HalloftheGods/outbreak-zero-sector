@@ -5,10 +5,11 @@ import type { SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import { circleHitsSolid } from '../shared/world-map.ts';
 import { CirclingBot, ScavengerBot } from './helpers/bots.ts';
+import { arrivesAlone } from './helpers/lone-chase.ts';
 import { input, stateOf } from './helpers/sim-harness.ts';
 
 const SOAK_TICKS = 20000;
-/** A hunter this far from everyone that has not moved this long is stuck, not waiting. */
+/** A hunter this far from everyone that has not moved this long is stuck, unless it is only queueing behind the crowd. */
 const STUCK_TICKS = 150;
 const STUCK_RANGE = 40;
 
@@ -45,7 +46,8 @@ class StuckWatch {
       if (moved || nearPlayer || idleByChoice) {
         this.marks.set(z.id, { x: z.x, y: z.y, tick: state.tick });
       } else if (state.tick - mark.tick > STUCK_TICKS) {
-        this.stuck.push(`${z.type} ${z.id} at ${z.x.toFixed(1)},${z.y.toFixed(1)} tick ${state.tick}`);
+        const heldByTheWorld = !arrivesAlone(state, z);
+        if (heldByTheWorld) this.stuck.push(`${z.type} ${z.id} at ${z.x.toFixed(1)},${z.y.toFixed(1)} tick ${state.tick}`);
         this.marks.delete(z.id);
       }
     }

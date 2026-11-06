@@ -3,7 +3,8 @@ import { containerInReach } from '../../shared/containers.ts';
 import type { Container } from '../../shared/containers.ts';
 import { stepMovement } from '../../shared/movement.ts';
 import { playerSpeed } from '../../shared/players.ts';
-import type { EntityId, PlayerEntity, SnapshotPacket, WorldMap } from '../../shared/protocol.ts';
+import { groundSpeedScale } from '../../shared/town-rules.ts';
+import type { EntityId, PlayerEntity, SnapshotPacket, Stance, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt, circleHitsSolid } from '../../shared/world-query.ts';
 import type { SceneView } from '../engine/scene.ts';
 import { LocalPredictor } from './prediction.ts';
@@ -26,12 +27,17 @@ export class ClientWorld {
   private predicting = false;
   /** The local survivor's walking speed, which prediction has to match. */
   private speed = PLAYER_SPEED;
+  private skin: number | null = null;
+  /** The run's level, whose town may slow the walk. */
+  private level = 1;
+  /** From the keys held right now, ahead of the sim hearing about them. */
+  private stance: Stance = 'walk';
 
   constructor(map: WorldMap, localId: EntityId) {
     this.localId = localId;
     this.map = map;
     this.predictor = new LocalPredictor(
-      (x, y, dirX, dirY, dt) => stepMovement(this.map, x, y, dirX, dirY, this.speed, dt, PLAYER_RADIUS),
+      (x, y, dirX, dirY, dt) => stepMovement(this.map, x, y, dirX, dirY, this.speed * groundSpeedScale(this.level, this.map, x, y), dt, PLAYER_RADIUS),
       TICK_DT,
       (x, y) => circleHitsSolid(this.map, x, y, PLAYER_RADIUS),
     );
@@ -60,12 +66,27 @@ export class ClientWorld {
 
   push(snapshot: SnapshotPacket, nowMs: number): void {
     this.buffer.push(snapshot, nowMs);
+    this.level = snapshot.level;
     this.latestArrival = nowMs;
     const local = this.localPlayer;
-    if (local) this.speed = playerSpeed(local.skin);
+    if (local) this.skin = local.skin;
+    this.refreshSpeed();
     if (local?.status === 'alive' && this.predicting) {
       this.predictor.reconcile(local.x, local.y, local.lastInputSeq);
     }
+  }
+
+  /** The stance the local player is holding, so prediction moves at the sim's pace. */
+  setStance(stance: Stance): void {
+    const unchanged = stance === this.stance;
+    if (unchanged) return;
+    this.stance = stance;
+    this.refreshSpeed();
+  }
+
+  private refreshSpeed(): void {
+    const known = this.skin !== null;
+    if (known) this.speed = playerSpeed(this.skin as number, this.stance);
   }
 
   /** The player the camera should sit on: yourself, or a teammate once you are dead. */

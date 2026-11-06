@@ -1,0 +1,68 @@
+/* A phone on its side has room for only the essentials. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mag-head-title {
+    font-size: calc(var(--k) * 30);
+  }
+
+  .mag-head-deck {
+    display: none;
+  }
+
+  .mag-photo,
+  .mag-photo.is-small {
+    min-height: calc(var(--k) * 150);
+  }
+
+  .mag-layout-cover .mag-masthead {
+    font-size: calc(var(--k) * 84);
+    letter-spacing: calc(var(--k) * -3);
+  }
+
+  .mag-cover-top {
+    padding-block: calc(var(--k) * 4);
+  }
+
+  .mag-cover-strap {
+    font-size: calc(var(--k) * 15);
+  }
+
+  .mag-cover-middle {
+    padding-block: calc(var(--k) * 10);
+  }
+
+  .mag-cover-lines li:nth-child(n + 4),
+  .mag-cover-foot {
+    display: none;
+  }
+
+  .mag-contents-title {
+    font-size: calc(var(--k) * 26);
+  }
+
+  .mag-contents-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mag-contents-link {
+    min-height: 44px;
+  }
+
+  .mag-gallery.is-spotter {
+    --u: calc(var(--k) * 0.62);
+  }
+
+  .mag-gallery.is-spotter .mag-card {
+    grid-template-columns: calc(var(--k) * 74) 1fr;
+    gap: calc(var(--k) * 6);
+    padding-right: 0;
+  }
+
+  .mag-gallery.is-spotter .mag-card-tag,
+  .mag-gallery.is-spotter .mag-card::after {
+    display: none;
+  }
+
+  .mag-contents-words small {
+    display: none;
+  }
+}

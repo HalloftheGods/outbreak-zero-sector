@@ -47,6 +47,8 @@ export interface HudState {
   readonly ammoBag: Readonly<Record<WeaponId, number>>;
   readonly mags: Readonly<Record<WeaponId, number>>;
   readonly medkits: number;
+  /** Empty bottles to throw. */
+  readonly bottles: number;
   readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
@@ -83,6 +85,8 @@ export interface LevelCard {
   readonly heading: string;
   readonly title: string;
   readonly goal: string;
+  /** What this town's weather does to play, for towns where it does something. */
+  readonly rule?: string;
 }
 
 /** A small label for the place the player just walked into. */
@@ -139,6 +143,7 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     ammoBag: local.ammoBag,
     mags: local.mags,
     medkits: local.medkits,
+    bottles: local.bottles ?? 0,
     knife: local.knife,
     reload: local.reload,
     score: local.score,

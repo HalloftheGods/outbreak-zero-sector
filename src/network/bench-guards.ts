@@ -3,6 +3,8 @@ import type { GunQuirk, GunUpgrade } from '../../shared/gun-upgrade-data.ts';
 import type { GunFit, PlayerGear } from '../../shared/gun-upgrades.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
+import { EFFECT_ORDER } from '../../shared/round-effect-data.ts';
+import type { GunEffect } from '../../shared/round-effect-data.ts';
 import type { BenchView } from '../../shared/workbench.ts';
 
 type Fields = Record<string, unknown>;
@@ -17,8 +19,12 @@ function isGunFit(v: unknown): v is GunFit {
   return isFields(v)
     && isFields(v.ranks)
     && Object.entries(v.ranks).every(isRankEntry)
-    && (v.quirk === null || QUIRK_ORDER.includes(v.quirk as GunQuirk));
+    && (v.quirk === null || QUIRK_ORDER.includes(v.quirk as GunQuirk))
+    && (v.effect === undefined || EFFECT_ORDER.includes(v.effect as GunEffect));
 }
+
+/** Older frames have no kits at all. */
+const isKitCounts = (v: unknown): boolean => v === undefined || (isFields(v) && EFFECT_ORDER.every((effect) => isCount(v[effect])));
 
 const isFitEntry = ([weapon, fit]: [string, unknown]): boolean => WEAPON_ORDER.includes(weapon as WeaponId) && isGunFit(fit);
 
@@ -27,7 +33,8 @@ export function isPlayerGear(v: unknown): v is PlayerGear {
     && isFields(v.parts)
     && PART_ORDER.every((part) => isCount((v.parts as Fields)[part]))
     && isFields(v.fits)
-    && Object.entries(v.fits).every(isFitEntry);
+    && Object.entries(v.fits).every(isFitEntry)
+    && isKitCounts(v.kits);
 }
 
 export function isBenchView(v: unknown): v is BenchView {

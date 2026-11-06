@@ -1,0 +1,332 @@
+/* What sets each spread apart: its own colour bands, backgrounds and arrangement. */
+
+.mag-book.is-single .mag-key {
+  min-width: calc(var(--k) * 62);
+  padding: calc(var(--k) * 13) calc(var(--k) * 6);
+  font-size: calc(var(--k) * 19);
+}
+
+/* Contents */
+.mag-layout-contents {
+  background-color: var(--paper);
+}
+
+.mag-layout-letter .mag-letter {
+  padding-top: calc(var(--k) * 6);
+}
+
+/* Feature: the photo sits on a loud colour page */
+.mag-layout-feature.is-left {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.2) 28%, transparent 30%) 0 0 / calc(var(--k) * 10) calc(var(--k) * 10),
+    var(--band);
+}
+
+.mag-layout-feature.is-left .mag-running-head {
+  color: var(--on-band);
+  border-color: var(--on-band);
+}
+
+.mag-layout-feature.is-left .mag-folio {
+  background: var(--print);
+}
+
+.mag-layout-feature.is-left .mag-caption {
+  color: var(--on-band);
+  font-size: calc(var(--k) * 15);
+}
+
+/* Keys: a band across the top of the spread */
+.mag-layout-keys::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(var(--m) * 26);
+  background: var(--band);
+}
+
+.mag-layout-keys .mag-running-head {
+  color: var(--on-band);
+  border-color: transparent;
+}
+
+.mag-book.is-single .mag-layout-keys .mag-keyboard {
+  flex: none;
+}
+
+.mag-book.is-single .mag-layout-keys .mag-flow {
+  justify-content: space-between;
+}
+
+.mag-layout-keys.is-right .mag-sticky {
+  align-self: flex-start;
+  margin-top: 0;
+}
+
+/* Rings: a dark, loud page beside a quiet one */
+.mag-layout-rings.is-right {
+  background: var(--band-deep);
+  color: var(--on-band);
+}
+
+.mag-layout-rings.is-right .mag-running-head {
+  color: var(--on-band);
+}
+
+.mag-layout-rings.is-right .mag-caption {
+  color: var(--on-band);
+}
+
+.mag-layout-rings.is-right .mag-gallery-title {
+  color: var(--note);
+}
+
+.mag-layout-rings.is-left {
+  border-left: calc(var(--m) * 10) solid var(--band);
+}
+
+/* Catalog: a mail order page with a checker strip */
+.mag-layout-catalog::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--m) * 14);
+  background: conic-gradient(var(--print) 25%, var(--band) 0 50%, var(--print) 0 75%, var(--band) 0) 0 0 / calc(var(--m) * 14) calc(var(--m) * 14);
+}
+
+.mag-layout-catalog {
+  padding-bottom: calc(var(--m) * 20);
+}
+
+.mag-layout-catalog.is-left .mag-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mag-layout-catalog.is-left .mag-cards {
+  flex: 1;
+  min-height: 0;
+  grid-auto-rows: 1fr;
+}
+
+.mag-layout-catalog .mag-stamp {
+  position: absolute;
+  right: 0;
+  top: calc(var(--k) * 6);
+}
+
+/* Classifieds: a page of small ads in newsprint */
+.mag-layout-classifieds.is-right {
+  background: #e7e0cd;
+}
+
+.mag-layout-classifieds.is-right .mag-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hero: one object, one wall of colour */
+.mag-layout-hero.is-left {
+  background: repeating-conic-gradient(from 0deg at 50% 52%, var(--band) 0 10deg, var(--band-deep) 10deg 20deg);
+}
+
+.mag-layout-hero.is-left .mag-running-head {
+  color: var(--on-band);
+  border-color: var(--on-band);
+}
+
+.mag-layout-hero.is-left .mag-folio {
+  background: var(--print);
+}
+
+.mag-hero-sprite {
+  rotate: -18deg;
+  filter: drop-shadow(calc(var(--k) * 6) calc(var(--k) * 6) 0 rgba(43, 34, 51, 0.6));
+}
+
+/* Wildlife: a field notebook */
+.mag-layout-wildlife.is-left {
+  background:
+    linear-gradient(rgba(85, 125, 23, 0.25) 1px, transparent 1px) 0 0 / 100% calc(var(--k) * 24),
+    #f2f3d4;
+  border-right: 0;
+}
+
+.mag-layout-wildlife.is-left .mag-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panorama: one picture under both pages, the words on paper over it */
+.mag-layout-panorama {
+  background-color: #33343c;
+  background-image: var(--backdrop);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.mag-layout-panorama.is-left {
+  background-position: left center;
+}
+
+.mag-layout-panorama.is-right {
+  background-position: right center;
+}
+
+/* One tall page cannot show half a wide picture without stretching it. */
+.mag-book.is-single .mag-layout-panorama {
+  background-size: auto 100%;
+}
+
+.mag-book.is-single .mag-layout-panorama.is-left {
+  background-position: 62% center;
+}
+
+.mag-book.is-single .mag-layout-panorama.is-right {
+  background-position: 40% center;
+}
+
+.mag-layout-panorama .mag-running-head {
+  padding: calc(var(--m) * 3) calc(var(--m) * 8);
+  background: var(--paper);
+}
+
+.mag-layout-panorama .mag-head {
+  padding: calc(var(--k) * 10) calc(var(--k) * 12);
+  background: var(--paper);
+  rotate: -1deg;
+  box-shadow: calc(var(--k) * 5) calc(var(--k) * 5) 0 var(--print);
+}
+
+.mag-layout-panorama .mag-sticky {
+  margin-top: calc(var(--k) * -10);
+}
+
+.mag-layout-panorama.is-right .mag-flow {
+  justify-content: flex-end;
+}
+
+.mag-layout-panorama .mag-article {
+  padding: calc(var(--k) * 10) calc(var(--k) * 12);
+  background: var(--paper);
+  rotate: 0.8deg;
+  box-shadow: calc(var(--k) * 5) calc(var(--k) * 5) 0 var(--print);
+}
+
+/* Diagram: a blueprint sheet */
+.mag-layout-diagram.is-right {
+  background-color: var(--paper-deep);
+}
+
+.mag-layout-diagram .mag-stamp {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--k) * 12);
+  translate: -50% 0;
+  background: rgba(246, 236, 212, 0.9);
+}
+
+/* Roster: stripes behind a stack of passports */
+.mag-layout-roster {
+  background: repeating-linear-gradient(135deg, var(--band) 0 calc(var(--m) * 26), var(--band-deep) calc(var(--m) * 26) calc(var(--m) * 52));
+}
+
+.mag-layout-roster .mag-running-head {
+  color: var(--on-band);
+  border-color: var(--on-band);
+}
+
+.mag-layout-roster .mag-folio {
+  background: var(--print);
+}
+
+.mag-layout-roster .mag-head {
+  padding: calc(var(--k) * 10) calc(var(--k) * 12);
+  background: var(--paper);
+  rotate: -1deg;
+  box-shadow: calc(var(--k) * 5) calc(var(--k) * 5) 0 var(--print);
+}
+
+.mag-layout-roster .mag-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Forecast: a weather table */
+.mag-layout-forecast.is-right {
+  background-color: #dcecf6;
+}
+
+.mag-layout-forecast.is-right .mag-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Postcard: the back of the card on the right page */
+.mag-layout-postcard.is-left {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.3) 28%, transparent 30%) 0 0 / calc(var(--k) * 12) calc(var(--k) * 12),
+    var(--band);
+}
+
+.mag-layout-postcard.is-left .mag-head {
+  padding: calc(var(--k) * 10) calc(var(--k) * 12);
+  background: var(--paper);
+  rotate: 1deg;
+}
+
+.mag-layout-postcard.is-left .mag-running-head {
+  color: var(--on-band);
+  border-color: var(--on-band);
+}
+
+.mag-layout-postcard.is-left .mag-caption {
+  color: var(--on-band);
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 18);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.mag-layout-postcard.is-left .mag-folio {
+  background: var(--print);
+}
+
+.mag-layout-postcard.is-right .mag-flow {
+  padding: calc(var(--k) * 16) calc(var(--k) * 14);
+  background:
+    linear-gradient(transparent calc(100% - 1px), rgba(43, 34, 51, 0.16) 1px) 0 0 / 100% calc(var(--k) * 34),
+    #fffdf5;
+  box-shadow: calc(var(--k) * 4) calc(var(--k) * 4) 0 var(--print);
+  rotate: 0.6deg;
+}
+
+.mag-layout-postcard .mag-article {
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 19);
+  line-height: 1.2;
+}
+
+.mag-layout-postcard .mag-stamp {
+  align-self: flex-end;
+  margin-bottom: calc(var(--k) * -22);
+}
+
+.mag-layout-postcard.is-right .mag-sticky {
+  margin-top: calc(var(--k) * 4);
+}

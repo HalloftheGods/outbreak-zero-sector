@@ -10,10 +10,12 @@ import { headOnBulletPlane, headshotMultiplier } from './headshots.ts';
 import type { EntityId } from './protocol.ts';
 import { maybeDropOnKill } from './pickups.ts';
 import { hurtPlayer } from './player-health.ts';
+import { PIERCE_DAMAGE_SCALE } from './round-effect-data.ts';
 import type { BulletState, SimState, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 import { segmentHitsSolid } from './world-query.ts';
 import { startHunting } from './zombie-senses.ts';
+import { announcePierce, applyRoundEffect, corrosionScale } from './zombie-status.ts';
 
 /** Bullets count as this much fatter than a point against zombies. */
 const BULLET_RADIUS = 2;
@@ -38,7 +40,10 @@ function burst(sim: SimState, z: ZombieState, killerId: EntityId | null): void {
 }
 
 function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: EntityId | null): void {
-  const killer = sim.players.find((p) => p.id === killerId);
+  const present = sim.players.find((p) => p.id === killerId);
+  // A killer who has dropped out (a burn lands after they go) keeps the credit for when they return.
+  const away = present ? undefined : [...sim.departed.values()].find((p) => p.id === killerId);
+  const killer = present ?? away;
   if (killer) {
     killer.score += z.points;
     killer.kills += 1;
@@ -64,9 +69,10 @@ export function damageZombie(
   damage: number,
   angle: number,
   killerId: EntityId | null,
+  corrodes = false,
 ): void {
   if (z.health <= 0) return;
-  z.health -= damage;
+  z.health -= damage * (corrodes ? corrosionScale(z) : 1);
   const turnsOnShooter = killerId !== null && !z.horde;
   if (turnsOnShooter) startHunting(sim, z);
   // Big bodies shove less.
@@ -78,6 +84,16 @@ export function damageZombie(
     z.health = 0;
     killZombie(sim, z, angle, killerId);
   }
+}
+
+/** Damage with no blow behind it, as from a fire: nothing flinches and nothing new turns round. */
+export function woundZombie(sim: SimState, z: ZombieState, damage: number, killerId: EntityId | null): void {
+  if (z.health <= 0) return;
+  z.health -= damage * corrosionScale(z);
+  const killed = z.health <= 0;
+  if (!killed) return;
+  z.health = 0;
+  killZombie(sim, z, z.angle, killerId);
 }
 
 /** Fraction along the segment where it enters the circle, or Infinity on a miss. */
@@ -117,7 +133,8 @@ function firstZombieOnPath(sim: SimState, b: BulletState, dx: number, dy: number
   let zombie: ZombieState | null = null;
   let best = Infinity;
   for (const z of nearby) {
-    if (z.health <= 0) continue;
+    const hittable = z.health > 0 && z !== b.passed;
+    if (!hittable) continue;
     const t = segmentEntersCircle(b.x, b.y, dx, dy, z.x, z.y, z.radius + BULLET_RADIUS);
     if (t < best) {
       best = t;
@@ -130,10 +147,28 @@ function firstZombieOnPath(sim: SimState, b: BulletState, dx: number, dy: number
   return zombie ? { zombie, t: best } : null;
 }
 
-/** Returns false once the bullet is spent. Each tick's whole path is swept, so speed cannot tunnel. */
-function advanceBullet(sim: SimState, b: BulletState): boolean {
+/** A piercing round goes on with less behind it, and whatever head it was after is behind it now. */
+function passThrough(sim: SimState, b: BulletState, z: ZombieState): void {
+  b.passed = z;
+  b.damage *= PIERCE_DAMAGE_SCALE;
+  const headBehind = b.headTarget === z;
+  if (headBehind) b.headTarget = null;
+  announcePierce(sim, z);
+}
+
+/** Lands the bullet on a body. True if it carries on out the far side. */
+function strike(sim: SimState, b: BulletState, z: ZombieState, angle: number): boolean {
+  const damage = b.damage * headshotMultiplier(sim, b, z, angle);
+  damageZombie(sim, z, damage, angle, b.shooterId, b.effect === 'acid');
+  if (b.effect) applyRoundEffect(sim, b.effect, z, b.shooterId, b.volley);
+  const carriesOn = b.effect === 'piercing' && !b.passed;
+  if (carriesOn) passThrough(sim, b, z);
+  return carriesOn;
+}
+
+/** Returns false once the bullet is spent. The whole of `length` is swept, so speed cannot tunnel. */
+function sweepBullet(sim: SimState, b: BulletState, length: number): boolean {
   const speed = Math.hypot(b.vx, b.vy);
-  const length = Math.min(speed * TICK_DT, b.rangeLeft);
   const dx = (b.vx / speed) * length;
   const dy = (b.vy / speed) * length;
   const angle = Math.atan2(b.vy, b.vx);
@@ -144,9 +179,13 @@ function advanceBullet(sim: SimState, b: BulletState): boolean {
 
   const struck = target !== null && target.t <= wallT;
   if (struck) {
-    const damage = b.damage * headshotMultiplier(sim, b, target.zombie, angle);
-    damageZombie(sim, target.zombie, damage, angle, b.shooterId);
-    return false;
+    const carriesOn = strike(sim, b, target.zombie, angle);
+    if (!carriesOn) return false;
+    const travelled = target.t * length;
+    b.x += dx * target.t;
+    b.y += dy * target.t;
+    b.rangeLeft -= travelled;
+    return sweepBullet(sim, b, length - travelled);
   }
   if (wall) {
     emit(sim, { type: 'bullet_impact', x: wall.x, y: wall.y, angle });
@@ -158,6 +197,9 @@ function advanceBullet(sim: SimState, b: BulletState): boolean {
   const inWorld = b.x >= 0 && b.y >= 0 && b.x <= sim.map.width && b.y <= sim.map.height;
   return b.rangeLeft > 0 && inWorld;
 }
+
+const advanceBullet = (sim: SimState, b: BulletState): boolean =>
+  sweepBullet(sim, b, Math.min(Math.hypot(b.vx, b.vy) * TICK_DT, b.rangeLeft));
 
 export function updateBullets(sim: SimState): void {
   sim.bullets = sim.bullets.filter((b) => advanceBullet(sim, b));

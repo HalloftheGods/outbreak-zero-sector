@@ -10,6 +10,8 @@ import {
   WEAPONS,
 } from './constants.ts';
 import { noParts } from './gun-upgrades.ts';
+import { noKits } from './round-effects.ts';
+import { START_BOTTLES } from './bottles.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { alivePlayers, emit, openGroundNear } from './sim-state.ts';
 
@@ -20,7 +22,9 @@ function resetKit(p: PlayerState, spareRounds: number): void {
   p.ammoBag = { pistol: spareRounds, carbine: 0, shotgun: 0 };
   p.medkits = 0;
   p.knife = false;
+  p.bottles = START_BOTTLES;
   p.parts = noParts();
+  p.kits = noKits();
   p.owned = ['pistol'];
   p.weapon = 'pistol';
   p.ammo = pistol.magSize;

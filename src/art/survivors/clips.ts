@@ -91,6 +91,11 @@ function facings(build: (dir: DrawnDir) => Clip): DirClips {
   return [e, se, s, mirrored(se), mirrored(e), mirrored(ne), n, ne];
 }
 
+/** Just the standing clips, for callers that need a look at each facing and not the whole kit. */
+export function idleClips(person: Person, weapon: WeaponId): DirClips {
+  return facings((dir) => clip(person, weapon, dir, [{}], 2, true));
+}
+
 export function weaponClips(person: Person, weapon: WeaponId): SurvivorWeaponArt {
   const reload = (dir: DrawnDir) => (weapon === 'shotgun' ? shotgunPoses(dir) : magazinePoses(weapon, dir));
   return {

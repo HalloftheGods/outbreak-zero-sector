@@ -4,6 +4,7 @@ import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
 import { barrelOffset } from './barrel.ts';
 import { ParticleSystem } from './particles.ts';
+import { burstFor } from './status-bursts.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { ScreenEffects } from './screen-effects.ts';
 import type { VisualStore } from './visuals.ts';
@@ -12,6 +13,7 @@ const HIT_FLASH_SEC = 0.09;
 const BLOOD = ['#8c1a14', '#a8231a', '#5e100c'];
 const ACID = ['#a9d94a', '#6d9c22', '#d4f07a'];
 const SPARK = ['#fff0b8', '#ffc04a', '#ff8e2e'];
+const BOTTLE_GLASS = ['#8c8c56', '#c4f048', '#e4f0c0'];
 const SKULL_CHIPS = ['#e4dcc3', '#c9bd9c', '#a8231a'];
 const HEADSHOT_COLOR = '#ff5a3c';
 /** The word goes over the head it names. */
@@ -30,6 +32,8 @@ const MUZZLE_LIGHT: Record<WeaponId, { radius: number; life: number }> = {
   shotgun: { radius: 110, life: 0.1 },
 };
 
+const STATUS_LIGHT_RADIUS = 46;
+const STATUS_LIGHT_LIFE = 0.25;
 const SHOT_KICK: Record<WeaponId, number> = { pistol: 0.16, carbine: 0.12, shotgun: 0.42 };
 
 const PICKUP_LABEL: Record<PickupType, string> = {
@@ -41,11 +45,16 @@ const PICKUP_LABEL: Record<PickupType, string> = {
   carbine: 'CARBINE',
   shotgun: 'SHOTGUN',
   knife: 'KNIFE',
+  radio: 'RADIO',
   barrel: 'BARREL',
   grip: 'GRIP',
   magazine: 'MAGAZINE',
   suppressor: 'SUPPRESSOR',
   toolkit: 'TOOLKIT',
+  incendiary_kit: 'FLAME KIT',
+  acid_kit: 'ACID KIT',
+  piercing_kit: 'PIERCING KIT',
+  tranq_kit: 'TRANQ KIT',
 };
 
 export interface PulseLight {
@@ -125,6 +134,9 @@ export class FxDirector {
       case 'player_revived': this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR); break;
       case 'pickup': this.onPickup(event, ctx); break;
       case 'container_opened': this.onContainerOpened(event, ctx); break;
+      case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
+      case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
+      case 'zombie_status': this.onZombieStatus(event); break;
       default: break;
     }
   }
@@ -182,6 +194,13 @@ export class FxDirector {
   private onImpact(x: number, y: number, angle: number): void {
     this.particles.addClip(this.art.fx.bulletImpact, x, y - CHEST_HEIGHT, true);
     this.burstDots(x, y, angle + Math.PI, SPARK, 5, 70, true);
+  }
+
+  /** A status newly took hold: a puff of its colour, and for fire a warm pulse of light. */
+  private onZombieStatus(event: Extract<GameEvent, { type: 'zombie_status' }>): void {
+    const burst = burstFor(event);
+    this.burstDots(event.x, event.y, -Math.PI / 2, burst.colors, burst.count, burst.speed, burst.emissive, Math.PI);
+    if (event.effect === 'incendiary') this.pulses.push({ x: event.x, y: event.y, radius: STATUS_LIGHT_RADIUS, color: '#ff8a1c', life: STATUS_LIGHT_LIFE, maxLife: STATUS_LIGHT_LIFE });
   }
 
   private onZombieHit(id: EntityId, x: number, y: number, angle: number, time: number): void {
@@ -251,8 +270,16 @@ export class FxDirector {
   /** Whoever hears a clatter sees where it came from; only the searcher is told they found nothing. */
   private onContainerOpened(event: Extract<GameEvent, { type: 'container_opened' }>, ctx: FxContext): void {
     const emptyHanded = !event.found && event.playerId === ctx.localId;
+    const gotBottle = event.bottle === true && event.playerId === ctx.localId;
     if (event.noisy) this.particles.addText('CLATTER', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR);
+    else if (gotBottle) this.note('BOTTLE', event.x, event.y);
     else if (emptyHanded) this.note('NOTHING', event.x, event.y);
+  }
+
+  /** Green glass across the ground where a thrown bottle broke. */
+  private onBottleSmash(x: number, y: number): void {
+    this.burstDots(x, y, 0, BOTTLE_GLASS, 14, 70, false, Math.PI);
+    this.particles.addText('SMASH', x, y - NOTE_HEIGHT, SCORE_COLOR);
   }
 
   /** Over the local player's head, for what the sim says nothing about: an item left where it lay. */

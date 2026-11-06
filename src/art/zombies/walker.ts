@@ -3,7 +3,7 @@
 
 import { ZOMBIES } from '../../../shared/constants.ts';
 import { dirClips, makeClip } from '../kit.ts';
-import type { DrawnDir } from '../kit.ts';
+import type { DrawnDir, Legend } from '../kit.ts';
 import type { Clip, PixelSprite, ZombieArt } from '../types.ts';
 import { drawBody } from './body.ts';
 import type { BodyPlan, Pose } from './body.ts';
@@ -72,30 +72,33 @@ const DEATH: readonly Pose[] = [
 /** Three frames fill the wind-up, so the last, the follow-through, lands with the hit. */
 const ATTACK_FPS = 3 / ZOMBIES.walker.windupSec;
 
-function flat(rows: readonly string[], pool: readonly string[] = []): PixelSprite {
-  return flatFrame(CELL, OX, OY, WALKER_LEGEND, [[4, 34 - pool.length, pool], [2, 3, rows]]);
+function flat(legend: Legend, rows: readonly string[], pool: readonly string[] = []): PixelSprite {
+  return flatFrame(CELL, OX, OY, legend, [[4, 34 - pool.length, pool], [2, 3, rows]]);
 }
 
 /** Facing the camera, a reaching arm foreshortens: it stays high and comes straight out. */
-function draw(dir: DrawnDir, pose: Pose): PixelSprite {
-  if (dir !== 2) return drawBody(PLAN, dir, pose);
-  return drawBody(PLAN, dir, { ...pose, hands: [add(pose.hands[0], [-1, -1, 3]), pose.hands[1]] });
+function draw(plan: BodyPlan, dir: DrawnDir, pose: Pose): PixelSprite {
+  const sideOn = dir !== 2;
+  if (sideOn) return drawBody(plan, dir, pose);
+  return drawBody(plan, dir, { ...pose, hands: [add(pose.hands[0], [-1, -1, 3]), pose.hands[1]] });
 }
 
-export function buildWalker(): ZombieArt {
+/** The walker's body and moves. Another legend recolours it into a cousin, as the screamer is. */
+export function buildWalker(legend: Legend = WALKER_LEGEND): ZombieArt {
+  const plan: BodyPlan = { ...PLAN, legend };
   return {
-    walk: dirClips((dir) => makeClip(WALK.map((pose) => draw(dir, pose)), 8)),
-    attack: dirClips((dir) => makeClip(ATTACK.map((pose) => drawBody(PLAN, dir, pose)), ATTACK_FPS, false)),
+    walk: dirClips((dir) => makeClip(WALK.map((pose) => draw(plan, dir, pose)), 8)),
+    attack: dirClips((dir) => makeClip(ATTACK.map((pose) => drawBody(plan, dir, pose)), ATTACK_FPS, false)),
     death: makeClip([
-      ...DEATH.map((pose) => drawBody(PLAN, 2, pose)),
-      flat(WALKER_FALL),
-      flat(WALKER_CORPSE),
-      flat(WALKER_CORPSE, WALKER_POOL[0]),
-      flat(WALKER_CORPSE, WALKER_POOL[1]),
+      ...DEATH.map((pose) => drawBody(plan, 2, pose)),
+      flat(legend, WALKER_FALL),
+      flat(legend, WALKER_CORPSE),
+      flat(legend, WALKER_CORPSE, WALKER_POOL[0]),
+      flat(legend, WALKER_CORPSE, WALKER_POOL[1]),
     ], 9, false),
   };
 }
 
 export function referenceWalker(): { idle: PixelSprite; walk: Clip } {
-  return { idle: draw(2, STAND), walk: makeClip(WALK.map((pose) => draw(2, pose)), 8) };
+  return { idle: draw(PLAN, 2, STAND), walk: makeClip(WALK.map((pose) => draw(PLAN, 2, pose)), 8) };
 }

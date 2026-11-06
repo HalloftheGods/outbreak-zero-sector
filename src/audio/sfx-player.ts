@@ -107,6 +107,13 @@ export const containerOpen: Recipe = (v) => {
   tone(v, { at: 0.1, type: 'triangle', f0: 240, f1: 170, decay: 0.05, gain: 0.25 });
 };
 
+/** A radio coming on in your hands: a burst of static, then a thin tone sliding into tune. */
+export const pickupRadio: Recipe = (v) => {
+  noise(v, { filter: 'bandpass', freq: 1800, freq1: 3200, q: 1.5, attack: 0.01, decay: 0.22, gain: 0.35 });
+  tone(v, { at: 0.12, type: 'sine', f0: 620, f1: 880, attack: 0.02, decay: 0.2, gain: 0.25 });
+  tone(v, { at: 0.3, type: 'triangle', f0: 880, f1: 880, attack: 0.02, decay: 0.3, gain: 0.2 });
+};
+
 /** Things coming off a shelf and hitting the floor, loud enough to be worth flinching at. */
 export const clatter: Recipe = (v) => {
   [0, 0.07, 0.11, 0.2, 0.26, 0.38].forEach((at, i) => {

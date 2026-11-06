@@ -5,15 +5,18 @@ import { CHARACTERS } from './characters.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type { PartId } from './gun-upgrade-data.ts';
 import type { PlayerGear } from './gun-upgrades.ts';
+import type { GunEffect, RoundKitId } from './round-effect-data.ts';
 import type { BenchAction, BenchView } from './workbench.ts';
 
 export type EntityId = string;
 
 export type WeaponId = 'pistol' | 'carbine' | 'shotgun';
-export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute';
-export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun' | 'knife' | PartId;
+export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute' | 'screamer';
+export type PickupType = 'bandage' | 'medkit' | 'pistol_ammo' | 'carbine_ammo' | 'shells' | 'carbine' | 'shotgun' | 'knife' | 'radio' | PartId | RoundKitId;
 export type PlayerStatus = 'alive' | 'downed' | 'dead';
 export type GamePhase = 'intermission' | 'wave' | 'gameover';
+/** How a survivor is moving: sneaking is slow and hard to spot, sprinting is fast and loud. */
+export type Stance = 'walk' | 'sneak' | 'sprint';
 
 export const WEAPON_ORDER: readonly WeaponId[] = ['pistol', 'carbine', 'shotgun'];
 export const SURVIVOR_SKIN_COUNT = CHARACTERS.length;
@@ -46,6 +49,8 @@ export interface PlayerEntity {
   medkits: number;
   /** Carrying a knife, which makes the shove a stab. */
   knife: boolean;
+  /** Empty bottles to throw. Left off at none. */
+  bottles?: number;
   /** 0 when not searching, otherwise 0..1 through the search. */
   search: number;
   /** Id of the building this player stands in, or null outdoors. */
@@ -74,6 +79,12 @@ export interface ZombieEntity {
   maxHealth: number;
   /** True during the attack wind-up and swing, drives the attack clip. */
   attacking: boolean;
+  /** On fire, which glows. Left off unless true. */
+  burning?: boolean;
+  /** Stacks of acid on it, 1 up to CORROSION_MAX_STACKS. Left off at none. */
+  corrosion?: number;
+  /** Slowed by a tranq round. Left off unless true. */
+  slowed?: boolean;
 }
 
 export interface BulletEntity {
@@ -84,6 +95,8 @@ export interface BulletEntity {
   /** World pixels per second. */
   vx: number;
   vy: number;
+  /** What the gun it came from fires. Left off for a plain round. */
+  effect?: GunEffect;
 }
 
 export interface PickupEntity {
@@ -126,7 +139,7 @@ export interface ExitEntity {
 
 /** One-shot facts for audio, particles and banners. Every field is in world space. */
 export type GameEvent =
-  | { readonly type: 'shot'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number; readonly angle: number; readonly suppressed?: boolean }
+  | { readonly type: 'shot'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number; readonly angle: number; readonly suppressed?: boolean; readonly effect?: GunEffect }
   | { readonly type: 'dry_fire'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'melee'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly angle: number; readonly hit: boolean }
   | { readonly type: 'heal'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly amount: number }
@@ -136,6 +149,8 @@ export type GameEvent =
   | { readonly type: 'weapon_switch'; readonly playerId: EntityId; readonly weapon: WeaponId; readonly x: number; readonly y: number }
   | { readonly type: 'bullet_impact'; readonly x: number; readonly y: number; readonly angle: number }
   | { readonly type: 'zombie_hit'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number }
+  /** A round's effect took hold: a body lit (`caught` if off another body), acid went a stack deeper, a tranq landed, or a bullet went through. */
+  | { readonly type: 'zombie_status'; readonly effect: GunEffect; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly caught?: boolean; readonly stacks?: number }
   | { readonly type: 'headshot'; readonly playerId: EntityId; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly points: number }
   | { readonly type: 'zombie_die'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly killerId: EntityId | null; readonly points: number }
   | { readonly type: 'zombie_attack'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
@@ -145,7 +160,10 @@ export type GameEvent =
   | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
-  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean }
+  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean }
+  /** A thrown bottle broke at x,y, thrown from fromX,fromY. */
+  | { readonly type: 'bottle_smash'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number }
+  | { readonly type: 'car_alarm'; readonly x: number; readonly y: number }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
   | { readonly type: 'wave_clear'; readonly wave: number }
@@ -177,6 +195,12 @@ export interface ClientInputPacket {
   readonly heal: boolean;
   /** The search key is held down. */
   readonly search: boolean;
+  /** Throw a bottle at the crosshair. Left off when not. */
+  readonly throw?: boolean;
+  /** The sneak key is held. Left off when not. Wins over sprint when both are held. */
+  readonly sneak?: boolean;
+  /** The sprint key is held. Left off when not. */
+  readonly sprint?: boolean;
 }
 
 export interface SnapshotPacket {
@@ -214,6 +238,8 @@ export interface WelcomePacket {
   readonly tickRate: number;
   /** generateWorldMap(mapSeed) rebuilds the town being played when this client joined. */
   readonly mapSeed: number;
+  /** What the room is played on: a guest plays the first player's choice, not their own. */
+  readonly difficulty?: DifficultyId;
 }
 
 export type ServerPacket =

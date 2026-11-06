@@ -36,6 +36,7 @@ const PROPS: readonly (readonly [PropKind, number, number])[] = [
 
 const SURVIVORS: readonly (readonly [number, WeaponId, number, number, number])[] = [
   [0, 'pistol', 2, 218, 186], [1, 'carbine', 0, 248, 200], [2, 'shotgun', 1, 200, 214], [3, 'pistol', 4, 262, 170],
+  [4, 'pistol', 0, 282, 212],
 ];
 
 const ZOMBIES: readonly (readonly [ZombieType, number, number, number])[] = [

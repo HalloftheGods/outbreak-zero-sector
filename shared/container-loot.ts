@@ -4,8 +4,9 @@ import { AMMO_PICKUPS } from './constants.ts';
 import { scaleRounds } from './difficulty.ts';
 import type { DifficultyId } from './difficulty.ts';
 import { isAmmoPickup } from './pickups.ts';
-import type { BuildingKind, PickupType } from './protocol.ts';
-import { pickWeighted, shuffle } from './rng.ts';
+import type { BuildingInstance, BuildingKind, PickupType } from './protocol.ts';
+import { pick, pickWeighted, shuffle } from './rng.ts';
+import type { Rng } from './rng.ts';
 import type { SimState } from './sim-state.ts';
 
 interface ContainerLootRule {
@@ -93,6 +94,12 @@ export function stockEmptyHomes(sim: SimState): void {
     stocked.add(building);
     sim.containers[id].loot = { type: pickWeighted(sim.rng, HOME_KEEPSAKES), rounds: 0 };
   }
+}
+
+/** An empty, shut container in this building, or null if it has none. */
+export function containerInBuilding(sim: SimState, building: BuildingInstance, rng: Rng): ContainerState | null {
+  const here = townContainers(sim.map).filter((each) => each.building === building.id && sim.containers[each.id].loot === null);
+  return here.length > 0 ? sim.containers[pick(rng, here).id] : null;
 }
 
 /** All that is still shut away, for adding up the town's ammo. */

@@ -30,6 +30,29 @@ export const LULLS: readonly Playlist[] = [
   lull('level-10-final-stand.mp3', 'level-10-final-evacuation.mp3'),
 ];
 
+export type TrackGroup = 'title' | 'horde' | 'level' | 'victory' | 'credits';
+
+export interface TrackInfo {
+  readonly file: string;
+  readonly group: TrackGroup;
+  /** The level that has to be reached to hear it in a run. The title and the first horde belong to the first. */
+  readonly level: number;
+}
+
+const tracksOf = (playlist: Playlist, group: TrackGroup, level: number): TrackInfo[] =>
+  playlist.files.map((file) => ({ file, group, level }));
+
+/** Every recorded track, read from the playlists above so the Sound Test keeps no list of its own. */
+export function allTracks(): readonly TrackInfo[] {
+  return [
+    ...tracksOf(RUINS, 'title', FIRST_LEVEL),
+    ...tracksOf(HORDE, 'horde', FIRST_LEVEL),
+    ...LULLS.flatMap((playlist, index) => tracksOf(playlist, 'level', FIRST_LEVEL + index)),
+    ...tracksOf(VICTORY, 'victory', FINAL_LEVEL),
+    ...tracksOf(CREDITS, 'credits', FINAL_LEVEL),
+  ];
+}
+
 /** What plays in a scene on a level. Levels past either end of the run hold to the nearest. */
 export function playlistFor(scene: Scene, level: number): Playlist {
   if (scene === 'menu') return RUINS;

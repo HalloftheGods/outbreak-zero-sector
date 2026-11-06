@@ -14,6 +14,7 @@ import type { AmmoPickup } from './constants.ts';
 import { foundGunFit, isPartPickup, takePart } from './gun-upgrades.ts';
 import { WEAPON_ORDER } from './protocol.ts';
 import type { PickupType, WeaponId } from './protocol.ts';
+import { isKitPickup, takeKit } from './round-effects.ts';
 import type { PickupState, PlayerState, SimState } from './sim-state.ts';
 import { emit, entityId } from './sim-state.ts';
 import { syncGun } from './weapons.ts';
@@ -85,7 +86,10 @@ function applyPickup(p: PlayerState, item: PickupState): boolean {
     p.knife = true;
     return true;
   }
+  /** The Radio does nothing in the sim: whoever stands on it takes it, and the event tells every client. */
+  if (type === 'radio') return true;
   if (isPartPickup(type)) return takePart(p, type);
+  if (isKitPickup(type)) return takeKit(p, type);
   const used = isAmmoPickup(type) ? takeAmmo(p, item, type) : takeGun(p, item, type);
   if (used) syncGun(p);
   return used;

@@ -6,6 +6,7 @@ import type { Clip } from '../types.ts';
 import { makeClip, PixelCanvas } from '../kit.ts';
 import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
+import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
 import type { Grid } from './shared.ts';
 
@@ -133,6 +134,22 @@ const KNIFE: Grid = [
   '.......n........',
 ];
 
+/** A pocket radio: olive case, a speaker grille, a lit dial with a red needle, two knobs and a bent aerial. */
+const RADIO: Grid = [
+  '...........p....',
+  '..........p.....',
+  '.........p......',
+  '.cccccccccccccc.',
+  'cbbbbbbbbbbbbbba',
+  'cbmnmnmbeeeeeeba',
+  'cbnmnmnbefffrfba',
+  'cbmnmnmbeeeeeeba',
+  'cbnmnmnbbbbbbbba',
+  'cbmnmnmbbpbbpbba',
+  'cbbbbbbbbbbbbbba',
+  'aaaaaaaaaaaaaaaa',
+];
+
 interface ItemSpec {
   readonly rows: Grid;
   /** Where the glint sits, relative to the item. */
@@ -148,7 +165,9 @@ const ITEMS: Record<PickupType, ItemSpec> = {
   carbine: { rows: CARBINE, glint: [8, 1] },
   shotgun: { rows: SHOTGUN, glint: [10, 1] },
   knife: { rows: KNIFE, glint: [11, 1] },
+  radio: { rows: RADIO, glint: [2, 3] },
   ...PART_ART,
+  ...KIT_ART,
 };
 
 function frame({ rows, glint }: ItemSpec, index: number): PixelCanvas {

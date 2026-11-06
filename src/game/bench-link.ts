@@ -1,6 +1,7 @@
 import type { SnapshotPacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import type { GameTransport } from '../network/transport.ts';
+import { tapBenchAction } from './analytics/event-tap.ts';
 
 interface BenchHost {
   transport(): GameTransport | null;
@@ -31,6 +32,7 @@ export class BenchLink {
   }
 
   send(action: BenchAction): void {
+    tapBenchAction(action);
     this.host.transport()?.sendBench(action);
   }
 }

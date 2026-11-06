@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { startGameServer } from '../server/server.ts';
 import type { RunningGameServer } from '../server/server.ts';
 import { EXIT_HOLD_SEC } from '../shared/constants.ts';
+import { effectOf } from '../shared/gun-upgrades.ts';
+import type { SnapshotPacket, WeaponId } from '../shared/protocol.ts';
+import type { GunEffect } from '../shared/round-effect-data.ts';
 import type { SimState } from '../shared/sim-state.ts';
 import { alivePlayers } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
@@ -22,6 +25,11 @@ function nearlyAway(state: SimState): void {
     p.x = exit.x;
     p.y = exit.y;
   }
+}
+
+function effectIn(frame: SnapshotPacket | null | undefined, weapon: WeaponId): GunEffect | null {
+  const gear = frame?.players[0].gear;
+  return effectOf(gear?.fits[weapon]);
 }
 
 describe('the workbench over a socket', () => {
@@ -62,6 +70,31 @@ describe('the workbench over a socket', () => {
     ann.send({ type: 'bench', action: { kind: 'ready', ready: true } });
     const moved = await ann.until(() => ann.lastSnapshot?.level === 2 && ann.lastSnapshot);
     expect(moved.bench).toBeUndefined();
+  });
+
+  it('fits and moves a round kit\'s effect for a client, and the frames stay well formed', async () => {
+    const { state, ann } = await room();
+    const [p] = state.players;
+    p.kits.incendiary = 1;
+    p.parts.toolkit = 1;
+    p.guns.carbine = { ammo: 30 };
+    p.owned = ['pistol', 'carbine'];
+    nearlyAway(state);
+    await ann.until(() => ann.lastSnapshot?.bench);
+
+    ann.send({ type: 'bench', action: { kind: 'fit_effect', weapon: 'pistol', effect: 'incendiary' } });
+    const fitted = await ann.until(() => effectIn(ann.lastSnapshot, 'pistol') === 'incendiary' && ann.lastSnapshot);
+    expect(isSnapshotPacket(fitted)).toBe(true);
+    expect(fitted.players[0].gear?.kits).toBeUndefined();
+
+    ann.send({ type: 'bench', action: { kind: 'move_effect', from: 'pistol', to: 'carbine' } });
+    const moved = await ann.until(() => effectIn(ann.lastSnapshot, 'carbine') === 'incendiary' && ann.lastSnapshot);
+    expect(effectIn(moved, 'pistol')).toBeNull();
+    expect(moved.players[0].gear?.parts.toolkit).toBe(0);
+
+    ann.send({ type: 'bench', action: { kind: 'ready', ready: true } });
+    const nextTown = await ann.until(() => ann.lastSnapshot?.level === 2 && ann.lastSnapshot);
+    expect(effectIn(nextTown, 'carbine')).toBe('incendiary');
   });
 
   it('ignores a bench packet that makes no sense', async () => {

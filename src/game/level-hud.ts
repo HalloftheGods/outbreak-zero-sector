@@ -1,4 +1,5 @@
 import { FINAL_LEVEL, levelDef } from '../../shared/levels.ts';
+import { townRule } from '../../shared/town-rules.ts';
 import type { HudState, LevelCard } from './hud-state.ts';
 
 /** Hordes this town has seen off, the one on the street not counted. */
@@ -22,9 +23,11 @@ export function levelGoal(hud: Pick<HudState, 'level' | 'phase' | 'wave' | 'exit
 export function levelTitle(level: number): Omit<LevelCard, 'key'> {
   const { number, title, hordes } = levelDef(level);
   const isLast = number === FINAL_LEVEL;
+  const rule = townRule(level);
   return {
     heading: isLast ? 'Final level' : `Level ${number} of ${FINAL_LEVEL}`,
     title,
     goal: `Survive ${hordes} hordes, then reach the van`,
+    ...(rule ? { rule: `${rule.name}: ${rule.blurb}` } : {}),
   };
 }

@@ -7,6 +7,7 @@ import { spawnPickup } from './pickups.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
 import { makeNoise } from './zombie-senses.ts';
+import { maybeCarAlarm, scroungeBottle } from './bottles.ts';
 
 /** Odds that a search knocks something over. */
 export const CLATTER_CHANCE = 0.1;
@@ -44,7 +45,9 @@ function finishSearch(sim: SimState, p: PlayerState, id: number): void {
   const found = loot !== null;
   if (noisy) makeNoise(sim, p.x, p.y, CLATTER_RADIUS);
   if (found) spawnPickup(sim, loot.type, p.x, p.y, loot.rounds);
-  emit(sim, { type: 'container_opened', playerId: p.id, container: id, x: p.x, y: p.y, found, noisy });
+  const bottle = !found && scroungeBottle(sim, p);
+  maybeCarAlarm(sim, townContainers(sim.map)[id]);
+  emit(sim, { type: 'container_opened', playerId: p.id, container: id, x: p.x, y: p.y, found, noisy, ...(bottle ? { bottle } : {}) });
   stopSearch(p);
   p.searchSpent = true;
 }

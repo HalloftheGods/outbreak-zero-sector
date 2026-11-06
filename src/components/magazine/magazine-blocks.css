@@ -1,0 +1,436 @@
+/* The pieces a page is pasted up from. Sizes run on --k, the page's unit with its fit applied. */
+
+/* Headline */
+.mag-head {
+  flex: none;
+  position: relative;
+}
+
+.mag-head-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--k) * 6);
+  padding: calc(var(--k) * 2) calc(var(--k) * 10) calc(var(--k) * 2) 0;
+  background: var(--band);
+  color: var(--on-band);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12.5);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.mag-head-number {
+  padding: calc(var(--k) * 2) calc(var(--k) * 7);
+  margin: calc(var(--k) * -2) 0;
+  background: var(--print);
+  color: var(--paper);
+  font-weight: 700;
+}
+
+.mag-head-title {
+  margin-top: calc(var(--k) * 6);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 42);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: calc(var(--k) * -1);
+  color: var(--print);
+  text-shadow: calc(var(--k) * 2.5) calc(var(--k) * 2.5) 0 var(--band);
+}
+
+.mag-head-deck {
+  margin-top: calc(var(--k) * 6);
+  font-size: calc(var(--k) * 18);
+  font-style: italic;
+  line-height: 1.2;
+  color: var(--band-deep);
+}
+
+/* Body copy */
+.mag-article {
+  flex: none;
+}
+
+.mag-article ul,
+.mag-article ol {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 6);
+  list-style: none;
+}
+
+.mag-article li {
+  position: relative;
+  padding-left: calc(var(--k) * 24);
+}
+
+.mag-article-heading,
+.mag-gallery-title,
+.mag-itinerary-title {
+  margin-bottom: calc(var(--k) * 5);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 15);
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--band-deep);
+}
+
+.mag-article.is-numbered ol {
+  counter-reset: mag-step;
+}
+
+.mag-article.is-numbered li {
+  counter-increment: mag-step;
+  padding-left: calc(var(--k) * 30);
+}
+
+.mag-article.is-numbered li::before {
+  content: counter(mag-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--k) * 22);
+  height: calc(var(--k) * 22);
+  background: var(--band);
+  color: var(--on-band);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 13);
+  font-weight: 700;
+  line-height: calc(var(--k) * 22);
+  text-align: center;
+}
+
+.mag-article.is-bullets li::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--k) * 3);
+  top: calc(var(--k) * 5);
+  width: calc(var(--k) * 11);
+  height: calc(var(--k) * 11);
+  background: var(--band);
+  rotate: 45deg;
+}
+
+.mag-article.is-plain li {
+  padding-left: 0;
+}
+
+.mag-article.is-keys ul {
+  gap: calc(var(--k) * 4);
+}
+
+.mag-article.is-keys li {
+  padding-left: 0;
+}
+
+.mag-lead {
+  display: inline-block;
+  min-width: calc(var(--k) * 22);
+  padding: 0 calc(var(--k) * 5);
+  margin-right: calc(var(--k) * 1);
+  background: var(--print);
+  color: var(--paper);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Snapshots */
+.mag-photo {
+  flex: 1 1 0;
+  min-height: calc(var(--k) * 110);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 8);
+}
+
+.mag-photo.is-small {
+  flex-grow: 0.7;
+  min-height: calc(var(--k) * 90);
+}
+
+.mag-photo-frame {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: end center;
+  padding-top: calc(var(--k) * 6);
+}
+
+.mag-print {
+  position: relative;
+  width: min(94cqw, calc(92cqh * var(--ratio)));
+  aspect-ratio: var(--ratio);
+  border: calc(var(--k) * 7) solid #fffdf5;
+  rotate: var(--tilt);
+  background: #fffdf5;
+  box-shadow: calc(var(--k) * 2) calc(var(--k) * 3) 0 rgba(43, 34, 51, 0.35);
+}
+
+/* Masking tape on the top edge. */
+.mag-print::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: calc(var(--k) * -15);
+  width: calc(var(--k) * 72);
+  height: calc(var(--k) * 20);
+  translate: -50% 0;
+  rotate: -3deg;
+  background: rgba(242, 220, 140, 0.8);
+  box-shadow: 0 1px 0 rgba(43, 34, 51, 0.15);
+}
+
+.sprite-img.mag-print-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+.mag-marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mag-marks path {
+  fill: none;
+  stroke: var(--marker);
+  stroke-width: calc(var(--k) * 3);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.mag-mark-note {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  max-width: 62%;
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 17);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--marker);
+  text-shadow: 1px 1px 0 #fff, -1px 1px 0 #fff, 1px -1px 0 #fff, -1px -1px 0 #fff;
+  rotate: -3deg;
+}
+
+/* Marker writing on a tiny print only gets in the way. */
+@container (max-height: 160px) {
+  .mag-mark-note {
+    display: none;
+  }
+}
+
+.mag-caption {
+  flex: none;
+  font-size: calc(var(--k) * 13);
+  font-style: italic;
+  line-height: 1.2;
+  color: var(--print-soft);
+}
+
+/* Notes, tips, stamps */
+.mag-sticky {
+  flex: none;
+  align-self: flex-end;
+  position: relative;
+  z-index: 4;
+  max-width: 62%;
+  padding: calc(var(--k) * 9) calc(var(--k) * 12);
+  background: var(--note);
+  color: var(--print);
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 18);
+  font-weight: 700;
+  line-height: 1.12;
+  rotate: var(--tilt);
+  box-shadow: calc(var(--k) * 2) calc(var(--k) * 3) 0 rgba(43, 34, 51, 0.3);
+}
+
+/* Stuck on a corner of the photo beneath it. */
+.mag-sticky:has(+ .mag-photo) {
+  margin-bottom: calc(var(--k) * -34);
+}
+
+.mag-tip {
+  flex: none;
+  position: relative;
+  padding: calc(var(--k) * 8) calc(var(--k) * 12);
+  border-top: calc(var(--k) * 5) dashed var(--on-band);
+  background: var(--band);
+  color: var(--on-band);
+  box-shadow: calc(var(--k) * 4) calc(var(--k) * 4) 0 var(--print);
+}
+
+.mag-tip p {
+  font-size: calc(var(--k) * 15);
+  font-weight: 700;
+  line-height: 1.22;
+}
+
+.mag-tip-label {
+  display: block;
+  margin-bottom: calc(var(--k) * 2);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12.5);
+  text-transform: uppercase;
+}
+
+.mag-stamp {
+  flex: none;
+  align-self: flex-start;
+  position: relative;
+  z-index: 4;
+  padding: calc(var(--k) * 3) calc(var(--k) * 10);
+  border: calc(var(--k) * 3) solid var(--marker);
+  color: var(--marker);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 20);
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  rotate: var(--tilt);
+  opacity: 0.85;
+}
+
+.mag-sidebar {
+  flex: none;
+  padding: calc(var(--k) * 10) calc(var(--k) * 12);
+  border-top: calc(var(--k) * 6) solid var(--band);
+  background: var(--paper-deep);
+}
+
+.mag-sidebar-title {
+  margin-bottom: calc(var(--k) * 6);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 16);
+  text-transform: uppercase;
+  color: var(--band-deep);
+}
+
+.mag-sidebar dt {
+  display: inline;
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12.5);
+  font-weight: 700;
+}
+
+.mag-sidebar dt::after {
+  content: ' ';
+}
+
+.mag-sidebar dd {
+  display: inline;
+  font-style: italic;
+  font-size: calc(var(--k) * 14.5);
+}
+
+.mag-sidebar dd::after {
+  content: '';
+  display: block;
+  height: calc(var(--k) * 5);
+}
+
+.mag-burst {
+  display: inline-grid;
+  place-items: center;
+  width: calc(var(--k) * 118);
+  height: calc(var(--k) * 118);
+  padding: calc(var(--k) * 22);
+  background: var(--note);
+  color: var(--marker);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 14);
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  rotate: 12deg;
+  clip-path: polygon(50% 0, 60% 13%, 75% 7%, 79% 22%, 95% 25%, 90% 40%, 100% 50%, 90% 60%, 95% 75%, 79% 78%, 75% 93%, 60% 87%, 50% 100%, 40% 87%, 25% 93%, 21% 78%, 5% 75%, 10% 60%, 0 50%, 10% 40%, 5% 25%, 21% 22%, 25% 7%, 40% 13%);
+}
+
+.mag-hero {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.mag-hero .mag-burst {
+  position: absolute;
+  right: 0;
+  top: 2%;
+}
+
+.mag-hero-caption {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--k) * 6);
+  padding: calc(var(--k) * 2) calc(var(--k) * 10);
+  background: var(--print);
+  color: var(--paper);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 13);
+  text-transform: uppercase;
+}
+
+.mag-review {
+  flex: none;
+  padding: calc(var(--k) * 8) calc(var(--k) * 12);
+  border-left: calc(var(--k) * 6) solid var(--band);
+  background: var(--paper-deep);
+  font-size: calc(var(--k) * 17);
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.mag-review-stars {
+  display: block;
+  color: var(--band);
+  font-size: calc(var(--k) * 20);
+  font-style: normal;
+  letter-spacing: calc(var(--k) * 2);
+}
+
+.mag-letter {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 8);
+}
+
+.mag-letter-title {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 24);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--print);
+}
+
+.mag-letter > p:first-of-type::first-letter {
+  float: left;
+  padding-right: calc(var(--k) * 6);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 46);
+  font-weight: 700;
+  line-height: 0.85;
+  color: var(--band);
+}
+
+.mag-letter-signed {
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 16);
+  font-weight: 700;
+  color: var(--band-deep);
+}
