@@ -123,8 +123,17 @@ export function playStepper(flow: PlayFlow): readonly StepperStop[] {
     step,
     label: STEP_LABELS[step],
     number: index + 1,
-    state: index < at ? 'done' : index === at ? 'current' : 'next',
+    state: stopState(index, at),
   }));
+}
+
+/** Where one stop stands against the step the player is on. */
+function stopState(index: number, at: number): StepperStop['state'] {
+  const isBehind = index < at;
+  const isHere = index === at;
+  if (isBehind) return 'done';
+  if (isHere) return 'current';
+  return 'next';
 }
 
 /** A done step picked on the stepper: back to it, the mode kept. A step ahead, or one this walk skips, leaves the flow as it is. */
