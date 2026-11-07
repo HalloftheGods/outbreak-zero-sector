@@ -20,7 +20,8 @@ const SURFACE_STEP: Readonly<Partial<Record<TileKind, SfxName>>> = {
 
 /** Slow enough to be sneaking, fast enough to be sprinting, or neither. */
 function stanceBySpeed(ratio: number): Stance {
-  if (ratio < SNEAK_BELOW) return 'sneak';
+  const isSneaking = ratio < SNEAK_BELOW;
+  if (isSneaking) return 'sneak';
   return ratio > SPRINT_ABOVE ? 'sprint' : 'walk';
 }
 
@@ -58,7 +59,8 @@ export class FootstepTracker {
   tick(players: readonly PlayerEntity[], localId: EntityId | null, map: WorldMap, dt: number, play: StepPlayer): void {
     this.frame += 1;
     for (const p of players) this.step(p, p.id === localId, map, dt, play);
-    if (this.walkers.size > players.length) this.drop();
+    const hasGoneWalkers = this.walkers.size > players.length;
+    if (hasGoneWalkers) this.drop();
   }
 
   reset(): void {
@@ -75,26 +77,30 @@ export class FootstepTracker {
     const dist = Math.hypot(p.x - w.x, p.y - w.y);
     w.x = p.x;
     w.y = p.y;
-    if (p.status !== 'alive' || dt <= 0) {
+    const isResting = p.status !== 'alive' || dt <= 0;
+    if (isResting) {
       w.acc = 0;
       return;
     }
-    if (dist === 0) return;
+    const isStandingStill = dist === 0;
+    if (isStandingStill) return;
     const kind = groundAt(map, p.x, p.y);
     const drag = (kind && GROUND_EFFECTS[kind]?.speed) || 1;
     const ratio = dist / dt / (playerSpeed(p.skin) * drag);
-    if (ratio > TELEPORT_RATIO) {
-      w.acc = 0;
-      return;
-    }
     const stance = stanceBySpeed(ratio);
-    w.acc = Math.min(w.acc + dist, STRIDE[stance] * 2);
-    if (w.acc < STRIDE[stance]) return;
+    // A jump (a respawn, a van ride) is no stride: the count starts again and nothing sounds.
+    const isTeleport = ratio > TELEPORT_RATIO;
+    w.acc = isTeleport ? 0 : Math.min(w.acc + dist, STRIDE[stance] * 2);
+    const isMidStride = w.acc < STRIDE[stance];
+    if (isMidStride) return;
     w.acc -= STRIDE[stance];
     play(stepSfxFor(kind), local ? { local: true, gain: STEP_GAIN[stance] } : { x: p.x, y: p.y, gain: STEP_GAIN[stance] });
   }
 
   private drop(): void {
-    for (const [id, w] of this.walkers) if (w.seen !== this.frame) this.walkers.delete(id);
+    for (const [id, w] of this.walkers) {
+      const isGone = w.seen !== this.frame;
+      if (isGone) this.walkers.delete(id);
+    }
   }
 }

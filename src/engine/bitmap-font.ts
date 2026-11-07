@@ -61,7 +61,8 @@ function buildAtlas(color: string): Atlas {
     const origin = slots.get(char)!;
     rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x += 1) {
-        if (row[x] === '#') ctx.fillRect(origin + x, y, 1, 1);
+        const isInked = row[x] === '#';
+        if (isInked) ctx.fillRect(origin + x, y, 1, 1);
       }
     });
   }

@@ -14,9 +14,11 @@ export interface Spatial { readonly gain: number; readonly pan: number }
 export function spatialize(lx: number, ly: number, x: number, y: number): Spatial | null {
   const dx = x - lx;
   const dist = Math.hypot(dx, y - ly);
-  if (dist >= HEARING_RANGE) return null;
+  const isOutOfEarshot = dist >= HEARING_RANGE;
+  if (isOutOfEarshot) return null;
   const gain = (1 - dist / HEARING_RANGE) ** 1.5;
-  if (gain < 0.01) return null;
+  const isInaudible = gain < 0.01;
+  if (isInaudible) return null;
   return { gain, pan: Math.max(-1, Math.min(1, dx / PAN_SPAN)) };
 }
 
@@ -99,11 +101,10 @@ export class Mixer {
     const now = ctx.currentTime;
     const positional = o.x !== undefined && o.y !== undefined && !o.local;
     const space = positional ? spatialize(this.lx, this.ly, o.x as number, o.y as number) : null;
-    if (positional && !space) return;
-    if (!o.local && now - (this.last.get(name) ?? -1) < def.cooldown) return;
-    const slack = o.local ? 2 : 0;
-    if ((this.active.get(name) ?? 0) >= def.voices + slack) return;
-    if (this.total >= MAX_VOICES + (o.local ? 8 : 0)) return;
+    const isOutOfRange = positional && !space;
+    if (isOutOfRange) return;
+    const hasVoice = this.hasVoiceFor(name, Boolean(o.local), now);
+    if (!hasVoice) return;
     this.last.set(name, now);
 
     const delay = o.delay ?? 0;
@@ -112,7 +113,8 @@ export class Mixer {
     const trim = ctx.createGain();
     trim.gain.value = level;
     let tail: AudioNode = trim;
-    if (space && ctx.createStereoPanner) {
+    const canPan = space && ctx.createStereoPanner;
+    if (canPan) {
       const pan = ctx.createStereoPanner();
       pan.pan.value = space.pan;
       trim.connect(pan);
@@ -126,15 +128,26 @@ export class Mixer {
     const timer = setTimeout(() => {
       this.timers.delete(timer);
       trim.disconnect();
-      if (tail !== trim) tail.disconnect();
+      const hasPanner = tail !== trim;
+      if (hasPanner) tail.disconnect();
       this.total--;
       this.active.set(name, (this.active.get(name) ?? 1) - 1);
     }, (delay + def.length + 0.2) * 1000);
     this.timers.add(timer);
   }
 
+  /** A sound waits out its cooldown and its voice cap; the player's own sounds get a little slack on both. */
+  private hasVoiceFor(name: SfxName, local: boolean, now: number): boolean {
+    const def = SFX[name];
+    const isCoolingDown = !local && now - (this.last.get(name) ?? -1) < def.cooldown;
+    const slack = local ? 2 : 0;
+    const isNameBusy = (this.active.get(name) ?? 0) >= def.voices + slack;
+    const isMixFull = this.total >= MAX_VOICES + (local ? 8 : 0);
+    return !isCoolingDown && !isNameBusy && !isMixFull;
+  }
+
   dispose(): void {
-    for (const t of this.timers) clearTimeout(t);
+    for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
     void this.ctx.close().catch(() => undefined);
   }

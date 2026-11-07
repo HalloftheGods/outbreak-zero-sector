@@ -71,5 +71,6 @@ export const impact: Recipe = (v) => {
   noise(v, { filter: 'bandpass', freq: 3000, q: 1.5, decay: 0.04, gain: 0.4 });
   tone(v, { type: 'sine', f0: 1800, f1: 700, decay: 0.03, gain: 0.12 });
   noise(v, { at: 0.01, filter: 'highpass', freq: 5000, decay: 0.09, gain: 0.12 });
-  if (v.rand() < 0.35) tone(v, { at: 0.02, type: 'sine', f0: 3200, f1: 1300, decay: 0.16, gain: 0.05 });
+  const hasRicochet = v.rand() < 0.35;
+  if (hasRicochet) tone(v, { at: 0.02, type: 'sine', f0: 3200, f1: 1300, decay: 0.16, gain: 0.05 });
 };

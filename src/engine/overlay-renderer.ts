@@ -44,7 +44,8 @@ type Pixel = readonly [number, number];
 function parsePixels(rows: readonly string[]): Pixel[] {
   const pixels: Pixel[] = [];
   rows.forEach((row, y) => [...row].forEach((cell, x) => {
-    if (cell === '#') pixels.push([x - 2, y - 2]);
+    const isInked = cell === '#';
+    if (isInked) pixels.push([x - 2, y - 2]);
   }));
   return pixels;
 }
@@ -173,16 +174,21 @@ export class OverlayRenderer {
     const x = Math.round(player.x) - left;
     let y = Math.round(player.y) - top - this.heightOf(player.id) - 4;
 
-    if (player.status === 'downed') {
-      if (player.revive > 0) {
+    const isDowned = player.status === 'downed';
+    if (isDowned) {
+      const isBeingRevived = player.revive > 0;
+      if (isBeingRevived) {
         drawBar(ctx, x - 12, y, 24, player.revive, AMBER);
-      } else if (!isLocal && Math.floor(time * 3) % 2 === 0) {
-        drawOutlinedText(ctx, 'HELP', x, y - 2, BLOOD);
+      } else {
+        const isHelpBlinkOn = !isLocal && Math.floor(time * 3) % 2 === 0;
+        if (isHelpBlinkOn) drawOutlinedText(ctx, 'HELP', x, y - 2, BLOOD);
       }
       y -= FONT_HEIGHT + 3;
     }
-    if (isLocal || player.status === 'dead') return;
-    if (player.status === 'alive') {
+    const hasNoTag = isLocal || player.status === 'dead';
+    if (hasNoTag) return;
+    const isAlive = player.status === 'alive';
+    if (isAlive) {
       drawBar(ctx, x - 8, y, 16, player.health / player.maxHealth, SICK);
       y -= FONT_HEIGHT + 3;
     }
@@ -200,7 +206,8 @@ export class OverlayRenderer {
 
   private drawPointers(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number): void {
     for (const player of scene.players) {
-      if (player.status !== 'downed' || player.id === scene.localId) continue;
+      const needsNoPointer = player.status !== 'downed' || player.id === scene.localId;
+      if (needsNoPointer) continue;
       const pointer = edgePointer(player.x - left, player.y - top, viewW, viewH);
       if (pointer) drawArrow(ctx, pointer, SICK);
     }
@@ -271,7 +278,8 @@ export class OverlayRenderer {
     ctx.fillStyle = AMBER;
     for (const [dx, dy] of EXIT_RING) ctx.fillRect(x + dx, y + dy, 1, 1);
     const tagY = y - VAN_TAG_HEIGHT;
-    if (exit.progress > 0) drawBar(ctx, x - VAN_BAR_WIDTH / 2, tagY, VAN_BAR_WIDTH, exit.progress, SICK);
+    const isLoading = exit.progress > 0;
+    if (isLoading) drawBar(ctx, x - VAN_BAR_WIDTH / 2, tagY, VAN_BAR_WIDTH, exit.progress, SICK);
     else drawOutlinedText(ctx, 'VAN', x, tagY, AMBER);
   }
 

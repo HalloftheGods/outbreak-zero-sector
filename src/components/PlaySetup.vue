@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import { trackTitlePage } from '../game/analytics/index.ts';
@@ -137,6 +137,10 @@ function textOf(event: Event): string {
   return (event.target as HTMLInputElement).value;
 }
 
+/** Puts the copy label back after a moment; cleared on unmount so it never outlives the page. */
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+onBeforeUnmount(() => clearTimeout(copiedTimer));
+
 async function copyInvite(): Promise<void> {
   const link = inviteLink.value;
   if (!link) return;
@@ -146,7 +150,8 @@ async function copyInvite(): Promise<void> {
   } catch {
     copied.value = 'failed';
   }
-  setTimeout(() => (copied.value = 'idle'), 2000);
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => (copied.value = 'idle'), 2000);
 }
 
 /** A method handed to the template loses its `this`, so the pick goes through here. */
@@ -159,8 +164,12 @@ function pick(mode: PlayMode): void {
 }
 
 function start(): void {
-  if (multi.value) game.startCoop(runStyle.value);
-  else if (chosen !== null) game.continueSolo(chosen);
+  if (multi.value) {
+    game.startCoop(runStyle.value);
+    return;
+  }
+  const isContinuing = chosen !== null;
+  if (isContinuing) game.continueSolo(chosen);
   else game.startSolo(runStyle.value);
 }
 
@@ -176,7 +185,8 @@ function focusStep(): void {
 
 /** Enter in a field only moves one step on, landing on that step's choice; the run starts from the button on the last. */
 function next(event?: Event): void {
-  if (event instanceof KeyboardEvent && event.repeat) return;
+  const isKeyRepeat = event instanceof KeyboardEvent && event.repeat;
+  if (isKeyRepeat) return;
   flow.value = advance(flow.value);
   focusStep();
 }

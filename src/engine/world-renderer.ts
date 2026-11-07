@@ -184,7 +184,8 @@ export class WorldRenderer {
     const look = this.atmosphere.look;
     const lights = this.map?.lights ?? [];
     for (let i = 0; i < lights.length; i += 1) {
-      if (!lampWorks(look, i)) continue;
+      const isLampOut = !lampWorks(look, i);
+      if (isLampOut) continue;
       const light = lights[i];
       const strength = (light.flicker ? flicker(this.time, i) : 1) * LAMP_STRENGTH * look.lampStrength;
       lighting.addPool(light.x - left, light.y - top, light.radius * LAMP_REACH, look.lampColor ?? light.color, strength);
@@ -205,7 +206,8 @@ export class WorldRenderer {
     for (const player of scene.players) {
       this.addPlayerLight(player, scene.viewerId, room, left, top);
     }
-    if (scene.phase === 'gameover') {
+    const isGameOver = scene.phase === 'gameover';
+    if (isGameOver) {
       lighting.addPool(scene.focusX - left, scene.focusY - top, 120, AURA_COLOR, 0.6);
     }
     lighting.finish();
@@ -285,7 +287,8 @@ export class WorldRenderer {
     const isKilled = (id: EntityId) => this.entities.isKilled(id);
     const outdoors = 1 - (this.buildings.openRoom()?.reveal ?? 0);
     this.atmosphere.drawWash(ctx, viewW, viewH, time, outdoors);
-    if (outdoors > 0) this.groundMotion.draw(ctx, left, top, viewW, viewH, time, 'lit');
+    const isOutdoors = outdoors > 0;
+    if (isOutdoors) this.groundMotion.draw(ctx, left, top, viewW, viewH, time, 'lit');
 
     this.entities.drawEmissive(ctx, scene, left, top, viewW, viewH, time);
     paintTrackingMarks(ctx, scene.zombies, left, top, viewW, viewH, time, this.reducedMotion);
