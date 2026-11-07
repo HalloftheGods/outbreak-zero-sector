@@ -248,6 +248,11 @@ export class AudioEngine {
       case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
       case 'candy_eaten': mixer.play(e.saved ? 'revive' : 'heal', at(e.x, e.y, e.playerId)); break;
       case 'pickup': mixer.play(PICKUP_SFX[e.pickup], at(e.x, e.y, e.playerId)); break;
+      case 'stairs_taken':
+        // Two treads, the second a little lower, where they come out.
+        mixer.play('step_hard', at(e.x, e.y, e.playerId));
+        mixer.play('step_hard', { ...at(e.x, e.y, e.playerId), pitch: 0.8 });
+        break;
       case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
       case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
       case 'molotov_burst':

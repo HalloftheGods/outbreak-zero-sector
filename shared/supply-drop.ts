@@ -16,6 +16,7 @@ import { alivePlayers, emit } from './sim-state.ts';
 import { FLARE_SEC } from './throwables.ts';
 import { LARGE_JEWEL_SILVER } from './treasure.ts';
 import { buildingAt, circleHitsSolid } from './world-query.ts';
+import { townHeight } from './storeys.ts';
 import { makeNoise } from './zombie-senses.ts';
 
 /** Seconds into the lull after the first horde before the flare goes up. */
@@ -54,7 +55,7 @@ export function dropSpot(sim: SimState, rng: Rng): { x: number; y: number } | nu
   const players = alivePlayers(sim);
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const x = margin + rng() * (map.width - margin * 2);
-    const y = margin + rng() * (map.height - margin * 2);
+    const y = margin + rng() * (townHeight(map) - margin * 2);
     const open = buildingAt(map, x, y) === null && !circleHitsSolid(map, x, y, DROP_CLEARANCE);
     if (!open) continue;
     const nearest = Math.min(...players.map((p) => Math.hypot(p.x - x, p.y - y)));

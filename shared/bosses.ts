@@ -14,7 +14,8 @@ import type { SimState, ZombieState } from './sim-state.ts';
 import { alivePlayers, emit } from './sim-state.ts';
 import { LARGE_JEWEL_SILVER } from './treasure.ts';
 import { spawnZombie } from './waves.ts';
-import { buildingAt, circleHitsSolid } from './world-query.ts';
+import { buildingAt, circleHitsSolid, groundOf } from './world-query.ts';
+import { townHeight } from './storeys.ts';
 import { makeNoise } from './zombie-senses.ts';
 
 export type { BossId } from './protocol.ts';
@@ -96,12 +97,13 @@ function bossSpot(sim: SimState, rng: Rng, radius: number): { x: number; y: numb
   const anchors = alivePlayers(sim);
   if (anchors.length === 0) return null;
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const anchor = pick(rng, anchors);
+    const picked = pick(rng, anchors);
+    const anchor = groundOf(sim.map, picked.x, picked.y);
     const angle = rng() * Math.PI * 2;
     const distance = BOSS_SPAWN_MIN + rng() * (BOSS_SPAWN_MAX - BOSS_SPAWN_MIN);
     const x = anchor.x + Math.cos(angle) * distance;
     const y = anchor.y + Math.sin(angle) * distance;
-    const onMap = x > radius && y > radius && x < sim.map.width - radius && y < sim.map.height - radius;
+    const onMap = x > radius && y > radius && x < sim.map.width - radius && y < townHeight(sim.map) - radius;
     const open = onMap && buildingAt(sim.map, x, y) === null && !circleHitsSolid(sim.map, x, y, radius + 1);
     if (open) return { x, y };
   }

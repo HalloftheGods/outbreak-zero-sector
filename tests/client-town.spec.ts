@@ -449,7 +449,8 @@ describe('the town on screen', () => {
   it('shows the town map at two pixels a tile', () => {
     const view = new TownMapView(map);
     expect(view.width).toBe(map.cols * 2);
-    expect(view.height).toBe(map.rows * 2);
+    // The floors above and below lie off the bottom of the town, so the map ends at the town's edge.
+    expect(view.height).toBe((map.townRows ?? map.rows) * 2);
   });
 
   it('paints players and ticks without leaving whole pixels', () => {

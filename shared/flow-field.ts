@@ -1,5 +1,6 @@
 import { TILE_SIZE } from './protocol.ts';
 import type { WorldMap } from './protocol.ts';
+import { flightsOf } from './storeys.ts';
 import { blockedTiles, segmentHitsSolid } from './world-query.ts';
 
 const UNREACHED = 0xffff;
@@ -23,6 +24,8 @@ export class FlowField {
   private readonly blocked: Uint8Array;
   private readonly distance: Uint16Array;
   private readonly queue: Int32Array;
+  /** Where each tile's stairs lead, or -1: one step, like walking to the next tile. */
+  private readonly stairs: Int32Array;
   private computed = false;
 
   constructor(map: WorldMap) {
@@ -32,6 +35,8 @@ export class FlowField {
     this.blocked = blockedTiles(map);
     this.distance = new Uint16Array(map.cols * map.rows);
     this.queue = new Int32Array(map.cols * map.rows);
+    this.stairs = new Int32Array(map.cols * map.rows).fill(-1);
+    for (const flight of flightsOf(map).values()) this.stairs[flight.fromIndex] = flight.toIndex;
   }
 
   get ready(): boolean {
@@ -76,7 +81,7 @@ export class FlowField {
 
   /** Spreads `reach` tiles from the seeds; anything farther stays unreached. */
   recompute(seeds: readonly Point[], reach: number = UNREACHED - 1): void {
-    const { cols, rows, blocked, distance, queue } = this;
+    const { cols, rows, blocked, distance, queue, stairs } = this;
     distance.fill(UNREACHED);
     let head = 0;
     let tail = 0;
@@ -104,6 +109,12 @@ export class FlowField {
         distance[index + cols] = next;
         queue[tail++] = index + cols;
       }
+      const upOrDown = stairs[index];
+      const nearerByStairs = upOrDown >= 0 && distance[upOrDown] > next;
+      if (nearerByStairs) {
+        distance[upOrDown] = next;
+        queue[tail++] = upOrDown;
+      }
     }
     this.computed = true;
   }
@@ -115,6 +126,19 @@ export class FlowField {
     if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return Infinity;
     const value = this.distance[row * this.cols + col];
     return value === UNREACHED ? Infinity : value;
+  }
+
+  /** For a body standing on stairs, where they come out if taking them is the way down the field; otherwise null. */
+  stairsDown(x: number, y: number): Point | null {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    const onMap = col >= 0 && row >= 0 && col < this.cols && row < this.rows;
+    const here = row * this.cols + col;
+    const leadsTo = onMap ? this.stairs[here] : -1;
+    const downhill = leadsTo >= 0 && this.distance[leadsTo] < this.distance[here];
+    if (!downhill) return null;
+    const toCol = leadsTo % this.cols;
+    return { x: (toCol + 0.5) * TILE_SIZE, y: ((leadsTo - toCol) / this.cols + 0.5) * TILE_SIZE };
   }
 
   /** Nudges a waypoint off the walls beside its tile, far enough for the body to clear them. */

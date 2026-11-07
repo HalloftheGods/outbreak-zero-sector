@@ -21,10 +21,11 @@ import { isAmmoPickup, spawnPickup } from './pickups.ts';
 import { placeRadio } from './radio.ts';
 import { BUILDING_DEFS, TILE_SIZE } from './protocol.ts';
 import type { BuildingInstance, BuildingKind, PickupType, WeaponId, WorldMap } from './protocol.ts';
-import { pickWeighted, randInt, shuffle } from './rng.ts';
+import { createRng, pickWeighted, randInt, shuffle } from './rng.ts';
 import type { Rng } from './rng.ts';
 import type { PickupState, SimState } from './sim-state.ts';
 import { blockedTiles, buildingAt, buildingBox, circleHitsSolid, doorBox, isSolidProp, propBox } from './world-query.ts';
+import { isStorey, townBuildings } from './storeys.ts';
 
 export interface LootRule {
   /** How many items a building of this kind holds, inclusive. */
@@ -50,7 +51,13 @@ export const LOOT_RULES: Record<BuildingKind, LootRule> = {
   diner: { items: [0, 1], table: { bandage: 2, pistol_ammo: 1, knife: 0.3 }, smallAmmo: true },
   house: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2, knife: 0.05 }, smallAmmo: true },
   apartment: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2 }, smallAmmo: true },
+  // What was put away upstairs, and what was hidden in the cellar: worth the trip down, and the noise it brings.
+  // No ammo up or down: the town's rounds are budgeted, so these floors are for first aid, and the candy hidden in them.
+  upstairs: { items: [0, 1], table: { bandage: 3, knife: 0.3 } },
+  cellar: { items: [0, 2], table: { bandage: 2, medkit: 1, knife: 0.5 } },
 };
+
+const STOREY_LOOT_SALT = 0x55504457;
 
 /** Tiles in front of a door kept free of loot. */
 const DOOR_CLEAR_TILES = 3;
@@ -108,7 +115,7 @@ function floorSpots(map: WorldMap, building: BuildingInstance): Point[] {
   for (let y = y0; y < y1; y += TILE_SIZE) {
     for (let x = x0; x < x1; x += TILE_SIZE) {
       const free = blocked[(y / TILE_SIZE) * map.cols + x / TILE_SIZE] === 0;
-      const inDoorway = x >= door.x0 && x < door.x1 && y >= y1 - DOOR_CLEAR_TILES * TILE_SIZE;
+      const inDoorway = !isStorey(building) && x >= door.x0 && x < door.x1 && y >= y1 - DOOR_CLEAR_TILES * TILE_SIZE;
       const spot = { x: x + TILE_SIZE / 2, y: y + TILE_SIZE / 2 };
       const usable = free && !inDoorway && !circleHitsSolid(map, spot.x, spot.y, SPOT_CLEARANCE);
       if (usable) spots.push(spot);
@@ -148,9 +155,9 @@ function roundsIn(type: PickupType, rule: LootRule, difficulty: DifficultyId): n
   return scaleRounds(rule.smallAmmo ? Math.ceil(rounds / 2) : rounds, difficulty);
 }
 
-function stock(sim: SimState, building: BuildingInstance, items: readonly PickupType[]): void {
+function stock(sim: SimState, building: BuildingInstance, items: readonly PickupType[], rng: Rng = sim.rng): void {
   const rule = LOOT_RULES[building.kind];
-  const spots = shuffle(sim.rng, [...lootSpots(sim.map, building)]);
+  const spots = shuffle(rng, [...lootSpots(sim.map, building)]);
   items.slice(0, spots.length).forEach((type, index) => {
     spawnPickup(sim, type, spots[index].x, spots[index].y, roundsIn(type, rule, sim.difficulty));
   });
@@ -168,7 +175,7 @@ function settleFloorAmmo(sim: SimState, share: number): number {
     total -= damageOf(item);
     sim.pickups.splice(sim.pickups.indexOf(item), 1);
   }
-  for (const building of shuffle(sim.rng, [...sim.map.buildings])) {
+  for (const building of shuffle(sim.rng, [...townBuildings(sim.map)])) {
     const rule = LOOT_RULES[building.kind];
     const type = rollItem(sim.rng, rule);
     const worth = damageOf({ type, rounds: roundsIn(type, rule, sim.difficulty) });
@@ -182,13 +189,14 @@ function settleFloorAmmo(sim: SimState, share: number): number {
 
 /** Stocks the town for a new run. */
 export function placeTownLoot(sim: SimState): void {
-  for (const building of sim.map.buildings) {
+  const upOrDown = createRng(sim.map.seed ^ STOREY_LOOT_SALT);
+  for (const building of townBuildings(sim.map)) {
     const rule = LOOT_RULES[building.kind];
     const count = Math.max(0, randInt(sim.rng, rule.items[0], rule.items[1]));
     const rolled = Array.from({ length: count }, () => rollItem(sim.rng, rule));
     stock(sim, building, [...(rule.fixed ?? []), ...rolled]);
   }
-  stockContainers(sim);
+  stockContainers(sim, upOrDown);
   const budget = AMMO_DAMAGE_BUDGET * levelDef(sim.level).difficulty * difficultyDef(sim.difficulty).ammo;
   const onFloors = settleFloorAmmo(sim, budget * AMMO_FLOOR_SHARE);
   settleContainerAmmo(sim, budget - onFloors, damageOf);
@@ -196,6 +204,16 @@ export function placeTownLoot(sim: SimState): void {
   placeRadio(sim);
   placeTownParts(sim, (building) => lootSpots(sim.map, building));
   placeTownKits(sim, (building) => lootSpots(sim.map, building));
+  stockStoreys(sim, upOrDown);
+}
+
+/** The floors above and below get their own finds, last, on their own generator: the town's rolls are as they were. */
+function stockStoreys(sim: SimState, rng: Rng): void {
+  for (const storey of sim.map.buildings.filter(isStorey)) {
+    const rule = LOOT_RULES[storey.kind];
+    const count = Math.max(0, randInt(rng, rule.items[0], rule.items[1]));
+    stock(sim, storey, Array.from({ length: count }, () => rollItem(rng, rule)), rng);
+  }
 }
 
 function gunsMissing(sim: SimState): Set<string> {
@@ -214,7 +232,7 @@ export function restockLoot(sim: SimState): void {
     const { w, h } = BUILDING_DEFS[building.kind];
     return standing.every((p) => Math.hypot(building.x + w / 2 - p.x, building.y + h / 2 - p.y) >= RESTOCK_MIN_DISTANCE);
   };
-  const candidates = shuffle(sim.rng, sim.map.buildings.filter(farOff));
+  const candidates = shuffle(sim.rng, townBuildings(sim.map).filter(farOff));
   for (const building of candidates.slice(0, RESTOCK_ITEMS)) {
     stock(sim, building, [rollItem(sim.rng, LOOT_RULES[building.kind])]);
   }

@@ -4,7 +4,8 @@ import { ZOMBIES } from '../shared/constants.ts';
 import { FlowField } from '../shared/flow-field.ts';
 import { BUNKER_SEED } from '../shared/home-protocol.ts';
 import { BUILDING_DEFS, BUILDING_KINDS, DOOR_WIDTH, PROP_DEFS, TILE_KINDS, TILE_SIZE, WALL_THICKNESS } from '../shared/protocol.ts';
-import type { BuildingKind, PropKind, WorldMap } from '../shared/protocol.ts';
+import type { BuildingInstance, BuildingKind, PropKind, WorldMap } from '../shared/protocol.ts';
+import { flightsOf } from '../shared/storeys.ts';
 import { createRng } from '../shared/rng.ts';
 import { planTown } from '../shared/town-plan.ts';
 import {
@@ -27,6 +28,9 @@ const FURNITURE: readonly PropKind[] = ['shelf', 'counter', 'table', 'sofa', 'be
 /** Before the rebalance, one sampled town had one diner in every five buildings. */
 const MOST_DINERS_SHARE = 0.12;
 
+/** The town's own buildings: the floors above and below have no door and are reached by their stairs. */
+const townBuildings = (map: WorldMap) => map.buildings.filter((building) => building.of === undefined);
+
 const tileOf = (map: WorldMap, x: number, y: number): number => Math.floor(y / TILE_SIZE) * map.cols + Math.floor(x / TILE_SIZE);
 
 function reachableFromSpawn(map: WorldMap): Uint8Array {
@@ -38,7 +42,8 @@ function reachableFromSpawn(map: WorldMap): Uint8Array {
   while (stack.length) {
     const index = stack.pop() as number;
     const col = index % map.cols;
-    const next = [col > 0 ? index - 1 : -1, col < map.cols - 1 ? index + 1 : -1, index - map.cols, index + map.cols];
+    const stairs = flightsOf(map).get(index)?.toIndex ?? -1;
+    const next = [col > 0 ? index - 1 : -1, col < map.cols - 1 ? index + 1 : -1, index - map.cols, index + map.cols, stairs];
     for (const n of next) {
       if (n >= 0 && n < seen.length && !blocked[n] && !seen[n]) {
         seen[n] = 1;
@@ -125,7 +130,7 @@ describe('generateWorldMap', () => {
 
   it.each(SEEDS)('seed %i: starts near a building, but not next to one', (seed) => {
     const map = generateWorldMap(seed);
-    const doors = map.buildings.map((b) => Math.hypot(doorBox(b).x0 - map.spawn.x, doorBox(b).y1 - map.spawn.y));
+    const doors = townBuildings(map).map((b) => Math.hypot(doorBox(b).x0 - map.spawn.x, doorBox(b).y1 - map.spawn.y));
     expect(Math.min(...doors)).toBeGreaterThan(200);
     expect(Math.min(...doors)).toBeLessThan(700);
   });
@@ -136,7 +141,8 @@ describe('generateWorldMap', () => {
     const seen = reachableFromSpawn(map);
     const stranded = Array.from(blocked).filter((isBlocked, index) => !isBlocked && !seen[index]);
     expect(stranded.length).toBe(0);
-    expect(Array.from(blocked).filter(Boolean).length).toBeLessThan(blocked.length / 3);
+    const town = blocked.subarray(0, (map.townRows ?? map.rows) * map.cols);
+    expect(Array.from(town).filter(Boolean).length).toBeLessThan(town.length / 3);
   });
 
   it('points each curb tile at the road across its named edge', () => {
@@ -255,9 +261,10 @@ describe('buildings', () => {
   it('wallBoxes leave exactly the door gap', () => {
     const map = generateWorldMap(2);
     const boxes = wallBoxes(map);
-    const expected = map.buildings.reduce((sum, building) => sum + 5 + (backDoorBox(building) ? 1 : 0) + partitionBoxes(building).length, 0);
+    const sides = (building: BuildingInstance): number => (building.of === undefined ? 5 + (backDoorBox(building) ? 1 : 0) : 4);
+    const expected = map.buildings.reduce((sum, building) => sum + sides(building) + partitionBoxes(building).length, 0);
     expect(boxes.length).toBe(expected);
-    for (const building of map.buildings) {
+    for (const building of townBuildings(map)) {
       const door = doorBox(building);
       expect(door.x1 - door.x0).toBe(DOOR_WIDTH);
       const y = (door.y0 + door.y1) / 2;
@@ -271,7 +278,7 @@ describe('buildings', () => {
 
   it('wallBoxes cover the other three sides whole, but for a back door', () => {
     const map = generateWorldMap(2);
-    for (const building of map.buildings) {
+    for (const building of townBuildings(map)) {
       const { x0, y0, x1, y1 } = buildingBox(building);
       const back = backDoorBox(building);
       // Across the north wall clear of any back door: its west end, which no back door reaches.
@@ -292,7 +299,7 @@ describe('buildings', () => {
     const map = generateWorldMap(seed);
     const seen = reachableFromSpawn(map);
     const paved = new Set(['sidewalk', 'curb_n', 'curb_s', 'curb_e', 'curb_w']);
-    for (const building of map.buildings) {
+    for (const building of townBuildings(map)) {
       const door = doorBox(building);
       const midX = (door.x0 + door.x1) / 2;
       const inside = tileOf(map, midX, door.y0 - TILE_SIZE);
@@ -308,7 +315,7 @@ describe('buildings', () => {
     const map = generateWorldMap(seed);
     const field = new FlowField(map);
     field.recompute([map.spawn]);
-    for (const building of map.buildings) {
+    for (const building of townBuildings(map)) {
       const door = doorBox(building);
       expect(field.distanceAt((door.x0 + door.x1) / 2, door.y0 - TILE_SIZE)).toBeLessThan(Infinity);
     }
@@ -328,7 +335,7 @@ describe('buildings', () => {
       expect(box.x1).toBeLessThanOrEqual(room.x1 - WALL_THICKNESS);
       expect(box.y1).toBeLessThanOrEqual(room.y1 - WALL_THICKNESS);
       const door = doorBox(owner);
-      const inDoorway = box.x0 < door.x1 && box.x1 > door.x0 && box.y1 > door.y0 - TILE_SIZE * 2;
+      const inDoorway = owner.of === undefined && box.x0 < door.x1 && box.x1 > door.x0 && box.y1 > door.y0 - TILE_SIZE * 2;
       expect(inDoorway).toBe(false);
     }
   });
