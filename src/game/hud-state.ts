@@ -1,3 +1,4 @@
+import type { CalloutTone } from './kill-juice.ts';
 import { displayName } from '../../shared/callsign.ts';
 import { characterOf } from '../../shared/characters.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
@@ -83,6 +84,14 @@ export interface Banner {
   readonly tone: 'danger' | 'quiet' | 'hope';
 }
 
+/** A word or two over the action for a kill worth noticing: a chain, a close call, a horde wiped out. */
+export interface Callout {
+  /** Changes with every callout, so the component replays its entrance. */
+  readonly key: number;
+  readonly text: string;
+  readonly tone: CalloutTone;
+}
+
 /** Names a level as it starts. */
 export interface LevelCard {
   readonly key: number;
@@ -120,6 +129,7 @@ export interface UiState {
   readonly mapOpen: boolean;
   readonly hud: HudState | null;
   readonly banner: Banner | null;
+  readonly callout: Callout | null;
   readonly place: PlaceBanner | null;
   readonly levelCard: LevelCard | null;
   /** The bunker and the trip, on a Campaign run. */

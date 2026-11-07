@@ -26,6 +26,7 @@ export class LocalSession implements GameTransport {
 
   private options: ConnectOptions = { name: '' };
   private paused = false;
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly clock = new TickClock(1000 / TICK_RATE, () => this.tick());
 
   connect(options: ConnectOptions): void {
@@ -63,7 +64,19 @@ export class LocalSession implements GameTransport {
     else this.clock.start();
   }
 
+  hold(ms: number): void {
+    if (this.paused || ms <= 0) return;
+    this.clock.stop();
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = setTimeout(() => {
+      this.holdTimer = null;
+      if (!this.paused && this.sim) this.clock.start();
+    }, ms);
+  }
+
   disconnect(): void {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = null;
     this.clock.stop();
     this.sim = null;
   }

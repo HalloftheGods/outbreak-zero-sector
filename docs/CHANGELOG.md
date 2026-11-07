@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Kills that land
+
+### Added
+- A hit-stop: in solo the picture and the sim hold still for a beat on your headshot (45 ms), a chain kill (35 ms) and a brute you drop (110 ms). Co-op keeps moving, since the town does.
+- Kill-chain callouts over the action (`KillCallout.vue`): DOUBLE, TRIPLE, QUAD, then MASSACRE xN for your kills less than 1.4 seconds apart, counting every kill in one shotgun blast.
+- CLOSE CALL for a kill made at 20% health or less, at most once every 8 seconds.
+- When the last zombie of a horde falls (rather than the horde giving up), the banner reads HORDE WIPED OUT, the frame holds for a quarter second and the screen flashes warm white. Reduced motion skips the flash.
+- The rules are one pure module, `src/game/kill-juice.ts`, reading only snapshot events, so play is unchanged; tests in `tests/kill-juice.spec.ts`.
+
 ## [2026-11-07] - The Overrun goes live
 
 ### Changed

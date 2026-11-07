@@ -4,6 +4,7 @@ const MAX_SHAKE_PX = 7;
 const SHAKE_DECAY = 2.6;
 const REDUCED_MOTION_SHAKE = 0.2;
 const HURT_DECAY = 1.8;
+const FLASH_DECAY = 3.2;
 const LOW_HEALTH = 0.34;
 const DESATURATE_RATE = 0.45;
 const VIGNETTE_RGB = [122, 16, 12] as const;
@@ -45,6 +46,7 @@ export class ScreenEffects {
   private readonly reducedMotion: boolean;
   private trauma = 0;
   private hurt = 0;
+  private flash = 0;
   private health = 1;
   private desaturation = 0;
   private desaturationTarget = 0;
@@ -63,6 +65,7 @@ export class ScreenEffects {
   reset(): void {
     this.trauma = 0;
     this.hurt = 0;
+    this.flash = 0;
     this.health = 1;
     this.desaturation = 0;
     this.desaturationTarget = 0;
@@ -71,6 +74,12 @@ export class ScreenEffects {
   /** 0..1. Stacks, then squares, so small kicks stay small. */
   addShake(amount: number): void {
     this.trauma = Math.min(1, this.trauma + amount);
+  }
+
+  /** A white wash for a big moment. Reduced motion skips it: a full-screen flash is the kind of thing that setting is for. */
+  addFlash(amount: number): void {
+    if (this.reducedMotion) return;
+    this.flash = Math.min(1, this.flash + amount);
   }
 
   addHurt(amount: number): void {
@@ -89,6 +98,7 @@ export class ScreenEffects {
     this.time += dt;
     this.trauma = Math.max(0, this.trauma - SHAKE_DECAY * dt);
     this.hurt = Math.max(0, this.hurt - HURT_DECAY * dt);
+    this.flash = Math.max(0, this.flash - FLASH_DECAY * dt);
     const toward = this.desaturationTarget - this.desaturation;
     const step = Math.min(Math.abs(toward), DESATURATE_RATE * dt);
     this.desaturation += Math.sign(toward) * step;
@@ -120,6 +130,11 @@ export class ScreenEffects {
     if (strength > 0.01 && this.vignette) {
       ctx.globalAlpha = strength;
       ctx.drawImage(this.vignette, 0, 0);
+    }
+    if (this.flash > 0.01) {
+      ctx.globalAlpha = this.flash * 0.6;
+      ctx.fillStyle = '#fff4dc';
+      ctx.fillRect(0, 0, width, height);
     }
     ctx.globalAlpha = 1;
   }

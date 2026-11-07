@@ -34,5 +34,7 @@ export interface GameTransport {
   /** Solo can begin again from a later level; co-op restarts at level 1 and ignores it. */
   requestRestart(fromLevel?: number): void;
   setPaused(paused: boolean): void;
+  /** Solo only: stop the clock for a beat (a hit-stop), then carry on unless paused meanwhile. */
+  hold?(ms: number): void;
   disconnect(): void;
 }
