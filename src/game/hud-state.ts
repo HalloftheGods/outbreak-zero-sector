@@ -59,10 +59,6 @@ export interface HudState {
   readonly kills: number;
   readonly bleedout: number;
   readonly revive: number;
-  /** Sprint stamina, 1 full to 0 empty. */
-  readonly stamina: number;
-  /** Out of breath: the bar is locked until it refills a little. */
-  readonly winded: boolean;
   readonly phase: GamePhase;
   readonly level: number;
   /** The van has come for this town. */
@@ -167,8 +163,6 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     kills: local.kills,
     bleedout: local.bleedout,
     revive: local.revive,
-    stamina: local.stamina ?? 1,
-    winded: local.winded === true,
     phase: snapshot.phase,
     level: snapshot.level,
     exitOpen: snapshot.exit !== null,

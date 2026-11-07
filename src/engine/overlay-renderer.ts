@@ -33,6 +33,11 @@ const SEARCH_TAG_HEIGHT = FONT_HEIGHT * 2 + 12;
 const SEARCH_BAR_WIDTH = 24;
 /** A stall's "!" floats this far over its sprite. */
 const QUEST_MARK_GAP = FONT_HEIGHT + 4;
+/** The sprint bar sits this far under a survivor's feet, clear of the shadow. */
+const STAMINA_BAR_DROP = 5;
+const STAMINA_BAR_WIDTH = 16;
+/** A winded survivor's bar blinks this many times a second. */
+const WINDED_BLINKS_PER_SEC = 3;
 
 type Pixel = readonly [number, number];
 
@@ -59,6 +64,21 @@ function quarterTurns(pixels: readonly Pixel[], turns: number): Pixel[] {
 /** Indexed like dirFromAngle: 0=E 1=SE 2=S and on round. */
 const ARROWS: readonly (readonly Pixel[])[] = Array.from({ length: 8 }, (_, dir) =>
   quarterTurns(dir % 2 === 0 ? ARROW_EAST : ARROW_SOUTHEAST, Math.floor(dir / 2)));
+
+export interface StaminaBar {
+  readonly fraction: number;
+  readonly color: string;
+}
+
+/** What the local survivor's sprint bar shows, or null while it is full, they are not alive, or it is someone else. */
+export function staminaBar(player: PlayerEntity, isLocal: boolean, time: number): StaminaBar | null {
+  const stamina = player.stamina ?? 1;
+  const worn = isLocal && player.status === 'alive' && stamina < 1;
+  if (!worn) return null;
+  if (!player.winded) return { fraction: stamina, color: AMBER };
+  const lit = Math.floor(time * WINDED_BLINKS_PER_SEC * 2) % 2 === 0;
+  return lit ? { fraction: stamina, color: BLOOD } : { fraction: stamina, color: INK };
+}
 
 export interface EdgePointer {
   readonly x: number;
@@ -169,6 +189,15 @@ export class OverlayRenderer {
     drawOutlinedText(ctx, tagLabel(player.name, player.skin), x, y, BONE);
   }
 
+  /** The local survivor's sprint bar, under their feet. */
+  private drawStamina(ctx: CanvasRenderingContext2D, player: PlayerEntity, isLocal: boolean, left: number, top: number, time: number): void {
+    const bar = staminaBar(player, isLocal, time);
+    if (!bar) return;
+    const x = Math.round(player.x) - left - STAMINA_BAR_WIDTH / 2;
+    const y = Math.round(player.y) - top + STAMINA_BAR_DROP;
+    drawBar(ctx, x, y, STAMINA_BAR_WIDTH, bar.fraction, bar.color);
+  }
+
   private drawPointers(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number): void {
     for (const player of scene.players) {
       if (player.status !== 'downed' || player.id === scene.localId) continue;
@@ -244,6 +273,7 @@ export class OverlayRenderer {
     }
     for (const player of scene.players) {
       this.drawPlayerTag(ctx, player, player.id === scene.localId, left, top, time);
+      this.drawStamina(ctx, player, player.id === scene.localId, left, top, time);
     }
     this.drawQuestMarks(ctx, scene, left, top);
     this.drawSearch(ctx, scene, left, top);
