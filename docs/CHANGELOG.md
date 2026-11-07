@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - What's New book
+
+### Added
+- Clicking the version number in the title screen's corner opens What's New, a changelog printed like How to Play and the Record Book: a front page with the version and a contents list (each line jumps to its page), then every update two to a page, newest first, stamped New, Better or Fixed. Turned with Prev and Next, the arrow keys or a swipe; Esc or Back closes it.
+- The notes are written for players in `src/game/changelog.ts`. To add one, put a new `ChangeNote` at the top of `CHANGE_NOTES`; the pages and contents follow.
+
+### Changed
+- The Record Book and the changelog share their page turning (`src/game/book-turn.ts`, `src/components/use-book-pages.ts`).
+
 ## [2026-11-07] - Run log
 
 ### Added

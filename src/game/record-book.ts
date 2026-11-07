@@ -3,11 +3,13 @@
 
 import type { DailyLog, DailyResult } from './daily-night.ts';
 import { bestDay, dayLabel, nightFacts, recentDays, streakOf, todaysNight } from './daily-night.ts';
+import { openOf, pagesLabel, turnWithin } from './book-turn.ts';
+import type { BookMode } from './book-turn.ts';
 import { STAMPS } from './stamps.ts';
 import type { StampBook, StampId } from './stamps.ts';
 
 export type LeafId = 'bests' | 'ledger' | 'daily' | 'week' | 'stamps' | 'more_stamps';
-export type BookMode = 'spread' | 'single';
+export type { BookMode };
 
 export interface Leaf {
   readonly id: LeafId;
@@ -28,30 +30,19 @@ export const RECORD_LEAVES: readonly Leaf[] = [
 
 export const RECORD_BOOK_TITLE = "Survivor's Record Book";
 
-/** The first leaf showing: a spread always opens on an even leaf, so its pair sits together. */
-function firstShown(index: number, mode: BookMode): number {
-  return mode === 'spread' ? index - (index % 2) : index;
-}
-
 /** The leaves open in front of the reader. */
 export function openLeaves(index: number, mode: BookMode): readonly Leaf[] {
-  const first = firstShown(index, mode);
-  return mode === 'spread' ? RECORD_LEAVES.slice(first, first + 2) : [RECORD_LEAVES[first]];
+  return openOf(RECORD_LEAVES, index, mode);
 }
 
 /** The leaf a turn lands on, held inside the book. */
 export function turnLeaves(index: number, by: number, mode: BookMode): number {
-  const step = mode === 'spread' ? 2 : 1;
-  const target = firstShown(index, mode) + by * step;
-  return target < 0 || target >= RECORD_LEAVES.length ? firstShown(index, mode) : target;
+  return turnWithin(RECORD_LEAVES.length, index, by, mode);
 }
 
 /** "Pages 1-2 of 4", or "Page 3 of 4" one at a time. */
 export function leafLabel(index: number, mode: BookMode): string {
-  const shown = openLeaves(index, mode);
-  const first = firstShown(index, mode) + 1;
-  const pages = shown.length > 1 ? `Pages ${first}-${first + shown.length - 1}` : `Page ${first}`;
-  return `${pages} of ${RECORD_LEAVES.length}`;
+  return pagesLabel(RECORD_LEAVES.length, index, mode);
 }
 
 export interface DailySummary {
