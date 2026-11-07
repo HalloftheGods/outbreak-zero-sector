@@ -2,6 +2,14 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Halloween candy
+
+### Added
+- Candy (`shared/candy.ts`): twelve short boosts hidden in containers, most of them in houses and apartments. A survivor carries two and eats the next with X. Each lasts 75 seconds, and a candy already working is skipped for the next one in the bag, so boosts never stack. Where candy is hidden comes off the town's seed on a generator of its own, so the sim's other rolls stay put and a Daily Night hides the same candy for everyone.
+  - Sour Skulls (reload ×2), Fang Taffy (shove and knife ×2), Ghost Gum (silent sprint), Pumpkin Fizz (+25% speed, matched by the client's prediction), Witch's Brittle (+2 health a kill), Bat Bites (bullets pierce one zombie), Candy Corn Rush (chain window ×5), Jawbreaker (half damage), Black Licorice Lash (+3px head margin), Caramel Apple (one instant revive), Popping Eyeballs (molotovs without fuel), and the rare Full-Size Bar (everything at half strength for 20 seconds).
+  - Going down ends whatever is working, and a fresh start empties the bag. Candy rides along to the next town.
+- `candy_eaten` event, `PlayerEntity.candy` and `.sugar`, the `eat` input, and `container_opened.candy`. The HUD shows the bag and what is working, with a banner saying what the candy does.
+
 ## [2026-11-07] - Furniture against the side walls
 
 ### Fixed

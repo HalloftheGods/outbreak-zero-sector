@@ -35,6 +35,12 @@
 
     <footer class="hud-bottom">
       <div class="hud-vitals">
+        <ul v-if="hud.sugar.length > 0" class="hud-chip hud-sugar" aria-label="Candy working">
+          <li v-for="sugar in hud.sugar" :key="sugar.name">
+            <span>{{ sugar.name }}</span>
+            <span class="hud-sugar-left">{{ sugar.left }}s</span>
+          </li>
+        </ul>
         <div class="hud-chip hud-medkits" :class="{ 'is-none': hud.medkits === 0 }">
           <SpriteImg :sprite="art.ui.pickupIcons.medkit" />
           <span>{{ hud.medkits }}</span>
@@ -54,6 +60,11 @@
           <SpriteImg :sprite="art.ui.flare" />
           <span>{{ hud.flares }}</span>
           <span class="hud-slot-key keys-only">V</span>
+        </div>
+        <div v-if="hud.candy.length > 0" class="hud-chip hud-bottles hud-candy" :title="hud.candy.join(', ')">
+          <span class="hud-candy-icon" aria-hidden="true" />
+          <span>{{ hud.candy[0] }}<template v-if="hud.candy.length > 1"> +{{ hud.candy.length - 1 }}</template></span>
+          <span class="hud-slot-key keys-only">X</span>
         </div>
         <div v-if="hud.knife" class="hud-chip hud-knife">
           <SpriteImg :sprite="art.ui.pickupIcons.knife" />
@@ -257,6 +268,37 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
   flex-direction: row;
   align-items: center;
   gap: calc(var(--u) * 2);
+}
+
+/* A wrapped sweet: an orange middle with twisted ends, drawn in boxes like the rest of the pixel HUD. */
+.hud-candy-icon {
+  width: calc(var(--u) * 8);
+  height: calc(var(--u) * 4);
+  background:
+    linear-gradient(var(--candy-wrap, #e8742a), var(--candy-wrap, #e8742a)) center / calc(var(--u) * 4) 100% no-repeat,
+    linear-gradient(#f4d36b, #f4d36b) left center / calc(var(--u) * 2) calc(var(--u) * 2) no-repeat,
+    linear-gradient(#f4d36b, #f4d36b) right center / calc(var(--u) * 2) calc(var(--u) * 2) no-repeat;
+}
+
+.hud-candy span:nth-child(2) {
+  font-size: calc(var(--u) * 5);
+}
+
+.hud-sugar {
+  margin: 0;
+  list-style: none;
+  color: #f4d36b;
+  font-size: calc(var(--u) * 5);
+}
+
+.hud-sugar li {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--u) * 4);
+}
+
+.hud-sugar-left {
+  color: var(--bone);
 }
 
 .hud-medkits.is-none,

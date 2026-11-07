@@ -246,6 +246,7 @@ export class AudioEngine {
       case 'player_downed': mixer.play('player_downed', at(e.x, e.y, e.playerId)); break;
       case 'player_dead': mixer.play('player_downed', { ...at(e.x, e.y, e.playerId), pitch: 0.75 }); break;
       case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
+      case 'candy_eaten': mixer.play(e.saved ? 'revive' : 'heal', at(e.x, e.y, e.playerId)); break;
       case 'pickup': mixer.play(PICKUP_SFX[e.pickup], at(e.x, e.y, e.playerId)); break;
       case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
       case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;

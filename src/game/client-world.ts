@@ -1,3 +1,4 @@
+import { candySpeed } from '../../shared/candy.ts';
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_DT } from '../../shared/constants.ts';
 import { containerInReach } from '../../shared/containers.ts';
 import type { Container } from '../../shared/containers.ts';
@@ -38,6 +39,8 @@ export class ClientWorld {
   private stance: Stance = 'walk';
   /** The sim says the local player is out of breath, so a held sprint key moves them at a walk. */
   private winded = false;
+  /** What candy does to the local player's pace, read off the latest snapshot. */
+  private sugarSpeed = 1;
 
   constructor(map: WorldMap, localId: EntityId) {
     this.localId = localId;
@@ -82,6 +85,7 @@ export class ClientWorld {
     const local = this.localPlayer;
     if (local) this.skin = local.skin;
     this.winded = local?.winded === true;
+    this.sugarSpeed = candySpeed({ sugar: (local?.sugar ?? []).map((sugar) => ({ ...sugar })) });
     this.refreshSpeed();
     if (local?.status === 'alive' && this.predicting) {
       this.predictor.reconcile(local.x, local.y, local.lastInputSeq);
@@ -98,7 +102,7 @@ export class ClientWorld {
 
   private refreshSpeed(): void {
     const known = this.skin !== null;
-    if (known) this.speed = playerSpeed(this.skin as number, effectiveStance(this.stance, this.winded));
+    if (known) this.speed = playerSpeed(this.skin as number, effectiveStance(this.stance, this.winded)) * this.sugarSpeed;
   }
 
   /** The player the camera should sit on: yourself, or a teammate once you are dead. */

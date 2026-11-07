@@ -2,6 +2,7 @@
 // The client's DOUBLE/TRIPLE callouts use the same window, so the words and the points agree.
 
 import { TICK_DT } from './constants.ts';
+import { CORN_RUSH_WINDOW, sugarById } from './candy.ts';
 import type { EntityId } from './protocol.ts';
 import type { SimState } from './sim-state.ts';
 
@@ -27,6 +28,7 @@ export function chainKill(sim: SimState, killerId: EntityId): number {
   const chain = sim.killChains.get(killerId);
   const chained = chain !== undefined && sim.tick <= chain.until;
   const count = chained ? chain.count + 1 : 1;
-  sim.killChains.set(killerId, { count, until: sim.tick + Math.round(CHAIN_WINDOW_SEC / TICK_DT) });
+  const rush = 1 + (CORN_RUSH_WINDOW - 1) * sugarById(sim, killerId, 'corn_rush');
+  sim.killChains.set(killerId, { count, until: sim.tick + Math.round((CHAIN_WINDOW_SEC * rush) / TICK_DT) });
   return count;
 }

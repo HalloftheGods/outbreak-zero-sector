@@ -1,3 +1,4 @@
+import type { SugarState } from './candy.ts';
 import type { SupplyDrop } from './supply-drop.ts';
 import type { BossState } from './bosses.ts';
 import type { KillChain } from './kill-chain.ts';
@@ -5,6 +6,7 @@ import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type {
   BulletEntity,
+  CandyId,
   EntityId,
   GameEvent,
   GameOverStats,
@@ -57,7 +59,7 @@ export interface PlayerHome extends Omit<HomeView, 'overrun' | 'chest'> {
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home' | 'candy' | 'sugar'> {
   bottles: number;
   /** Fuel for molotovs and flares to throw, found in town and left there (`shared/throwables.ts`). */
   fuel: number;
@@ -69,6 +71,10 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottl
   molotovQueued: boolean;
   flareQueued: boolean;
   throwCooldown: number;
+  /** Candy carried, oldest first, and candy working now (`shared/candy.ts`). */
+  candy: CandyId[];
+  sugar: SugarState[];
+  eatQueued: boolean;
   parts: PartCounts;
   kits: KitCounts;
   /** Said so at the current workbench. */

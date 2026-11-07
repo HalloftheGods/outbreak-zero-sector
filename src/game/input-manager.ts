@@ -22,6 +22,7 @@ const SEARCH_CODE = 'KeyE';
 const THROW_CODE = 'KeyG';
 const MOLOTOV_CODE = 'KeyT';
 const FLARE_CODE = 'KeyV';
+const EAT_CODE = 'KeyX';
 const SNEAK_CODES = ['KeyC'];
 const SPRINT_CODES = ['ShiftLeft', 'ShiftRight'];
 const MAP_CODES: ReadonlySet<string> = new Set(['Tab', 'KeyN']);
@@ -41,6 +42,7 @@ const GAME_CODES: ReadonlySet<string> = new Set([
   THROW_CODE,
   MOLOTOV_CODE,
   FLARE_CODE,
+  EAT_CODE,
   ...SNEAK_CODES,
   ...SPRINT_CODES,
   ...Object.keys(WEAPON_KEYS),
@@ -107,6 +109,7 @@ export class InputManager {
   private throwLatch = false;
   private molotovLatch = false;
   private flareLatch = false;
+  private eatLatch = false;
   private reloadLatch = false;
   private weaponLatch: WeaponId | null = null;
   private cycleLatch = 0;
@@ -170,6 +173,7 @@ export class InputManager {
     this.throwLatch = false;
     this.molotovLatch = false;
     this.flareLatch = false;
+    this.eatLatch = false;
     this.reloadLatch = false;
     this.weaponLatch = null;
     this.cycleLatch = 0;
@@ -231,6 +235,7 @@ export class InputManager {
       ...(this.throwLatch ? { throw: true } : {}),
       ...(this.molotovLatch ? { molotov: true } : {}),
       ...(this.flareLatch ? { flare: true } : {}),
+      ...(this.eatLatch ? { eat: true } : {}),
       search: this.isHeld([SEARCH_CODE]),
       ...(this.stance === 'sneak' ? { sneak: true } : {}),
       ...(this.stance === 'sprint' ? { sprint: true } : {}),
@@ -278,6 +283,7 @@ export class InputManager {
     this.throwLatch ||= code === THROW_CODE;
     this.molotovLatch ||= code === MOLOTOV_CODE;
     this.flareLatch ||= code === FLARE_CODE;
+    this.eatLatch ||= code === EAT_CODE;
     const weapon = WEAPON_KEYS[code];
     if (weapon) this.weaponLatch = weapon;
   }

@@ -24,6 +24,16 @@ export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute' | 'screamer';
 export type BossId = 'howler' | 'mother' | 'butcher';
 export type PickupType = (typeof PICKUP_TYPES)[number];
 export type PlayerStatus = 'alive' | 'downed' | 'dead';
+/** Halloween candy: a short boost each (shared/candy.ts). */
+export type CandyId =
+  | 'sour_skulls' | 'fang_taffy' | 'ghost_gum' | 'pumpkin_fizz' | 'witchs_brittle' | 'bat_bites'
+  | 'corn_rush' | 'jawbreaker' | 'licorice_lash' | 'caramel_apple' | 'popping_eyeballs' | 'full_size_bar';
+
+export interface SugarView {
+  readonly id: CandyId;
+  /** Seconds left. */
+  readonly left: number;
+}
 export type GamePhase = (typeof GAME_PHASES)[number];
 /** How a survivor is moving: sneaking is slow and hard to spot, sprinting is fast and loud. */
 export type Stance = 'walk' | 'sneak' | 'sprint';
@@ -64,6 +74,10 @@ export interface PlayerEntity {
   /** Fuel for molotovs, and flares, found in this town. Left off at none. */
   fuel?: number;
   flares?: number;
+  /** Candy carried, oldest first (shared/candy.ts). Left off at none. */
+  candy?: CandyId[];
+  /** Candy working on this survivor now, with the seconds each has left. Left off at none. */
+  sugar?: SugarView[];
   /** Sprint stamina, 1 full to 0 empty. Left off while full. */
   stamina?: number;
   /** Ran dry: sprint is off until the bar refills past the re-arm mark. Left off when not. */
@@ -191,9 +205,11 @@ export type GameEvent =
   | { readonly type: 'player_hurt'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly damage: number }
   | { readonly type: 'player_downed'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
+  /** A survivor ate a candy. `saved` marks a Caramel Apple spent picking them back up. */
+  | { readonly type: 'candy_eaten'; readonly playerId: EntityId; readonly candy: CandyId; readonly x: number; readonly y: number; readonly saved?: boolean }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
-  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean; readonly stash?: 'fuel' | 'flare' }
+  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean; readonly stash?: 'fuel' | 'flare' | 'candy'; readonly candy?: CandyId }
   /** A thrown bottle broke at x,y, thrown from fromX,fromY. */
   | { readonly type: 'bottle_smash'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number }
   /** A molotov broke at x,y and left a pool of fire `radius` wide for `sec`. */
@@ -255,6 +271,8 @@ export interface ClientInputPacket {
   readonly molotov?: boolean;
   /** Throw a lit flare. Left off when not. */
   readonly flare?: boolean;
+  /** Eat the next candy in the bag. Left off when not. */
+  readonly eat?: boolean;
   /** The sneak key is held. Left off when not. Wins over sprint when both are held. */
   readonly sneak?: boolean;
   /** The sprint key is held. Left off when not. */

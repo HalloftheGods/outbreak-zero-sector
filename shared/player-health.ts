@@ -1,3 +1,4 @@
+import { caramelCatch, JAWBREAKER_GUARD, sugarOf } from './candy.ts';
 import {
   BLEEDOUT_ALONE_RATE,
   BLEEDOUT_SEC,
@@ -26,6 +27,8 @@ function resetKit(p: PlayerState, spareRounds: number): void {
   p.bottles = START_BOTTLES;
   p.fuel = 0;
   p.flares = 0;
+  p.candy = [];
+  p.sugar = [];
   p.parts = noParts();
   p.kits = noKits();
   p.owned = ['pistol'];
@@ -81,14 +84,18 @@ function down(sim: SimState, p: PlayerState): void {
   p.revive = 0;
   p.reload = 0;
   p.reloadLeft = 0;
+  // Down is down: nothing sweet carries on working.
+  p.sugar = [];
   emit(sim, { type: 'player_downed', playerId: p.id, x: p.x, y: p.y });
 }
 
 export function hurtPlayer(sim: SimState, p: PlayerState, damage: number): void {
   if (p.status !== 'alive') return;
-  p.health = Math.max(0, p.health - damage);
-  emit(sim, { type: 'player_hurt', playerId: p.id, x: p.x, y: p.y, damage });
+  const guarded = damage * (1 - JAWBREAKER_GUARD * sugarOf(p, 'jawbreaker'));
+  p.health = Math.max(0, p.health - guarded);
+  emit(sim, { type: 'player_hurt', playerId: p.id, x: p.x, y: p.y, damage: guarded });
   if (p.health > 0) return;
+  if (caramelCatch(sim, p)) return;
   const teammateCanRevive = sim.players.some((other) => other !== p && other.status === 'alive');
   if (teammateCanRevive) down(sim, p);
   else kill(sim, p);
