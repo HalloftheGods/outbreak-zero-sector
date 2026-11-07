@@ -20,8 +20,8 @@ export class RunStage {
   }
 
   /** Builds a town for all that draws it. Its level comes with the next snapshot. */
-  open(mapSeed: number): WorldMap {
-    const map = generateWorldMap(mapSeed);
+  open(mapSeed: number, level = 1): WorldMap {
+    const map = generateWorldMap(mapSeed, level);
     this.mapSeed = mapSeed;
     this.level = null;
     this.hud.setMap(map);
@@ -38,7 +38,7 @@ export class RunStage {
   /** Runs ahead of the snapshot's events, which already belong to the town it describes. */
   follow(world: ClientWorld, snapshot: SnapshotPacket, nowMs: number): void {
     const newTown = snapshot.mapSeed !== this.mapSeed;
-    if (newTown) world.enterTown(this.open(snapshot.mapSeed));
+    if (newTown) world.enterTown(this.open(snapshot.mapSeed, snapshot.level));
     const sameLevel = snapshot.level === this.level;
     if (sameLevel) return;
     this.level = snapshot.level;

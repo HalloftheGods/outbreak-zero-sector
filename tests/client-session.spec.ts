@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TICK_DT } from '../shared/constants.ts';
+import { closeText, FRIEND_NEEDS_UPDATE_TEXT, NEEDS_UPDATE_TEXT, UPDATE_REASON } from '../shared/close-codes.ts';
 import type { GameStyle } from '../shared/game-style.ts';
-import type { SnapshotPacket, WelcomePacket } from '../shared/protocol.ts';
+import { PROTOCOL_VERSION, type SnapshotPacket, type WelcomePacket } from '../shared/protocol.ts';
 import { LocalSession } from '../src/network/local-session.ts';
 import { SocketSession } from '../src/network/socket-session.ts';
 import { TickClock } from '../src/network/tick-clock.ts';
@@ -132,7 +133,7 @@ class FakeSocket {
   readyState = 0;
   sent: string[] = [];
   onmessage: ((event: { data: unknown }) => void) | null = null;
-  onclose: ((event: { code: number }) => void) | null = null;
+  onclose: ((event: { code: number; reason?: string }) => void) | null = null;
   closed = false;
 
   constructor() {
@@ -173,7 +174,7 @@ describe('SocketSession', () => {
     const { socket } = connect();
     expect(socket.sent).toHaveLength(0);
     socket.open('campaign');
-    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'join', name: 'ANA', token: expect.any(String), style: 'campaign' });
+    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'join', name: 'ANA', token: expect.any(String), style: 'campaign', protocol: PROTOCOL_VERSION });
   });
 
   it('hears the room again if it moved on before the join landed, but not after the welcome', () => {
@@ -231,6 +232,26 @@ describe('SocketSession', () => {
     socket.open();
     socket.onclose?.({ code: 4000 });
     expect(closed[0]).toMatch(/full/i);
+  });
+
+  it('tells the older side to reload and the newer side to wait for its friend', () => {
+    const older = connect();
+    older.socket.open();
+    older.socket.onclose?.({ code: 4014, reason: UPDATE_REASON.guestOlder });
+    expect(older.closed[0]).toBe(NEEDS_UPDATE_TEXT);
+    const newer = connect();
+    newer.socket.open();
+    newer.socket.onclose?.({ code: 4014, reason: UPDATE_REASON.hostOlder });
+    expect(newer.closed[0]).toBe(FRIEND_NEEDS_UPDATE_TEXT);
+  });
+
+  it('takes a bye packet as the close, since a data channel has no close code', () => {
+    const { closed, socket } = connect();
+    socket.open();
+    socket.onmessage?.({ data: JSON.stringify({ type: 'bye', code: 4011, reason: 'host left' }) });
+    expect(closed).toEqual([closeText(4011)]);
+    socket.onclose?.({ code: 1006 });
+    expect(closed).toHaveLength(1);
   });
 
   it('reports a dropped connection once, and never after disconnect', () => {

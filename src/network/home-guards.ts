@@ -74,6 +74,7 @@ export function isOverrunView(v: unknown): v is OverrunView {
   return isFields(v)
     && PHASES.includes(v.phase)
     && hasNumbers(v, ['left', 'hostiles', 'total'])
+    && (v.spanSec === undefined || isNumber(v.spanSec))
     && typeof v.slowed === 'boolean';
 }
 

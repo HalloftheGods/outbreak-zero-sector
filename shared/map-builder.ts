@@ -1,12 +1,17 @@
 import { BUILDING_DEFS, PROP_DEFS, TILE_KINDS, TILE_SIZE } from './protocol.ts';
 import type { BuildingInstance, BuildingKind, PropInstance, PropKind, TileKind } from './protocol.ts';
-import { randInt, randRange } from './rng.ts';
+import { isPlant, needsDirt, TEMPERATE } from './biomes.ts';
+import type { Biome, SpeciesSlot } from './biomes.ts';
+import { pick, randInt, randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import { buildingBox } from './world-query.ts';
 import type { Box } from './world-query.ts';
 
 /** Solids keep this far apart, so every gap holds one whole free tile and fits a brute. */
 export const SOLID_GAP = 32;
+/** The fence stands this far in from the map's edge, and nothing solid may leave a sliver between it and itself. */
+const FENCE_OUTER_EDGE = 10;
+const FENCE_CLEARANCE = 40;
 /** Nothing solid may stand this close to map.spawn. */
 export const SPAWN_CLEARANCE = 104;
 
@@ -22,9 +27,11 @@ export class MapBuilder {
   readonly props: PropInstance[] = [];
   readonly buildings: BuildingInstance[] = [];
   readonly spawn: { readonly x: number; readonly y: number };
+  readonly biome: Biome;
   private readonly solids: Box[] = [];
 
-  constructor(cols: number, rows: number, rng: Rng, spawn: { x: number; y: number }) {
+  constructor(cols: number, rows: number, rng: Rng, spawn: { x: number; y: number }, biome: Biome = TEMPERATE) {
+    this.biome = biome;
     this.cols = cols;
     this.rows = rows;
     this.rng = rng;
@@ -49,7 +56,8 @@ export class MapBuilder {
   }
 
   /** Paints a ragged disc over any tiles of kind `over`. */
-  blob(x: number, y: number, radius: number, kind: TileKind, over: TileKind): void {
+  blob(x: number, y: number, radius: number, kind: TileKind, over: TileKind | readonly TileKind[]): void {
+    const settles = ([] as readonly TileKind[]).concat(over);
     const minCol = Math.floor((x - radius) / TILE_SIZE);
     const maxCol = Math.ceil((x + radius) / TILE_SIZE);
     const minRow = Math.floor((y - radius) / TILE_SIZE);
@@ -59,7 +67,7 @@ export class MapBuilder {
         const distance = Math.hypot((col + 0.5) * TILE_SIZE - x, (row + 0.5) * TILE_SIZE - y);
         const raggedRadius = radius * randRange(this.rng, 0.7, 1.1);
         const inside = col >= 0 && row >= 0 && col < this.cols && row < this.rows;
-        if (inside && distance < raggedRadius && this.tileIs(col, row, over)) this.setTile(col, row, kind);
+        if (inside && distance < raggedRadius && settles.some((ground) => this.tileIs(col, row, ground))) this.setTile(col, row, kind);
       }
     }
   }
@@ -75,7 +83,7 @@ export class MapBuilder {
       this.props.push({ kind, x, y });
       return true;
     }
-    if (this.crowdsSpawn(box) || this.crowdsSolid(box, gap)) return false;
+    if (this.crowdsSpawn(box) || this.crowdsSolid(box, gap) || this.crowdsFence(box)) return false;
     this.solids.push(box);
     this.props.push({ kind, x, y });
     return true;
@@ -108,6 +116,31 @@ export class MapBuilder {
   }
 
   /** Tries to drop `count` props at random inside an area, keeping whole footprints inside it. */
+  /** A solid that leaves a sliver between itself and the fence would strand it, and the repair then takes the fence down. */
+  private crowdsFence(box: Box): boolean {
+    const near = (low: number, high: number, size: number): boolean => {
+      const nearLow = high > FENCE_OUTER_EDGE && low < FENCE_CLEARANCE;
+      const nearHigh = low < size - FENCE_OUTER_EDGE && high > size - FENCE_CLEARANCE;
+      return nearLow || nearHigh;
+    };
+    return near(box.x0, box.x1, this.cols * TILE_SIZE) || near(box.y0, box.y1, this.rows * TILE_SIZE);
+  }
+
+  /** The species the biome grows where the map asks for `kind`: oaks here are dead trunks there. */
+  species(kind: PropKind): PropKind {
+    const options = this.biome.swap[kind as SpeciesSlot];
+    return options ? pick(this.rng, options) : kind;
+  }
+
+  /** Scatters a plant as the biome grows it: its own species, as thick as it grows them. Other props go through as they are. */
+  flora(kind: PropKind, area: Box, count: number, gap = SOLID_GAP, onlyOn?: TileKind): void {
+    const total = isPlant(kind) ? Math.ceil(count * this.biome.lush) : count;
+    for (let i = 0; i < total; i++) {
+      const species = this.species(kind);
+      this.scatter(species, area, 1, gap, needsDirt(species) ? 'dirt' : onlyOn);
+    }
+  }
+
   scatter(kind: PropKind, area: Box, count: number, gap = SOLID_GAP, onlyOn?: TileKind): void {
     const { w, h } = PROP_DEFS[kind];
     for (let placed = 0, tries = 0; placed < count && tries < count * 6; tries++) {

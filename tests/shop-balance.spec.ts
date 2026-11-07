@@ -4,6 +4,7 @@ import { DIFFICULTIES } from '../shared/difficulty.ts';
 import { ammoKillShare } from '../shared/loot.ts';
 import type { PickupType } from '../shared/protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
+import { townWorth } from '../shared/treasure.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import type { HomeSave } from '../src/game/home/home-store.ts';
 import { MERCHANTS } from '../src/game/home/merchant-data.ts';
@@ -36,7 +37,8 @@ describe('merchant balance', () => {
 
   it('spending soak: a bot buys ammo, then a medkit, then a carbine over 20 trips and reports silver left', () => {
     const TRIPS = 20;
-    const INCOME = 260;
+    // A third of a level 1 town's jewels, once smelted: 253 silver.
+    const INCOME = Math.round(townWorth(1, false) / 3);
     let save: HomeSave = rollStock({ ...emptySave(11), locker: { ...emptySave(11).locker, guns: { pistol: {} } } });
     const bought: string[] = [];
     for (let trip = 1; trip <= TRIPS; trip++) {

@@ -151,11 +151,10 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
     tab: 'Treasure',
     title: 'Campaign: treasure',
     points: [
-      'Silver coins lie in drawers, wallets and cars.',
-      'Jewels are rarer: mostly in houses and apartments, and most of all in bedrooms.',
-      'What you pick up is carried, and the HUD keeps a running total. It is only yours once the van brings you home.',
-      '100 silver make 1 gold.',
-      'A small jewel is worth 40 silver and a large one 200, once it is smelted.',
+      'Towns hold jewels, not coin: mostly in houses and apartments, and most of all in bedrooms.',
+      'A small jewel is worth 40 silver and a large one 200, once it is smelted at the forge.',
+      'What you pick up is carried, and the HUD shows what it comes to. It is only yours once the van brings you home.',
+      '100 silver make 1 gold. Silver comes from the forge, quest rewards and the overrun chest.',
     ],
   },
   {
@@ -164,7 +163,7 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
     title: 'Campaign: the forge',
     points: [
       'Jewels only turn into money at the forge in the workshop.',
-      'Smelting takes three seconds a jewel, and only runs while you stand at the forge.',
+      'Smelting takes three seconds a jewel, and only runs while you stand at the forge. A whole town smelts in under a minute.',
       'Step away and what has finished is kept. The rest stays as raw jewels.',
       'The bench next to it fits parts to the guns in your hands.',
     ],

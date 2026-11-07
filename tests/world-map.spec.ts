@@ -106,7 +106,9 @@ describe('generateWorldMap', () => {
   it.each(SEEDS)('seed %i: uses every kind of ground and the town fixtures', (seed) => {
     const map = generateWorldMap(seed);
     const used = new Set(Array.from(map.tiles, (index) => TILE_KINDS[index]));
-    const townKinds = TILE_KINDS.filter((kind) => kind !== 'bunker_wall');
+    // Flood, snow, ash and sludge come only from a level's biome, which the plain town has none of.
+    const biomeGround: readonly string[] = ['bunker_wall', 'water', 'snow', 'ash', 'sludge'];
+    const townKinds = TILE_KINDS.filter((kind) => !biomeGround.includes(kind));
     expect([...used].sort()).toEqual([...townKinds].sort());
     const kinds = new Set(map.props.map((prop) => prop.kind));
     for (const kind of ['street_lamp', 'fire_barrel', 'tree', 'dumpster', 'sandbags', 'fence_h', 'fence_v', 'gas_pump', ...FURNITURE] as const) {

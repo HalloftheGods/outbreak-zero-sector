@@ -22,6 +22,7 @@ import { updateStations } from './stations.ts';
 import { updateWeapons } from './weapons.ts';
 import { buildingAt } from './world-query.ts';
 import { leaveFootprint } from './snow-tracks.ts';
+import { groundEffect } from './ground.ts';
 import { groundSpeedScale } from './town-rules.ts';
 import { makeNoise } from './zombie-senses.ts';
 
@@ -53,7 +54,7 @@ function footsteps(sim: SimState, p: PlayerState): void {
   const stepDue = p.stepNoiseLeft <= 0;
   if (!stepDue) return;
   p.stepNoiseLeft = SPRINT_NOISE_INTERVAL_SEC;
-  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS * characterOf(p.skin).noise);
+  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS * characterOf(p.skin).noise * groundEffect(sim.map, p.x, p.y).noise);
 }
 
 /** Stores the newest input. One-shot requests latch until a tick consumes them. */

@@ -8,7 +8,6 @@ export type DoorState = 'shut' | 'buckling' | 'burst';
 
 /** The warning that sets the door buckling: the second, a quarter of the clock left. */
 const BUCKLING_WARNING = 1;
-const BUCKLING_LEFT_SEC = OVERRUN_CLOCK_SEC * OVERRUN_WARNINGS[BUCKLING_WARNING];
 
 /** The blast door is drawn only while the overrun is switched on, so a bunker without it looks as it always has. */
 export function hiddenProp(kind: string, overrunOn: boolean): boolean {
@@ -20,7 +19,8 @@ export function doorState(overrun: OverrunView | undefined): DoorState {
   if (!overrun) return 'shut';
   const breached = overrun.phase === 'breached' || overrun.phase === 'held' || overrun.phase === 'lost';
   if (breached) return 'burst';
-  return overrun.left <= BUCKLING_LEFT_SEC ? 'buckling' : 'shut';
+  const buckleAt = (overrun.spanSec ?? OVERRUN_CLOCK_SEC) * OVERRUN_WARNINGS[BUCKLING_WARNING];
+  return overrun.left <= buckleAt ? 'buckling' : 'shut';
 }
 
 /** The chest stands from the hold until this player opens theirs, and only for a player who has one: their own view says so, nobody else's. */

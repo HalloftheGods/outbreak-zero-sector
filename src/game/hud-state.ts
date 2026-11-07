@@ -1,3 +1,4 @@
+import { displayName } from '../../shared/callsign.ts';
 import { characterOf } from '../../shared/characters.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
@@ -176,7 +177,7 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     hostiles: snapshot.hostiles,
     teammates: snapshot.players
       .filter((player) => player.id !== local.id)
-      .map(({ id, name, skin, health, maxHealth, status }) => ({ id, name, character: characterOf(skin).name, health, maxHealth, status })),
+      .map(({ id, name, skin, health, maxHealth, status }) => ({ id, name: displayName(name, skin), character: characterOf(skin).name, health, maxHealth, status })),
     spectating,
     gear: local.gear ?? null,
     bench: benchHud(snapshot, local),

@@ -31,6 +31,19 @@ describe('the blast door by overrun phase', () => {
     expect(doorState(view('counting', buckleAt + 1))).toBe('shut');
   });
 
+  it('buckles at a quarter of the view\'s own clock length, whatever the difficulty', () => {
+    for (const spanSec of [120, 150, 180, 240]) {
+      const at = spanSec * OVERRUN_WARNINGS[1];
+      expect(doorState({ ...view('counting', at + 1), spanSec }), `${spanSec} s`).toBe('shut');
+      expect(doorState({ ...view('counting', at), spanSec }), `${spanSec} s`).toBe('buckling');
+    }
+  });
+
+  it('reads a view with no length as the default clock', () => {
+    expect(doorState(view('counting', buckleAt + 1))).toBe('shut');
+    expect(doorState(view('counting', buckleAt))).toBe('buckling');
+  });
+
   it('buckles from the second warning to the breach', () => {
     expect(doorState(view('counting', buckleAt))).toBe('buckling');
     expect(doorState(view('armed', 10))).toBe('buckling');

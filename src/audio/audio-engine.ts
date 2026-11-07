@@ -1,6 +1,7 @@
 import type { GameStyle } from '../../shared/game-style.ts';
-import type { GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
+import type { GameEvent, PickupType, PlayerEntity, WeaponId, WorldMap, ZombieType } from '../../shared/protocol.ts';
 import type { GunEffect } from '../../shared/round-effect-data.ts';
+import { FootstepTracker, type StepPlayer } from './footsteps.ts';
 import { HEARING_RANGE, Mixer } from './mixer.ts';
 import { Music, type Scene } from './music.ts';
 import { Soundtrack } from './soundtrack.ts';
@@ -29,7 +30,7 @@ export const PICKUP_SFX: Record<PickupType, SfxName> = {
   knife: 'pickup_weapon', radio: 'pickup_radio',
   barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
   incendiary_kit: 'pickup_weapon', acid_kit: 'pickup_weapon', piercing_kit: 'pickup_weapon', tranq_kit: 'pickup_weapon',
-  silver: 'pickup_silver', jewel_small: 'pickup_jewel', jewel_large: 'pickup_jewel_large',
+  jewel_small: 'pickup_jewel', jewel_large: 'pickup_jewel_large',
 };
 const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrode', piercing: 'pierce', tranq: 'tranq_dart' };
 /** A can on the end of a gun: still a shot, but a dull one. */
@@ -70,6 +71,8 @@ export class AudioEngine {
   private groanIn = 2;
   private beatIn = 0;
   private alertIn = 0;
+  private readonly footsteps = new FootstepTracker();
+  private readonly playStep: StepPlayer = (name, opts) => this.mixer?.play(name, opts);
   private unlocking: Promise<void> | null = null;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -273,6 +276,18 @@ export class AudioEngine {
     if (near.length === 0) return;
     const z = near[Math.floor(Math.random() * near.length)];
     mixer.play(VOICE[z.type], { x: z.x, y: z.y, gain: 0.8 });
+  }
+
+  /**
+   * Footsteps for everyone on screen this frame, on the ground under them. Silent while muted
+   * or at zero volume, and until the audio has unlocked, like every other sound.
+   */
+  stepPlayers(players: readonly PlayerEntity[], localId: string | null, map: WorldMap, dt: number): void {
+    if (!this.mixer || this.level === 0) {
+      this.footsteps.reset();
+      return;
+    }
+    this.footsteps.tick(players, localId, map, dt, this.playStep);
   }
 
   dispose(): void {

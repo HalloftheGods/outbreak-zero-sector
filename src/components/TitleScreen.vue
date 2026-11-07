@@ -28,7 +28,8 @@
 import { ref } from 'vue';
 import { openPrivacy, privacyOpen } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
-import { parseJoinParam, withoutJoinParam } from '../game/invite-link.ts';
+import { parseInvite, withoutJoinParam } from '../game/invite-link.ts';
+import { setPendingRoomCode } from '../game/pending-room.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
 import { TITLE_MENU } from '../game/title-menu.ts';
 import { closePage, closePlay, INVITE_LANDING, openPage, pickLevel, TITLE_HOME } from '../game/title-nav.ts';
@@ -52,10 +53,14 @@ const { ui } = defineProps<{ ui: UiState }>();
 const game = useGame();
 const nav = ref(TITLE_HOME);
 
-/** An invite link (?join=host:port) fills in the server address and opens co-op setup. */
-const joinAddress = parseJoinParam(window.location.search);
-if (joinAddress) {
-  game.setServerAddress(joinAddress);
+/**
+ * An invite link opens co-op setup. ?join=host:port fills in the server address; ?room=CODE holds
+ * the code for the code join screen (?room wins when both are present).
+ */
+const invite = parseInvite(window.location.search);
+if (invite) {
+  if (invite.kind === 'room') setPendingRoomCode(invite.code);
+  else game.setServerAddress(invite.address);
   nav.value = INVITE_LANDING;
   window.history.replaceState(null, '', withoutJoinParam(window.location.href));
 }

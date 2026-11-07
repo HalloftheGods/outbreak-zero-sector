@@ -6,10 +6,11 @@ import type { MerchantId } from '../../../shared/home-protocol.ts';
 import { questOf, targetOf } from './quest-data.ts';
 import type { Objective, QuestDef, QuestFilter } from './quest-data.ts';
 import type { QuestState } from './quest-state.ts';
+import { emptyTally } from './quest-tally.ts';
 import type { TripTally } from './quest-tally.ts';
 
 /** Does this trip count for the quest at all: the right level, the right survivor, a big enough party. */
-function passes(filter: QuestFilter | undefined, receipt: TripReceipt, tally: TripTally): boolean {
+function passes(filter: QuestFilter | undefined, receipt: Pick<TripReceipt, 'level'>, tally: TripTally): boolean {
   if (!filter) return true;
   if (filter.minLevel !== undefined && receipt.level < filter.minLevel) return false;
   if (filter.survivor !== undefined && tally.survivor !== filter.survivor) return false;
@@ -66,13 +67,21 @@ function mapActive(quests: QuestState, step: (def: QuestDef, progress: number, m
 }
 
 /**
+ * A death moves nothing except resetting streaks that were still running. A finished streak keeps its pay (quests never fail),
+ * and a trip the quest's filter would not have counted cannot break it. A trip that never came home has no tally, so a filter on
+ * who wore it or how many were with them cannot be shown to fail and the streak is left alone; the level is always known.
+ */
+export function applyDeathToQuests(quests: QuestState, trip: Pick<TripReceipt, 'level'>, tally: TripTally = emptyTally()): QuestState {
+  const breaks = (def: QuestDef, progress: number): boolean => def.objective.kind === 'streak' && !isReady(def, progress) && passes(def.filter, trip, tally);
+  return mapActive(quests, (def, progress) => (breaks(def, progress) ? 0 : progress));
+}
+
+/**
  * The only path that moves trip progress. A banked trip counts what it brought and did; a death moves nothing
  * except resetting streaks. Returns the same object when nothing moved.
  */
 export function applyTripToQuests(quests: QuestState, receipt: TripReceipt, tally: TripTally): QuestState {
-  if (receipt.outcome === 'died') {
-    return mapActive(quests, (def, progress) => (def.objective.kind === 'streak' ? 0 : progress));
-  }
+  if (receipt.outcome === 'died') return applyDeathToQuests(quests, receipt, tally);
   return mapActive(quests, (def, progress) => afterBanked(def, progress, receipt, tally));
 }
 

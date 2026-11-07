@@ -10,6 +10,7 @@ import {
   ZOMBIE_SLEEP_RANGE,
   ZOMBIE_WANDER_SPEED_SCALE,
 } from './constants.ts';
+import { groundEffect } from './ground.ts';
 import { stepMovement } from './movement.ts';
 import { hurtPlayer } from './player-health.ts';
 import { TILE_SIZE } from './protocol.ts';
@@ -140,20 +141,22 @@ function stride(sim: SimState, z: ZombieState, dirX: number, dirY: number, pace 
   const headingY = dirY / length;
   const slip = z.sidestepLeft > 0 ? z.sidestepSide * SIDESTEP_WEIGHT : 0;
   z.sidestepLeft = Math.max(0, z.sidestepLeft - TICK_DT);
+  // Wading and drifts slow a zombie like anyone, and a slowed one is not a blocked one.
+  const footing = pace * groundEffect(sim.map, z.x, z.y).speed;
   const moved = stepMovement(
     sim.map,
     z.x,
     z.y,
     headingX + push.x * SEPARATION_WEIGHT - headingY * slip,
     headingY + push.y * SEPARATION_WEIGHT + headingX * slip,
-    zombieSpeed(z) * pace,
+    zombieSpeed(z) * footing,
     TICK_DT,
     z.radius,
   );
   const progress = Math.hypot(moved.x - z.x, moved.y - z.y);
   z.x = moved.x;
   z.y = moved.y;
-  startSidestepIfBlocked(sim, z, progress / pace);
+  startSidestepIfBlocked(sim, z, progress / footing);
 }
 
 function walkToward(sim: SimState, z: ZombieState, prey: PlayerState): void {
@@ -212,7 +215,7 @@ function wander(sim: SimState, z: ZombieState): void {
   const standingStill = z.wanderX === 0 && z.wanderY === 0;
   if (standingStill) return;
 
-  const speed = zombieSpeed(z) * ZOMBIE_WANDER_SPEED_SCALE;
+  const speed = zombieSpeed(z) * ZOMBIE_WANDER_SPEED_SCALE * groundEffect(sim.map, z.x, z.y).speed;
   const moved = stepMovement(sim.map, z.x, z.y, z.wanderX, z.wanderY, speed, TICK_DT, z.radius);
   const leavesHome = z.home !== null && buildingAt(sim.map, moved.x, moved.y)?.id !== z.home;
   const bumped = Math.hypot(moved.x - z.x, moved.y - z.y) < speed * TICK_DT * BLOCKED_PROGRESS;

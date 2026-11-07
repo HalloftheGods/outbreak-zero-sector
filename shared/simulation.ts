@@ -117,7 +117,9 @@ export class GameSimulation {
     if (existing) return playerSnapshot(existing);
 
     const taken = new Set(this.sim.players.map((p) => p.skin));
-    const arrival: Arrival = { id, name, token, skin: freeCharacter(taken, character) };
+    const skin = freeCharacter(taken, character);
+    // A public room sends no callsign: the name stays '' and whoever draws the player labels it by skin (shared/callsign.ts).
+    const arrival: Arrival = { id, name, token, skin };
     const live = reclaimLive(this.sim, arrival);
     if (live) {
       arriveInRoom(this.sim, live);

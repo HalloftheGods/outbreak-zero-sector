@@ -8,7 +8,7 @@ import { playerSpeed } from '../../shared/players.ts';
 import { effectiveStance } from '../../shared/stamina.ts';
 import { openableStation } from '../../shared/stations.ts';
 import { groundSpeedScale } from '../../shared/town-rules.ts';
-import type { EntityId, PlayerEntity, SnapshotPacket, Stance, WorldMap } from '../../shared/protocol.ts';
+import type { EntityId, PlayerEntity, PropInstance, SnapshotPacket, Stance, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt, circleHitsSolid } from '../../shared/world-query.ts';
 import type { SceneView } from '../engine/scene.ts';
 import { LocalPredictor } from './prediction.ts';
@@ -56,6 +56,11 @@ export class ClientWorld {
   /** The local player's entity as last reported by the sim. */
   get localPlayer(): PlayerEntity | null {
     return this.buffer.latest?.players.get(this.localId) ?? null;
+  }
+
+  /** The town being walked, for what is underfoot. */
+  get worldMap(): WorldMap {
+    return this.map;
   }
 
   /** A new run on the same connection. */
@@ -114,6 +119,11 @@ export class ClientWorld {
   private stationBy(player: PlayerEntity | null, phase: OverrunPhase | undefined): StationId | undefined {
     const free = player !== null && player.status === 'alive' && !player.home?.station && isBunkerMap(this.map);
     return free ? openableStation(this.map, player.x, player.y, player.home?.chest === true, phase)?.id : undefined;
+  }
+
+  /** The props standing in the bunker, which hold its stalls; none anywhere else. */
+  bunkerProps(): readonly PropInstance[] {
+    return isBunkerMap(this.map) ? this.map.props : [];
   }
 
   /** Advances prediction by dt and returns this frame's entities, or null before any snapshot. */

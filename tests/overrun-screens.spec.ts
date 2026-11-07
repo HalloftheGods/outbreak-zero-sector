@@ -33,9 +33,9 @@ describe('an overrun death', () => {
   });
 
   it('leaves a trip death as it was', () => {
-    const trip = { receipt: { outcome: 'died', level: 3, silver: 40, jewels: { small: 1, large: 0 } }, lost: gear() } as unknown as HomeDeath;
+    const trip = { receipt: { outcome: 'died', level: 3, silver: 0, jewels: { small: 1, large: 0 } }, lost: gear() } as unknown as HomeDeath;
     expect(deathHeading(trip)).toBe('You died on level 3');
-    expect(deathSummary(trip)).toEqual(['40 silver', '1 small jewel']);
+    expect(deathSummary(trip)).toEqual(['1 small jewel', '40 silver once smelted']);
   });
 });
 

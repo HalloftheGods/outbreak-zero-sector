@@ -28,6 +28,18 @@ export interface TouchMarks {
   readonly fingertip: number;
 }
 
+/** A "!" over a stall whose merchant has a quest on offer, or one finished and owed its pay. */
+export interface QuestMark {
+  readonly merchant: MerchantId;
+  /** What the prompt calls them: "Sarge". */
+  readonly name: string;
+  /** The stall prop's bottom centre. */
+  readonly x: number;
+  readonly y: number;
+  /** Owed pay, as against only on offer. */
+  readonly ready: boolean;
+}
+
 /** Everything the renderer draws this frame. Plain values; nothing here is reactive. */
 export interface SceneView {
   readonly players: readonly PlayerEntity[];
@@ -50,6 +62,8 @@ export interface SceneView {
   readonly overrunOn?: boolean;
   /** Stalls the overrun emptied, by this player's own save. Their merchants stand down until the stall reopens. */
   readonly closedStalls?: readonly MerchantId[];
+  /** Stalls whose merchant has work to offer or pay, by this player's own save. */
+  readonly questMarks?: readonly QuestMark[];
   /** The player at this keyboard, if they exist yet. */
   readonly localId: EntityId | null;
   /** Whose eyes the camera is behind: localId, or a teammate when spectating. */

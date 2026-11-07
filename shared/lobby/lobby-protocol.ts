@@ -1,0 +1,143 @@
+// Signaling between a host or guest tab and its Room DO. The DO relays SDP and ICE and never sees game packets.
+// Every message is JSON text of at most SIGNAL_MAX_BYTES; the guards return null for anything else.
+import { CHARACTERS } from '../characters.ts';
+
+export const SIGNAL_MAX_BYTES = 16 * 1024;
+const PEER_ID_MAX = 64;
+const SDP_MAX = 12 * 1024;
+const CANDIDATE_MAX = 2048;
+const HOST_KEY_MAX = 128;
+const END_REASON_MAX = 64;
+/** `taken` has one bit per survivor, so the largest honest value has every one set. */
+const ALL_SURVIVORS_TAKEN = (1 << CHARACTERS.length) - 1;
+
+/** The ICE candidate a browser hands over (RTCIceCandidateInit, trimmed to what the relay needs). */
+export interface IceCandidate {
+  readonly candidate: string;
+  readonly sdpMid?: string | null;
+  readonly sdpMLineIndex?: number | null;
+}
+
+/** What the host last reported about the room, for the listing. */
+export interface RoomReport {
+  readonly seats: number;
+  readonly taken: number;
+  readonly level: number;
+  readonly highest: number;
+  readonly phase: 'muster' | 'playing' | 'over';
+  readonly locked: boolean;
+}
+
+export type HostSignal =
+  | { readonly type: 'auth'; readonly hostKey: string }
+  | { readonly type: 'answer'; readonly peerId: string; readonly sdp: string }
+  | { readonly type: 'ice'; readonly peerId: string; readonly ice: IceCandidate }
+  | { readonly type: 'report'; readonly report: RoomReport }
+  | { readonly type: 'end'; readonly reason?: string };
+
+export type GuestSignal =
+  | { readonly type: 'offer'; readonly sdp: string }
+  | { readonly type: 'ice'; readonly ice: IceCandidate };
+
+/** DO to host. `peer-left` tells the host to drop a half-open connection. */
+export type ToHostSignal =
+  | { readonly type: 'offer'; readonly peerId: string; readonly sdp: string }
+  | { readonly type: 'ice'; readonly peerId: string; readonly ice: IceCandidate }
+  | { readonly type: 'peer-left'; readonly peerId: string };
+
+/** DO to guest. */
+export type ToGuestSignal =
+  | { readonly type: 'answer'; readonly sdp: string }
+  | { readonly type: 'ice'; readonly ice: IceCandidate }
+  | { readonly type: 'peer-left' };
+
+type Raw = Record<string, unknown>;
+
+const isRaw = (value: unknown): value is Raw => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isText = (value: unknown, max: number): value is string =>
+  typeof value === 'string' && value.length > 0 && value.length <= max;
+const isCount = (value: unknown, max: number): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max;
+
+/** JSON.parse that refuses oversize text and anything that is not an object. */
+export function parseSignalText(text: unknown): Raw | null {
+  if (typeof text !== 'string' || new TextEncoder().encode(text).length > SIGNAL_MAX_BYTES) return null;
+  try {
+    const value: unknown = JSON.parse(text);
+    return isRaw(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseIce(value: unknown): IceCandidate | null {
+  if (!isRaw(value) || !isText(value.candidate, CANDIDATE_MAX)) return null;
+  const { sdpMid, sdpMLineIndex } = value;
+  const midOk = sdpMid === undefined || sdpMid === null || isText(sdpMid, 64);
+  const indexOk = sdpMLineIndex === undefined || sdpMLineIndex === null || isCount(sdpMLineIndex, 255);
+  if (!midOk || !indexOk) return null;
+  return { candidate: value.candidate, sdpMid: sdpMid as string | null | undefined, sdpMLineIndex: sdpMLineIndex as number | null | undefined };
+}
+
+export function parseReport(value: unknown): RoomReport | null {
+  if (!isRaw(value)) return null;
+  const { seats, taken, level, highest, phase, locked } = value;
+  const phaseOk = phase === 'muster' || phase === 'playing' || phase === 'over';
+  const shapeOk = isCount(seats, 4) && isCount(taken, ALL_SURVIVORS_TAKEN) && isCount(level, 99) && isCount(highest, 99);
+  if (!phaseOk || !shapeOk || typeof locked !== 'boolean') return null;
+  return { seats, taken, level, highest, phase, locked };
+}
+
+export function parseHostSignal(text: unknown): HostSignal | null {
+  const m = parseSignalText(text);
+  if (!m) return null;
+  switch (m.type) {
+    case 'auth':
+      return isText(m.hostKey, HOST_KEY_MAX) ? { type: 'auth', hostKey: m.hostKey } : null;
+    case 'answer':
+      return isText(m.peerId, PEER_ID_MAX) && isText(m.sdp, SDP_MAX) ? { type: 'answer', peerId: m.peerId, sdp: m.sdp } : null;
+    case 'ice': {
+      const ice = parseIce(m.ice);
+      return isText(m.peerId, PEER_ID_MAX) && ice ? { type: 'ice', peerId: m.peerId, ice } : null;
+    }
+    case 'report': {
+      const report = parseReport(m.report);
+      return report ? { type: 'report', report } : null;
+    }
+    case 'end':
+      if (m.reason === undefined) return { type: 'end' };
+      return isText(m.reason, END_REASON_MAX) ? { type: 'end', reason: m.reason } : null;
+    default:
+      return null;
+  }
+}
+
+export function parseGuestSignal(text: unknown): GuestSignal | null {
+  const m = parseSignalText(text);
+  if (!m) return null;
+  if (m.type === 'offer') return isText(m.sdp, SDP_MAX) ? { type: 'offer', sdp: m.sdp } : null;
+  if (m.type === 'ice') {
+    const ice = parseIce(m.ice);
+    return ice ? { type: 'ice', ice } : null;
+  }
+  return null;
+}
+
+/** The DO's side: what the host or guest receives. */
+export function parseToHostSignal(text: unknown): ToHostSignal | null {
+  const m = parseSignalText(text);
+  if (!m || !isText(m.peerId, PEER_ID_MAX)) return null;
+  if (m.type === 'peer-left') return { type: 'peer-left', peerId: m.peerId };
+  if (m.type === 'offer') return isText(m.sdp, SDP_MAX) ? { type: 'offer', peerId: m.peerId, sdp: m.sdp } : null;
+  const ice = m.type === 'ice' ? parseIce(m.ice) : null;
+  return ice ? { type: 'ice', peerId: m.peerId, ice } : null;
+}
+
+export function parseToGuestSignal(text: unknown): ToGuestSignal | null {
+  const m = parseSignalText(text);
+  if (!m) return null;
+  if (m.type === 'peer-left') return { type: 'peer-left' };
+  if (m.type === 'answer') return isText(m.sdp, SDP_MAX) ? { type: 'answer', sdp: m.sdp } : null;
+  const ice = m.type === 'ice' ? parseIce(m.ice) : null;
+  return ice ? { type: 'ice', ice } : null;
+}

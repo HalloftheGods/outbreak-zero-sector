@@ -1,15 +1,19 @@
 <template>
-  <div class="treasure-chip" aria-label="Carried treasure">
-    <span class="treasure-silver">{{ home.carried.silver }} silver</span>
-    <span v-if="home.carried.jewels.small > 0" class="treasure-jewel">{{ home.carried.jewels.small }} small</span>
-    <span v-if="home.carried.jewels.large > 0" class="treasure-jewel">{{ home.carried.jewels.large }} large</span>
+  <div class="treasure-chip" aria-label="Carried jewels">
+    <span class="treasure-worth">{{ lines.worth }}</span>
+    <span v-for="count in lines.counts" :key="count" class="treasure-jewel">{{ count }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
+/** The jewels in hand on a trip: what they come to at the forge, in gold and silver, over the count of each size. */
+import { computed } from 'vue';
 import type { HomeUi } from '../game/home-hud.ts';
+import { carriedLines } from '../game/home-screens.ts';
 
-defineProps<{ home: HomeUi }>();
+const { home } = defineProps<{ home: HomeUi }>();
+
+const lines = computed(() => carriedLines(home.carried));
 </script>
 
 <style scoped>

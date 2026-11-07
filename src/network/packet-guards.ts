@@ -5,6 +5,7 @@ import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import { EFFECT_ORDER } from '../../shared/round-effect-data.ts';
 import type {
   BulletEntity,
+  ByePacket,
   ExitEntity,
   GameEvent,
   GameOverStats,
@@ -151,6 +152,10 @@ export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
     && (v.home === undefined || isRoomHomeView(v.home));
 }
 
+export function isByePacket(v: unknown): v is ByePacket {
+  return isFields(v) && v.type === 'bye' && isNumber(v.code) && isString(v.reason);
+}
+
 /** Returns null for anything that is not a well-formed server packet. */
 export function parseServerPacket(raw: unknown): ServerPacket | null {
   if (!isString(raw)) return null;
@@ -161,6 +166,7 @@ export function parseServerPacket(raw: unknown): ServerPacket | null {
     return null;
   }
   if (isSnapshotPacket(value) || isWelcomePacket(value) || isRoomPacket(value)) return value;
+  if (isByePacket(value)) return { type: 'bye', code: value.code, reason: value.reason };
   if (isFields(value) && value.type === 'player_disconnected' && isString(value.playerId)) {
     return { type: 'player_disconnected', playerId: value.playerId };
   }

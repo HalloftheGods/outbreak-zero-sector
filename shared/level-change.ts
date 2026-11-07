@@ -13,10 +13,10 @@ import { placeTownTreasure } from './treasure.ts';
 import { hordesSurvivedHere } from './waves.ts';
 import { generateWorldMap } from './world-map.ts';
 
-function raiseMap(sim: SimState, seed: number): void {
+function raiseMap(sim: SimState, seed: number, level: number): void {
   const sameMap = seed === sim.map.seed;
   if (sameMap) return;
-  sim.map = generateWorldMap(seed);
+  sim.map = generateWorldMap(seed, level);
   sim.flow = new FlowField(sim.map);
   sim.noiseFlow = new FlowField(sim.map);
 }
@@ -46,7 +46,7 @@ function emptyWorld(sim: SimState, level: number): void {
 
 /** Empties the world and raises a level's town, stocked and populated, ready for its lead-in. */
 export function enterTown(sim: SimState, level: number): void {
-  raiseMap(sim, levelSeed(sim.runSeed, level, sim.homeRun?.attempt));
+  raiseMap(sim, levelSeed(sim.runSeed, level, sim.homeRun?.attempt), level);
   emptyWorld(sim, level);
   placeTownLoot(sim);
   seedPopulation(sim);
@@ -55,7 +55,7 @@ export function enterTown(sim: SimState, level: number): void {
 
 /** Empties the world and goes home: no loot, no containers, no zombies, and the van parked. */
 export function enterBunker(sim: SimState): void {
-  raiseMap(sim, BUNKER_SEED);
+  raiseMap(sim, BUNKER_SEED, BUNKER_LEVEL);
   emptyWorld(sim, BUNKER_LEVEL);
   sim.containers = [];
   parkBunkerVan(sim);

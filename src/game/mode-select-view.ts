@@ -29,7 +29,7 @@ export const MODE_CARDS: readonly ModeCard[] = [
 export const PLAYER_SLOTS = MAX_PLAYERS;
 
 /**
- * Players: the room cap (server/room.ts). Difficulty: in co-op the first player into the room sets it (shared/difficulty.ts).
+ * Players: the room cap (shared/room/game-room.ts). Difficulty: in co-op the first player into the room sets it (shared/difficulty.ts).
  * Continue and the server field: only solo Arcade offers Continue from level; only co-op needs a server (PlaySetup.vue).
  * Campaign picks up from its bunker save with no Continue button. No style (an invite, where the room decides) says only that Continue is Arcade's.
  */

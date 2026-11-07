@@ -27,7 +27,8 @@ interface DistrictStyle {
   readonly fillers: readonly BuildingKind[];
   /** What must exist here. Anything that cannot fit moves on to the next district. */
   readonly wishes: readonly BuildingKind[];
-  readonly clutter: readonly (readonly [Parameters<MapBuilder['scatter']>[0], number])[];
+  /** Kind, count per 400 tiles, and the ground it needs: dry plants only take root on bare dirt. */
+  readonly clutter: readonly (readonly [Parameters<MapBuilder['scatter']>[0], number, TileKind?])[];
 }
 
 const STYLES: Record<TownStyle, DistrictStyle> = {
@@ -38,7 +39,7 @@ const STYLES: Record<TownStyle, DistrictStyle> = {
     vacancy: 0.1,
     fillers: ['house', 'house', 'house', 'house', 'apartment', 'apartment'],
     wishes: ['grocery', 'diner', 'garage', 'pharmacy', 'diner'],
-    clutter: [['bush', 3], ['tree', 2], ['dumpster', 1], ['crate_stack', 1], ['rubble', 2]],
+    clutter: [['bush', 6], ['tree', 3], ['dumpster', 1], ['crate_stack', 1], ['rubble', 2]],
   },
   riverside: {
     ground: 'grass',
@@ -47,7 +48,7 @@ const STYLES: Record<TownStyle, DistrictStyle> = {
     vacancy: 0.15,
     fillers: ['house', 'house', 'house', 'house', 'house', 'apartment'],
     wishes: ['grocery', 'diner'],
-    clutter: [['tree', 5], ['bush', 6], ['rubble', 1]],
+    clutter: [['tree', 3], ['pine', 4], ['bush', 5], ['rubble', 1]],
   },
   industrial: {
     ground: 'dirt',
@@ -56,7 +57,7 @@ const STYLES: Record<TownStyle, DistrictStyle> = {
     vacancy: 0.25,
     fillers: ['warehouse', 'warehouse', 'garage'],
     wishes: ['warehouse', 'garage', 'warehouse'],
-    clutter: [['crate_stack', 5], ['dumpster', 2], ['barrier', 2], ['fire_barrel', 1], ['rubble', 3]],
+    clutter: [['crate_stack', 5], ['dumpster', 2], ['barrier', 2], ['fire_barrel', 1], ['rubble', 3], ['bush', 3, 'dirt'], ['tree', 1, 'dirt']],
   },
   downtown: {
     ground: 'sidewalk',
@@ -127,7 +128,7 @@ function packRow(b: MapBuilder, block: Block, style: DistrictStyle, bottom: numb
 /** Rows run from the south edge, each with its doors on a paved lane or the street. */
 function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: BuildingKind[]): void {
   const area = rectBox(block);
-  b.fill(area, style.ground);
+  b.fill(area, style.ground === 'grass' ? b.biome.ground : style.ground);
   // No street runs along the fence, so doors facing it get a path of their own.
   const facesFence = block.r1 === MAP_TILES - EDGE_TILES;
   if (facesFence) b.fill(rectBox({ c0: block.c0, c1: block.c1, r0: block.r1, r1: block.r1 + WALK_TILES }), 'sidewalk');
@@ -142,7 +143,7 @@ function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: Bu
     b.fill(rectBox({ c0: block.c0, c1: block.c1, r0: bottom, r1: bottom + LANE_PAVED_TILES }), 'sidewalk');
   }
   const scale = ((block.c1 - block.c0) * (block.r1 - block.r0)) / 400;
-  for (const [kind, count] of style.clutter) b.scatter(kind, area, Math.ceil(count * scale));
+  for (const [kind, count, onlyOn] of [...style.clutter, ...b.biome.extra]) b.flora(kind, area, Math.ceil(count * scale), undefined, onlyOn);
 }
 
 /** Fills every block; the farthest in two districts stay open as a car park and a camp. */

@@ -3,3 +3,4 @@ dist
 .vite/*
 !.vite/.gitkeep
 *.tsbuildinfo
+.vitest/

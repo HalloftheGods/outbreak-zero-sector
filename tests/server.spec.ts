@@ -49,10 +49,11 @@ describe('packet validation', () => {
 
   it('sanitises and truncates names', () => {
     expect(sanitiseName('  Ann\u0000 \n Lee  ')).toBe('Ann Lee');
-    expect(sanitiseName('x'.repeat(40))).toBe('x'.repeat(16));
+    expect(sanitiseName('x'.repeat(40))).toBe('x'.repeat(12));
+    expect(sanitiseName('sh1t')).toBe('Survivor');
     expect(sanitiseName('\u0007\u0008')).toBe('Survivor');
     expect(sanitiseName('')).toBe('Survivor');
-    expect([...sanitiseName('🧟'.repeat(20))].length).toBe(16);
+    expect([...sanitiseName('🧟'.repeat(20))].length).toBe(12);
   });
 });
 

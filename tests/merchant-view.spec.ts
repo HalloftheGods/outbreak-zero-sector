@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MEDKIT_MAX } from '../shared/constants.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import { merchantView } from '../src/game/home/merchant-view.ts';
+import { emptyTally } from '../src/game/home/quest-tally.ts';
 import { rollStock } from '../src/game/home/shop.ts';
 import type { HomeUi } from '../src/game/home-hud.ts';
 
@@ -9,8 +10,8 @@ function homeAt(station: HomeUi['station'], silver: number, highest = 1): HomeUi
   const save = { ...rollStock(emptySave(2)), silver };
   return {
     inBunker: true, station, stationHold: 0, shop: station === 'medic' ? 'medic' : null, ready: false,
-    carried: { silver: 0, jewels: { small: 0, large: 0 } }, pickedLevel: null, roomHighest: 1, overrun: null, highest,
-    difficulty: 'lights_out', receipt: null, save, forgeProgress: 0, saveError: null, death: null, chest: null,
+    carried: { jewels: { small: 0, large: 0 }, worth: 0 }, pickedLevel: null, roomHighest: 1, overrun: null, highest,
+    difficulty: 'lights_out', receipt: null, save, forgeProgress: 0, saveError: null, death: null, chest: null, quests: { tally: emptyTally() },
   };
 }
 

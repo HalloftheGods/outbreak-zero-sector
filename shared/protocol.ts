@@ -245,7 +245,7 @@ export interface SnapshotPacket {
   readonly phase: GamePhase;
   /** Level of the run, 1 up to the last. */
   readonly level: number;
-  /** The town being played: generateWorldMap(mapSeed). A change means the map changed, whatever the events said. */
+  /** The town being played: generateWorldMap(mapSeed, level). A change means the map changed, whatever the events said. */
   readonly mapSeed: number;
   /** Horde number in this town. Phase 'intermission' is the scavenging lull, phase 'wave' is a horde hunting the players. */
   readonly wave: number;
@@ -276,8 +276,10 @@ export interface WelcomePacket {
   readonly type: 'welcome';
   readonly yourId: EntityId;
   readonly tickRate: number;
-  /** generateWorldMap(mapSeed) rebuilds the town being played when this client joined. */
+  /** generateWorldMap(mapSeed, level) rebuilds the town being played when this client joined. */
   readonly mapSeed: number;
+  /** The level of that town, which picks its biome. Left off, level 1. */
+  readonly level?: number;
   /** What the room is played on: a guest plays the first player's choice, not their own. */
   readonly difficulty?: DifficultyId;
   /** This join took back a body the room was still holding. Left off for a new one. */
@@ -293,15 +295,29 @@ export interface RoomPacket {
   readonly style: GameStyle | null;
 }
 
+/** Bumped by any change to a packet. A host closes a join from another version with 4014. */
+export const PROTOCOL_VERSION = 1;
+
+/**
+ * Sent just before a link is closed on purpose, because a data channel has no close code.
+ * Over a socket the same pair also rides the close frame.
+ */
+export interface ByePacket {
+  readonly type: 'bye';
+  readonly code: number;
+  readonly reason: string;
+}
+
 export type ServerPacket =
   | RoomPacket
   | WelcomePacket
   | SnapshotPacket
+  | ByePacket
   | { readonly type: 'player_disconnected'; readonly playerId: EntityId };
 
 export type ClientPacket =
-  /** The difficulty is read from the first player into an empty room and ignored from everyone after. The style must be the room's; an empty room takes it, and left off it is Arcade. */
-  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number; readonly home?: JoinHome; readonly style?: GameStyle }
+  /** The difficulty is read from the first player into an empty room and ignored from everyone after. The style must be the room's; an empty room takes it, and left off it is Arcade. The protocol is the sender's PROTOCOL_VERSION; only a LAN server takes a join without one. */
+  | { readonly type: 'join'; readonly name: string; readonly token: string; readonly difficulty?: DifficultyId; readonly character?: number; readonly home?: JoinHome; readonly style?: GameStyle; readonly protocol?: number }
   | { readonly type: 'input'; readonly input: ClientInputPacket }
   | { readonly type: 'bench'; readonly action: BenchAction }
   | { readonly type: 'home'; readonly action: HomeAction }
@@ -326,6 +342,11 @@ export const TILE_KINDS = [
   'curb_w',
   'grass',
   'dirt',
+  /** Shallow flood water, drifted snow, cinders and toxic sludge: ground a biome lays over grass, dirt and road. All walkable. */
+  'water',
+  'snow',
+  'ash',
+  'sludge',
   'floor_wood',
   'floor_tile',
   'floor_concrete',
@@ -353,7 +374,18 @@ export const PROP_DEFS = {
   fire_barrel: { w: 12, h: 8 },
   street_lamp: { w: 6, h: 4 },
   hydrant: { w: 6, h: 4 },
+  /** Evergreen: a narrow trunk under a dark spire. */
+  pine: { w: 10, h: 6 },
+  /** Saguaro: solid, but thin enough to walk round. */
+  cactus: { w: 8, h: 6 },
+  dead_tree: { w: 10, h: 6 },
   bush: { w: 0, h: 0 },
+  /** Dry scrub and tumbleweed: walk-through, like bush. */
+  scrub: { w: 0, h: 0 },
+  /** Marsh reeds and cattails: walk-through. */
+  reeds: { w: 0, h: 0 },
+  /** A giant fungus: solid, for the blighted and infested towns. */
+  fungus: { w: 10, h: 6 },
   rubble: { w: 0, h: 0 },
   fence_h: { w: 32, h: 6 },
   fence_v: { w: 6, h: 32 },

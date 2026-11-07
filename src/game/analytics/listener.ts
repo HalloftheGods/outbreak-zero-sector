@@ -7,7 +7,7 @@ import { watch } from 'vue';
 import { characterOf } from '../../../shared/characters.ts';
 import { loadCharacter } from '../character-pref.ts';
 import { loadDifficulty } from '../difficulty-pref.ts';
-import { parseJoinParam } from '../invite-link.ts';
+import { parseInvite } from '../invite-link.ts';
 import { MAX_ERROR_EVENTS } from './analytics-config.ts';
 import { ERROR_TYPES } from './catalog.ts';
 import type { EventName } from './catalog.ts';
@@ -20,7 +20,7 @@ import type { Profile, TrackedUi } from './run-tracker.ts';
 let tracker: RunTracker | null = null;
 
 /** Read when this file loads, before the title strips the join parameter from the address. Only the fact is kept. */
-const openedByInvite = parseJoinParam(globalThis.location?.search ?? '') !== null;
+const openedByInvite = parseInvite(globalThis.location?.search ?? '') !== null;
 
 /** A title page opened. Unknown pages are ignored. */
 export function trackTitlePage(page: string): void {

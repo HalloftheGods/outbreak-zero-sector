@@ -129,6 +129,13 @@ describe('packet guards', () => {
     expect(parseServerPacket(raw)).toBeNull();
   });
 
+  it('parses a bye packet and rejects a half of one', () => {
+    const bye = { type: 'bye', code: 4011, reason: 'host left' };
+    expect(parseServerPacket(JSON.stringify(bye))).toEqual(bye);
+    expect(parseServerPacket(JSON.stringify({ type: 'bye', code: '4011', reason: 'x' }))).toBeNull();
+    expect(parseServerPacket(JSON.stringify({ type: 'bye', code: 4011 }))).toBeNull();
+  });
+
   it('returns null for a binary frame', () => {
     expect(parseServerPacket(new ArrayBuffer(4))).toBeNull();
   });

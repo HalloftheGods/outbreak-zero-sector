@@ -8,7 +8,7 @@ import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
 import { KIT_ART } from './kits.ts';
 import { PART_ART } from './parts.ts';
-import { JEWEL_LARGE, JEWEL_SMALL, SILVER, TREASURE_LEGEND } from './treasure.ts';
+import { JEWEL_LARGE, JEWEL_SMALL, TREASURE_LEGEND } from './treasure.ts';
 import type { Grid } from './shared.ts';
 
 const { blood, bone, fire, ink, metal, olive, wood } = RAMPS;
@@ -170,7 +170,6 @@ const ITEMS: Record<PickupType, ItemSpec> = {
   radio: { rows: RADIO, glint: [2, 3] },
   ...PART_ART,
   ...KIT_ART,
-  silver: { rows: SILVER, glint: [2, 1] },
   jewel_small: { rows: JEWEL_SMALL, glint: [1, 1] },
   jewel_large: { rows: JEWEL_LARGE, glint: [3, 1] },
 };

@@ -23,7 +23,11 @@ class FakeSocket {
     FakeSocket.latest = this;
   }
 
-  send(): void {}
+  readonly sent: string[] = [];
+
+  send(data: string): void {
+    this.sent.push(data);
+  }
   close(): void {}
 
   receive(packet: object): void {
@@ -114,6 +118,20 @@ describe('game flow', () => {
     socket.receive({ type: 'welcome', yourId: 'me', tickRate: 30, mapSeed: 4242 });
     return socket;
   }
+
+  it.each([['Knight', 'Knight'], ['', ''], ['  \u0007 ', ''], ['sh1t', ''], ['x'.repeat(30), 'x'.repeat(12)]])(
+    'joins a room as callsign %j with the name %j, never a stand-in label',
+    (typed, sent) => {
+      game.setCallsign(typed);
+      vi.stubGlobal('WebSocket', FakeSocket);
+      game.startCoop('arcade');
+      const socket = FakeSocket.latest;
+      socket.onopen?.();
+      socket.receive({ type: 'room', style: 'arcade' });
+      const join = socket.sent.map((text) => JSON.parse(text) as { type: string; name?: string }).find((packet) => packet.type === 'join');
+      expect(join?.name).toBe(sent);
+    },
+  );
 
   it('loads the art behind the title', () => {
     expect(game.ui.value.screen).toBe('title');

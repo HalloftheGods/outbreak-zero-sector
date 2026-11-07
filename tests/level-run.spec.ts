@@ -182,7 +182,7 @@ describe('moving to the next town', () => {
     expect(frame.mapSeed).toBe(levelSeed(SEED, 2));
     expect(sim.map).not.toBe(firstTown);
     expect(sim.map.seed).toBe(frame.mapSeed);
-    expect(generateWorldMap(frame.mapSeed).tiles).toEqual(sim.map.tiles);
+    expect(generateWorldMap(frame.mapSeed, frame.level).tiles).toEqual(sim.map.tiles);
   });
 
   it('starts a clean lead-in in a stocked, populated town with no exit', () => {

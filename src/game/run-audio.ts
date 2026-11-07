@@ -14,4 +14,5 @@ export function tickRunAudio(audio: AudioEngine, world: ClientWorld, scene: Scen
   const threat = scene.phase === 'wave' ? Math.min(1, scene.hostiles / INTENSE_HOSTILES) : 0;
   audio.setIntensity(Math.min(1, threat * 0.75 + (1 - health) * 0.25));
   audio.tick(dt, scene.zombies);
+  audio.stepPlayers(scene.players, world.localId, world.worldMap, dt);
 }

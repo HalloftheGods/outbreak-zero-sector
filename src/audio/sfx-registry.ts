@@ -4,6 +4,7 @@ import * as Z from './sfx-zombies.ts';
 import * as P from './sfx-player.ts';
 import * as U from './sfx-ui.ts';
 import * as FX from './sfx-effects.ts';
+import * as ST from './sfx-steps.ts';
 
 export interface SfxDef {
   readonly play: Recipe;
@@ -70,7 +71,6 @@ export const SFX = {
   pickup_weapon: def(P.pickupWeapon, 0.6, { gain: 1.5, voices: 2, cooldown: 0.1, vary: 0.02 }),
   container_open: def(P.containerOpen, 0.25, { gain: 1.8, voices: 2, cooldown: 0.1, vary: 0.08 }),
   pickup_radio: def(P.pickupRadio, 0.7, { gain: 1.6, voices: 1, cooldown: 1, vary: 0 }),
-  pickup_silver: def(P.pickupSilver, 0.35, { gain: 2, voices: 3, cooldown: 0.06, vary: 0.05 }),
   pickup_jewel: def(P.pickupJewel, 0.6, { gain: 2, voices: 2, cooldown: 0.1, vary: 0.03 }),
   pickup_jewel_large: def(P.pickupJewelLarge, 0.95, { gain: 2, voices: 2, cooldown: 0.15, vary: 0.02 }),
   ignite: def(FX.ignite, 0.6, { gain: 1.2, voices: 4, cooldown: 0.08, vary: 0.08 }),
@@ -83,6 +83,13 @@ export const SFX = {
   wave_start: def(P.waveStart, 5.0, { gain: 1.1, voices: 1, cooldown: 2, vary: 0 }),
   wave_clear: def(P.waveClear, 2.0, { gain: 2, voices: 1, cooldown: 2, vary: 0 }),
   game_over: def(P.gameOver, 4.1, { gain: 0.95, voices: 1, cooldown: 4, vary: 0 }),
+  // Footsteps: short, dry and quiet. No cooldown to speak of, since several players step at once.
+  step_hard: def(ST.stepHard, 0.12, { gain: 0.5, voices: 4, cooldown: 0.015, vary: 0.15 }),
+  step_soft: def(ST.stepSoft, 0.14, { gain: 0.5, voices: 4, cooldown: 0.015, vary: 0.15 }),
+  step_water: def(ST.stepWater, 0.14, { gain: 0.45, voices: 4, cooldown: 0.015, vary: 0.15 }),
+  step_snow: def(ST.stepSnow, 0.14, { gain: 0.5, voices: 4, cooldown: 0.015, vary: 0.15 }),
+  step_sludge: def(ST.stepSludge, 0.14, { gain: 0.45, voices: 4, cooldown: 0.015, vary: 0.15 }),
+  step_ash: def(ST.stepAsh, 0.13, { gain: 0.5, voices: 4, cooldown: 0.015, vary: 0.15 }),
   ui_click: def(U.uiClick, 0.08, { gain: 1.2, voices: 3, cooldown: 0.02, vary: 0.02 }),
   ui_hover: def(U.uiHover, 0.06, { gain: 2, voices: 2, cooldown: 0.04, vary: 0.02 }),
   ui_start: def(U.uiStart, 0.6, { gain: 1.4, voices: 1, cooldown: 0.3, vary: 0 }),

@@ -81,7 +81,7 @@ export class LocalSession implements GameTransport {
     sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);
     this.sim = sim;
     this.paused = false;
-    this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: sim.map.seed, difficulty: sim.difficulty });
+    this.onWelcome({ type: 'welcome', yourId: LOCAL_PLAYER_ID, tickRate: TICK_RATE, mapSeed: sim.map.seed, level: sim.level, difficulty: sim.difficulty });
     this.onSnapshot(sim.snapshot());
     this.clock.start();
   }

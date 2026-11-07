@@ -6,7 +6,7 @@ import { BUNKER_LEVEL, BUNKER_SEED, isBunkerMap, isBunkerSeed, MERCHANT_IDS, OVE
 import type { HomeView, OverrunReceipt } from '../shared/home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL, levelSeed } from '../shared/levels.ts';
 import { emptyLoadout, loadoutOfEntity, mergeHome } from '../shared/loadout.ts';
-import { OVERRUN_CLOCK_SEC } from '../shared/overrun.ts';
+import { OVERRUN_CLOCK_BY_DIFFICULTY } from '../shared/overrun.ts';
 import { PROP_DEFS, TILE_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { PlayerEntity, SnapshotPacket } from '../shared/protocol.ts';
 import { GameSimulation } from '../shared/simulation.ts';
@@ -272,13 +272,13 @@ describe('the overrun on the wire', () => {
 
   it('shows the room\'s clock while there is one, in a shape the guards take', () => {
     const { sim, state } = homeSim();
-    state.overrun = { phase: 'counting', left: 212.44, slowed: true, warned: 0, queue: [], spawnTimer: 0, total: 0, kills: 0, startTick: 0 };
+    state.overrun = { phase: 'counting', spanSec: 240, left: 212.44, slowed: true, warned: 0, queue: [], spawnTimer: 0, total: 0, kills: 0, startTick: 0 };
     const clock = sim.snapshot().home?.overrun;
-    expect(clock).toEqual({ phase: 'counting', left: 212.4, slowed: true, hostiles: 0, total: 0 });
+    expect(clock).toEqual({ phase: 'counting', spanSec: 240, left: 212.4, slowed: true, hostiles: 0, total: 0 });
     expect(isRoomHomeView(sim.snapshot().home)).toBe(true);
     state.overrun = { ...state.overrun, phase: 'breached', left: 0, queue: ['walker', 'walker'], total: 24 };
     expect(sim.snapshot().home?.overrun).toMatchObject({ phase: 'breached', hostiles: 2, total: 24 });
-    expect(OVERRUN_CLOCK_SEC).toBe(300);
+    expect(OVERRUN_CLOCK_BY_DIFFICULTY).toEqual({ night_light: 240, stay_close: 180, lights_out: 150, undead_tired: 120 });
   });
 
   it('keeps each player\'s overrun receipt to that player', () => {

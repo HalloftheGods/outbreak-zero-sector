@@ -101,15 +101,6 @@ export const pickupShells: Recipe = (v) => {
   noise(v, { at: 0.2, filter: 'lowpass', freq: 500, decay: 0.08, gain: 0.35 });
 };
 
-/** Coins dropped into a palm: a few bright clinks on top of a soft metal thud. */
-export const pickupSilver: Recipe = (v) => {
-  tone(v, { type: 'sine', f0: 210, f1: 140, decay: 0.07, gain: 0.35, lp: 400 });
-  [0.02, 0.07, 0.12].forEach((at, i) => {
-    tone(v, { at, type: 'square', f0: 2350 + i * 310, f1: 2200 + i * 260, attack: 0.002, decay: 0.05, gain: 0.07 });
-    tone(v, { at, type: 'triangle', f0: 3700 + i * 380, decay: 0.09, gain: 0.12 });
-  });
-};
-
 /** A cut stone lifted out of the dirt: one glassy note with a quick shimmer over it. */
 export const pickupJewel: Recipe = (v) => {
   chime(v, [1318.5, 1760], 0.06, 'sine', 0.2, 0.28);

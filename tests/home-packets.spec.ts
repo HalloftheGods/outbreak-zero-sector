@@ -186,8 +186,16 @@ describe('home guards', () => {
     expect(isRoomHomeView({ pickedLevel: null, roomHighest: 3 })).toBe(true);
   });
 
+  it('reads a clock with its length, and a clock from a build that sends none', () => {
+    expect(isOverrunView({ ...clock, spanSec: 120 })).toBe(true);
+    expect(isRoomHomeView({ pickedLevel: null, roomHighest: 3, overrun: { ...clock, spanSec: 240 } })).toBe(true);
+    expect('spanSec' in clock).toBe(false);
+    expect(isOverrunView(clock)).toBe(true);
+  });
+
   it.each([
     ['an unknown phase', { ...clock, phase: 'burning' }],
+    ['a length that is not a number', { ...clock, spanSec: '120' }],
     ['a clock that is not a number', { ...clock, left: '4:12' }],
     ['slowed that is not a flag', { ...clock, slowed: 1 }],
     ['no total', { ...clock, total: undefined }],

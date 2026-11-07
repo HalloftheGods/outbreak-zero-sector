@@ -3,32 +3,45 @@ import { CHARACTERS } from '../shared/characters.ts';
 import { PLAYER_RADIUS } from '../shared/constants.ts';
 import { updateSearch } from '../shared/container-search.ts';
 import { containerInReach, townContainers } from '../shared/containers.ts';
-import type { Container } from '../shared/containers.ts';
+import type { Container, ContainerLoot } from '../shared/containers.ts';
 import { TREASURE_TYPES } from '../shared/events.ts';
+import type { Jewels } from '../shared/home-protocol.ts';
 import { enterTown } from '../shared/level-change.ts';
+import { FINAL_LEVEL, FIRST_LEVEL, LEVELS } from '../shared/levels.ts';
 import { spawnPickup } from '../shared/pickups.ts';
 import type { SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
-import { dropCarried, isTreasurePickup, placeTownTreasure, silverToCoins } from '../shared/treasure.ts';
+import {
+  coinText,
+  dropCarried,
+  isTreasurePickup,
+  jewelWorth,
+  LARGE_JEWEL_SILVER,
+  placeTownTreasure,
+  silverToCoins,
+  SMALL_JEWEL_SILVER,
+  TOWN_JEWELS,
+  townWorth,
+  treasureCounts,
+} from '../shared/treasure.ts';
 import { buildingAt, circleHitsSolid } from '../shared/world-query.ts';
+import { SMELT_SECONDS } from '../src/game/home/forge.ts';
 import { homeSim } from './helpers/home-harness.ts';
 import { SEED, stateOf, steps } from './helpers/sim-harness.ts';
 
-interface Found {
-  silver: number;
-  silverTotal: number;
-  small: number;
-  large: number;
-}
+/**
+ * What each level's town was worth when towns also held silver stacks (30 to 45 of them, 12.5 silver on average),
+ * from the old count tables. The jewels-only tables must stay within 5% of these.
+ */
+const OLD_TOWN_WORTH = [775, 800, 852.5, 1077.5, 1102.5, 1155, 1180, 1405, 1457.5, 1482.5];
+const WORTH_TOLERANCE = 0.05;
+/** The longest a full town's jewels may take on the forge, in seconds. */
+const SMELT_LIMIT_SEC = 60;
 
 /** What the town's containers hold of treasure. */
-function treasureIn(state: SimState): Found {
-  const found: Found = { silver: 0, silverTotal: 0, small: 0, large: 0 };
+function treasureIn(state: SimState): Jewels {
+  const found: Jewels = { small: 0, large: 0 };
   for (const { loot } of state.containers) {
-    if (loot?.type === 'silver') {
-      found.silver += 1;
-      found.silverTotal += loot.rounds;
-    }
     if (loot?.type === 'jewel_small') found.small += 1;
     if (loot?.type === 'jewel_large') found.large += 1;
   }
@@ -55,21 +68,67 @@ describe('silverToCoins', () => {
   it('shows 100 silver to the gold', () => {
     expect(silverToCoins(1234)).toEqual({ gold: 12, silver: 34 });
   });
+
+  it('words money as gold and silver, leaving out a zero part', () => {
+    expect([coinText(280), coinText(300), coinText(40), coinText(0)]).toEqual(['2 gold 80 silver', '3 gold', '40 silver', '0 silver']);
+  });
+
+  it('values jewels at what the forge makes of them', () => {
+    expect(jewelWorth({ small: 2, large: 1 })).toBe(2 * SMALL_JEWEL_SILVER + LARGE_JEWEL_SILVER);
+  });
+});
+
+describe('the jewel tables', () => {
+  it('has one row for every level', () => {
+    expect(TOWN_JEWELS).toHaveLength(LEVELS.length);
+  });
+
+  it('keeps each level within 5% of what it was worth with silver stacks', () => {
+    for (let level = FIRST_LEVEL; level <= FINAL_LEVEL; level++) {
+      const old = OLD_TOWN_WORTH[level - FIRST_LEVEL];
+      const worth = townWorth(level, false);
+      expect(Math.abs(worth / old - 1), `level ${level}: ${worth} against ${old}`).toBeLessThanOrEqual(WORTH_TOLERANCE);
+    }
+    expect(townWorth(FIRST_LEVEL, false)).toBe(760);
+    expect(townWorth(FINAL_LEVEL, false)).toBe(1480);
+  });
+
+  it('holds more small jewels and at least as many large as the old tables, at every level', () => {
+    const oldSmall = [5, 5, 6, 6, 6, 7, 7, 7, 8, 8];
+    const oldLarge = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3];
+    TOWN_JEWELS.forEach(({ small, large }, index) => {
+      expect(small).toBeGreaterThan(oldSmall[index]);
+      expect(large).toBeGreaterThanOrEqual(oldLarge[index]);
+    });
+  });
+
+  it('smelts a full town in under a minute at every level', () => {
+    const seconds = TOWN_JEWELS.map(({ small, large }) => (small + large) * SMELT_SECONDS);
+    for (const each of seconds) expect(each).toBeLessThanOrEqual(SMELT_LIMIT_SEC);
+    expect(seconds.at(-1)).toBe(51);
+  });
+
+  it('halves each count on a replay, rounded down, at every level', () => {
+    for (let level = FIRST_LEVEL; level <= FINAL_LEVEL; level++) {
+      const full = treasureCounts(level, false);
+      expect(treasureCounts(level, true)).toEqual({ small: Math.floor(full.small / 2), large: Math.floor(full.large / 2) });
+    }
+  });
 });
 
 describe('placing treasure', () => {
   it('home off places no treasure', () => {
     const state = stateOf(new GameSimulation({ seed: SEED }));
-    expect(treasureIn(state)).toEqual({ silver: 0, silverTotal: 0, small: 0, large: 0 });
+    expect(treasureIn(state)).toEqual({ small: 0, large: 0 });
     expect(state.pickups.some((item) => isTreasurePickup(item.type))).toBe(false);
     placeTownTreasure(state);
-    expect(treasureIn(state).silver).toBe(0);
+    expect(treasureIn(state)).toEqual({ small: 0, large: 0 });
   });
 
   it('treasure leaves ammo in town and every roll on sim.rng as they were', () => {
     const classic = stateOf(new GameSimulation({ seed: SEED }));
     const { state } = townAt(1);
-    expect(treasureIn(state).silver).toBeGreaterThan(0);
+    expect(treasureIn(state).small).toBeGreaterThan(0);
     const stripped = state.containers.map(({ loot }) => (loot && isTreasurePickup(loot.type) ? null : loot));
     expect(stripped).toEqual(classic.containers.map(({ loot }) => loot));
     expect(state.pickups).toEqual(classic.pickups);
@@ -86,18 +145,18 @@ describe('placing treasure', () => {
     });
   });
 
-  it('the treasure table\'s counts hold at levels 1 and 10', () => {
-    const first = treasureIn(townAt(1).state);
-    expect([first.silver, first.small, first.large]).toEqual([30, 5, 1]);
-    const last = treasureIn(townAt(10).state);
-    expect([last.silver, last.small, last.large]).toEqual([45, 8, 3]);
+  it('places the table\'s jewels at levels 1 and 10', () => {
+    expect(treasureIn(townAt(1).state)).toEqual(TOWN_JEWELS[0]);
+    expect(treasureIn(townAt(FINAL_LEVEL).state)).toEqual(TOWN_JEWELS[FINAL_LEVEL - FIRST_LEVEL]);
   });
 
-  it('values every stack between 5 and 20 silver', () => {
-    const { state } = townAt(1);
-    for (const { loot } of state.containers) {
-      if (loot?.type === 'silver') expect(loot.rounds).toBeGreaterThanOrEqual(5);
-      if (loot?.type === 'silver') expect(loot.rounds).toBeLessThanOrEqual(20);
+  it('places only jewels, each at its full value, and nothing on the ground', () => {
+    for (const level of [FIRST_LEVEL, FINAL_LEVEL]) {
+      const { state } = townAt(level);
+      const treasure = state.containers.flatMap(({ loot }) => (loot && isTreasurePickup(loot.type) ? [loot] : []));
+      expect(treasure.length).toBeGreaterThan(0);
+      for (const { type, rounds } of treasure) expect(rounds).toBe(type === 'jewel_large' ? LARGE_JEWEL_SILVER : SMALL_JEWEL_SILVER);
+      expect(state.pickups.some((item) => isTreasurePickup(item.type))).toBe(false);
     }
   });
 
@@ -105,7 +164,7 @@ describe('placing treasure', () => {
     const full = treasureIn(townAt(2).state);
     const replay = townAt(2, 3).state;
     const half = treasureIn(replay);
-    expect([half.silver, half.small, half.large]).toEqual([full.silver, full.small, full.large].map((n) => Math.floor(n / 2)));
+    expect(half).toEqual({ small: Math.floor(full.small / 2), large: Math.floor(full.large / 2) });
     for (const { loot } of replay.containers) {
       if (loot?.type === 'jewel_small') expect(loot.rounds).toBe(40);
       if (loot?.type === 'jewel_large') expect(loot.rounds).toBe(200);
@@ -118,22 +177,21 @@ describe('placing treasure', () => {
 });
 
 describe('taking treasure', () => {
-  it('a coin stack vanishes when taken', () => {
+  it('a jewel vanishes when taken, and is carried as a jewel, not as silver', () => {
     const { sim, state } = homeSim();
     const [p] = state.players;
-    spawnPickup(state, 'silver', p.x, p.y, 12);
     spawnPickup(state, 'jewel_small', p.x, p.y, 40);
     spawnPickup(state, 'jewel_large', p.x, p.y, 200);
     steps(sim, 2);
     expect(state.pickups).toEqual([]);
-    expect(p.home?.silver).toBe(12);
+    expect(p.home?.silver).toBe(0);
     expect(p.home?.jewels).toEqual({ small: 1, large: 1 });
   });
 
   it('numbers treasure on its own counter, off entityId', () => {
     const { state } = homeSim();
     const before = state.nextEntity;
-    spawnPickup(state, 'silver', 0, 0, 5);
+    spawnPickup(state, 'jewel_large', 0, 0, 200);
     spawnPickup(state, 'jewel_small', 0, 0, 40);
     spawnPickup(state, 'bandage', 0, 0);
     expect(state.pickups.map((item) => item.id).slice(0, 2)).toEqual(['t0', 't1']);
@@ -143,27 +201,35 @@ describe('taking treasure', () => {
 });
 
 describe('dropping what was carried', () => {
-  it('a dead player\'s carried treasure drops where they fell, p.home.lost records it, and a teammate can take it', () => {
+  it('a dead player\'s carried jewels drop where they fell, p.home.lost records them, and a teammate can take them', () => {
     const { sim, state } = homeSim({ players: ['a', 'b'] });
     const [a, b] = state.players;
     if (!a.home || !b.home) throw new Error('no home');
     a.x = 100;
     a.y = 100;
-    a.home.silver = 140;
     a.home.jewels = { small: 2, large: 1 };
     a.status = 'dead';
     dropCarried(state, a);
-    expect(a.home.silver).toBe(0);
     expect(a.home.jewels).toEqual({ small: 0, large: 0 });
-    expect(a.home.lost).toEqual({ silver: 140, jewels: { small: 2, large: 1 } });
-    expect(state.pickups).toHaveLength(4);
+    expect(a.home.lost).toEqual({ silver: 0, jewels: { small: 2, large: 1 } });
+    expect(state.pickups.map((item) => item.type).sort()).toEqual(['jewel_large', 'jewel_small', 'jewel_small']);
     for (const item of state.pickups) expect([item.x, item.y]).toEqual([100, 100]);
     b.x = 100;
     b.y = 100;
     steps(sim, 2);
     expect(state.pickups).toEqual([]);
-    expect(b.home?.silver).toBe(140);
     expect(b.home?.jewels).toEqual({ small: 2, large: 1 });
+  });
+
+  it('writes silver left in the body\'s slot down as lost, and drops no coin', () => {
+    const { state } = homeSim();
+    const [p] = state.players;
+    if (!p.home) throw new Error('no home');
+    p.home.silver = 140;
+    dropCarried(state, p);
+    expect(p.home.silver).toBe(0);
+    expect(p.home.lost.silver).toBe(140);
+    expect(state.pickups.some((item) => isTreasurePickup(item.type))).toBe(false);
   });
 
   it('drops nothing when home is off', () => {
@@ -191,7 +257,7 @@ describe('searching a treasure container', () => {
   }
 
   /** Searches one container 2000 times as Sol, holding the given loot, and counts what was turned up besides treasure. */
-  function searches(loot: { type: 'silver'; rounds: number } | null) {
+  function searches(loot: ContainerLoot | null) {
     const { state, p } = townWithSurvivor();
     const container = townContainers(state.map).find((candidate) => candidate.building !== undefined);
     if (!container) throw new Error('no container');
@@ -213,7 +279,7 @@ describe('searching a treasure container', () => {
 
   it('a treasure container still makes the luck and bottle rolls', () => {
     const empty = searches(null);
-    const holding = searches({ type: 'silver', rounds: 9 });
+    const holding = searches({ type: 'jewel_small', rounds: SMALL_JEWEL_SILVER });
     expect(empty.finds).toBeGreaterThan(0);
     expect(holding.treasure).toBe(TRIALS);
     expect(holding.finds).toBe(empty.finds);

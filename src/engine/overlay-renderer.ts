@@ -1,4 +1,4 @@
-import { characterOf } from '../../shared/characters.ts';
+import { tagLabel } from '../../shared/callsign.ts';
 import { EXIT_RADIUS, ZOMBIES } from '../../shared/constants.ts';
 import { CONTAINER_LABEL } from '../../shared/containers.ts';
 import { HEAD_MARGIN, isOnHead, TOUCH_HEAD_MARGIN } from '../../shared/headshots.ts';
@@ -31,6 +31,8 @@ const EXIT_RING_DOTS = 28;
 /** A search's bar and prompt sit this far over a head, clear of a teammate's own tag. */
 const SEARCH_TAG_HEIGHT = FONT_HEIGHT * 2 + 12;
 const SEARCH_BAR_WIDTH = 24;
+/** A stall's "!" floats this far over its sprite. */
+const QUEST_MARK_GAP = FONT_HEIGHT + 4;
 
 type Pixel = readonly [number, number];
 
@@ -164,7 +166,7 @@ export class OverlayRenderer {
       drawBar(ctx, x - 8, y, 16, player.health / player.maxHealth, SICK);
       y -= FONT_HEIGHT + 3;
     }
-    drawOutlinedText(ctx, `${player.name} / ${characterOf(player.skin).name}`, x, y, BONE);
+    drawOutlinedText(ctx, tagLabel(player.name, player.skin), x, y, BONE);
   }
 
   private drawPointers(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number, viewW: number, viewH: number): void {
@@ -185,7 +187,21 @@ export class OverlayRenderer {
       const atStation = isLocal && scene.station !== undefined;
       if (player.search > 0) drawBar(ctx, x - SEARCH_BAR_WIDTH / 2, y, SEARCH_BAR_WIDTH, player.search, BONE);
       else if (prompted) drawOutlinedText(ctx, `${scene.touch ? 'SEARCH' : 'HOLD E'}: ${CONTAINER_LABEL[scene.searchable.kind]}`, x, y, AMBER);
-      else if (atStation) drawOutlinedText(ctx, stationPrompt(scene.station, Boolean(scene.touch)), x, y, AMBER);
+      else if (atStation) drawOutlinedText(ctx, stationPrompt(scene.station, Boolean(scene.touch), this.payFrom(scene)), x, y, AMBER);
+    }
+  }
+
+  /** Who is holding pay at the stall the local player stands at, if anyone: it replaces the stall's name in the prompt. */
+  private payFrom(scene: SceneView): string | undefined {
+    return scene.questMarks?.find((mark) => mark.ready && mark.merchant === scene.station)?.name;
+  }
+
+  /** A "!" over each stall with work to take (pale) or pay to collect (amber). */
+  private drawQuestMarks(ctx: CanvasRenderingContext2D, scene: SceneView, left: number, top: number): void {
+    for (const mark of scene.questMarks ?? []) {
+      const height = bodyHeight(this.art.environment.props[mark.merchant]);
+      const y = Math.round(mark.y) - top - height - QUEST_MARK_GAP;
+      drawOutlinedText(ctx, '!', Math.round(mark.x) - left, y, mark.ready ? AMBER : BONE);
     }
   }
 
@@ -229,6 +245,7 @@ export class OverlayRenderer {
     for (const player of scene.players) {
       this.drawPlayerTag(ctx, player, player.id === scene.localId, left, top, time);
     }
+    this.drawQuestMarks(ctx, scene, left, top);
     this.drawSearch(ctx, scene, left, top);
     this.drawPointers(ctx, scene, left, top, viewW, viewH);
     const exitShown = scene.exit !== null && scene.phase !== 'gameover';

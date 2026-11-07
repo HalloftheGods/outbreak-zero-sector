@@ -5,7 +5,7 @@ import { emptyLoadout } from '../shared/loadout.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import type { HomeSave } from '../src/game/home/home-store.ts';
 import { QUESTS, jobTimes, questOf, questsOf, targetOf } from '../src/game/home/quest-data.ts';
-import { applyTripToQuests, noteSmelted, noteVisit } from '../src/game/home/quest-progress.ts';
+import { applyDeathToQuests, applyTripToQuests, noteSmelted, noteVisit } from '../src/game/home/quest-progress.ts';
 import { reviveQuests } from '../src/game/home/quest-revive.ts';
 import { blankQuests, rollJobs, starterQuests } from '../src/game/home/quest-state.ts';
 import { emptyTally } from '../src/game/home/quest-tally.ts';
@@ -162,6 +162,24 @@ describe('progress', () => {
     const other = idle('gunsmith', 'headhunter', 6);
     expect(applyTripToQuests(other.quests, bring({ outcome: 'died' }), tallied({ headshots: 30 }))).toBe(other.quests);
   });
+
+  it('keeps a finished streak through a death: quests never fail', () => {
+    const done = idle('medic', 'steady_hands', 3);
+    expect(applyTripToQuests(done.quests, bring({ outcome: 'died', level: 3 }), tallied())).toBe(done.quests);
+    expect(applyDeathToQuests(done.quests, { level: 3 })).toBe(done.quests);
+  });
+
+  it('breaks a streak only on a death the quest\'s filter would have counted', () => {
+    const streak = idle('medic', 'steady_hands', 2);
+    expect(applyTripToQuests(streak.quests, bring({ outcome: 'died', level: 1 }), tallied())).toBe(streak.quests);
+    expect(applyTripToQuests(streak.quests, bring({ outcome: 'died', level: 2 }), tallied()).active.medic?.progress).toBe(0);
+  });
+
+  it('breaks a running streak when a trip never came home, judged by its level alone', () => {
+    const streak = idle('medic', 'steady_hands', 2);
+    expect(applyDeathToQuests(streak.quests, { level: 2 }).active.medic?.progress).toBe(0);
+    expect(applyDeathToQuests(streak.quests, { level: 1 })).toBe(streak.quests);
+  });
 });
 
 describe('the work list', () => {
@@ -240,10 +258,28 @@ describe('accept, abandon and turn in', () => {
   });
 
   it('puts an abandoned one-time quest back on offer and loses its progress', () => {
-    const save = idle('medic', 'pharmacy_run', 1);
+    const save = idle('medic', 'pharmacy_run', 0);
     const dropped = abandon(save, 'medic', at('medic'))!;
     expect(dropped.quests.active.medic).toBeUndefined();
     expect(questRows(dropped, 'medic', 1)[0]).toMatchObject({ id: 'pharmacy_run', state: 'offered', progress: 0 });
+  });
+
+  it('will not abandon a finished quest: it waits to be turned in', () => {
+    const ready = idle('medic', 'pharmacy_run', 1);
+    expect(abandon(ready, 'medic', at('medic'))).toBeNull();
+    expect(abandon(idle('medic', 'pharmacy_run', 0), 'medic', at('medic'))).not.toBeNull();
+  });
+
+  it('puts an abandoned job back on the counter as the same job', () => {
+    const save = emptySave(8);
+    const empty = { ...save, quests: { ...save.quests, active: {} } };
+    const job = empty.quests.jobs.medic!;
+    const taken = accept(empty, 'medic', job, at('medic'))!;
+    expect(taken.quests.jobs.medic).toBeNull();
+    const dropped = abandon(taken, 'medic', at('medic'))!;
+    expect(dropped.quests.jobs.medic).toBe(job);
+    expect(dropped.quests.active.medic).toBeUndefined();
+    expect(accept(dropped, 'medic', job, at('medic'))?.quests.active.medic?.id).toBe(job);
   });
 });
 

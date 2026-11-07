@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildInviteLink, parseJoinParam, sanitizeJoinAddress, withoutJoinParam } from '../src/game/invite-link.ts';
+import {
+  buildInviteLink,
+  buildRoomLink,
+  parseInvite,
+  parseJoinParam,
+  parseRoomParam,
+  sanitizeJoinAddress,
+  withoutJoinParam,
+} from '../src/game/invite-link.ts';
 
 describe('sanitizeJoinAddress', () => {
   it('accepts host, host:port and ws/wss urls', () => {
@@ -82,5 +90,29 @@ describe('withoutJoinParam', () => {
   it('removes only the join param', () => {
     expect(withoutJoinParam('http://localhost/?join=10.0.0.5&x=1')).toBe('http://localhost/?x=1');
     expect(withoutJoinParam('http://localhost/?join=10.0.0.5')).toBe('http://localhost/');
+  });
+});
+
+describe('?room= invites', () => {
+  it('reads a valid code and refuses junk', () => {
+    expect(parseRoomParam('?room=bcdfg')).toBe('BCDFG');
+    expect(parseRoomParam('?room=BCDF1')).toBeNull();
+    expect(parseRoomParam('?room=')).toBeNull();
+    expect(parseRoomParam('?join=BCDFG')).toBeNull();
+  });
+
+  it('prefers ?room over ?join, and keeps ?join as the LAN invite', () => {
+    expect(parseInvite('?join=10.0.0.5:9000&room=BCDFG')).toEqual({ kind: 'room', code: 'BCDFG' });
+    expect(parseInvite('?join=10.0.0.5:9000')).toEqual({ kind: 'join', address: '10.0.0.5:9000' });
+    expect(parseInvite('?room=bad1&join=10.0.0.5')).toEqual({ kind: 'join', address: '10.0.0.5' });
+    expect(parseInvite('?x=1')).toBeNull();
+  });
+
+  it('builds and round-trips a room link, and strips both params', () => {
+    const link = buildRoomLink('https://game.example/zombie/?old=1#top', 'bcdfg')!;
+    expect(link).toBe('https://game.example/zombie/?room=BCDFG');
+    expect(parseRoomParam(new URL(link).search)).toBe('BCDFG');
+    expect(buildRoomLink('https://game.example/', 'nope1')).toBeNull();
+    expect(withoutJoinParam('https://game.example/?room=BCDFG&join=h&x=1')).toBe('https://game.example/?x=1');
   });
 });

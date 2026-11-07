@@ -57,7 +57,6 @@ const PICKUP_LABEL: Record<PickupType, string> = {
   acid_kit: 'ACID KIT',
   piercing_kit: 'PIERCING KIT',
   tranq_kit: 'TRANQ KIT',
-  silver: 'SILVER',
   jewel_small: 'JEWEL',
   jewel_large: 'LARGE JEWEL',
 };

@@ -16,6 +16,7 @@ export const STATION_LABEL: Record<StationId, string> = {
 };
 
 /** What to show over a head: the key to hold, or the word a finger can press. */
-export function stationPrompt(station: StationId, touch: boolean): string {
-  return `${touch ? 'OPEN' : 'HOLD E'}: ${STATION_LABEL[station]}`;
+export function stationPrompt(station: StationId, touch: boolean, payFrom?: string): string {
+  const verb = touch ? 'OPEN' : 'HOLD E';
+  return payFrom === undefined ? `${verb}: ${STATION_LABEL[station]}` : `${verb}: ${payFrom.toUpperCase()} HAS YOUR PAY`;
 }

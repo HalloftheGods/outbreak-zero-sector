@@ -80,12 +80,19 @@ export function accept(save: HomeSave, merchant: MerchantId, id: string, context
   return { ...save, quests: { ...quests, active, jobs } };
 }
 
-/** Gives the quest up. Its progress is lost, and a one-time quest goes back on offer. */
+/** A finished quest is never given up: it waits to be turned in, so its progress cannot be thrown away by a stray press. */
+const mayAbandon = (def: QuestDef | undefined, progress: number): boolean => def !== undefined && !isReady(def, progress);
+
+/** Gives an unfinished quest up. Its progress is lost, a one-time quest goes back on offer, and a job goes back on the counter as the same job. */
 export function abandon(save: HomeSave, merchant: MerchantId, context: QuestContext): HomeSave | null {
-  if (!atCounter(save, merchant, context) || !save.quests.active[merchant]) return null;
+  const open = save.quests.active[merchant];
+  const def = open && questOf(open.id);
+  if (!atCounter(save, merchant, context) || !open || !mayAbandon(def, open.progress)) return null;
   const active = { ...save.quests.active };
   delete active[merchant];
-  return { ...save, quests: { ...save.quests, active } };
+  const isJob = def?.repeat === 'job';
+  const jobs = isJob ? { ...save.quests.jobs, [merchant]: open.id } : save.quests.jobs;
+  return { ...save, quests: { ...save.quests, active, jobs } };
 }
 
 /** What a reward comes to in silver: a silver reward, or a job's silver by the player's level. */

@@ -9,7 +9,8 @@ import type { Box } from './world-query.ts';
 const ACROSS = 1;
 const DOWN = 2;
 const JUNCTION = ACROSS | DOWN;
-const LAMP_SPACING_TILES = 15;
+/** Longest stretch of kerb between two lamps on the same side. */
+const LAMP_SPACING_TILES = 12;
 const WRECK_SPACING_TILES = 22;
 const END_MARGIN_TILES = 6;
 
@@ -103,30 +104,98 @@ function placeOnWalk(b: MapBuilder, mask: Uint8Array, kind: PropKind, x: number,
   if (offRoad) b.place(kind, x, y, 24);
 }
 
+/** A lamp that keeps its place when a building or wreck is in the way: it slides along the kerb instead of vanishing. */
+function placeLamp(b: MapBuilder, mask: Uint8Array, kind: PropKind, x: number, y: number, horizontal: boolean): void {
+  for (const slide of [0, TILE_SIZE, -TILE_SIZE, 2 * TILE_SIZE, -2 * TILE_SIZE]) {
+    const col = Math.floor((horizontal ? x + slide : x) / TILE_SIZE);
+    const row = Math.floor(((horizontal ? y : y + slide) - 1) / TILE_SIZE);
+    const offRoad = col >= 0 && row >= 0 && col < b.cols && row < b.rows && mask[row * b.cols + col] === 0;
+    if (offRoad && b.place(kind, horizontal ? x + slide : x, horizontal ? y : y + slide, 24)) return;
+  }
+}
+
+/** One lamp on every street corner, where the kerbs of two streets meet. */
+function lightCorners(b: MapBuilder, mask: Uint8Array): void {
+  const isRoad = (col: number, row: number): boolean => {
+    const onMap = col >= 0 && row >= 0 && col < b.cols && row < b.rows;
+    return onMap && mask[row * b.cols + col] !== 0;
+  };
+  for (let row = 0; row < b.rows; row++) {
+    for (let col = 0; col < b.cols; col++) {
+      if (isRoad(col, row)) continue;
+      const lengthways = isRoad(col, row - 1) !== isRoad(col, row + 1);
+      const crossways = isRoad(col - 1, row) !== isRoad(col + 1, row);
+      const sides = Number(isRoad(col, row - 1)) + Number(isRoad(col, row + 1)) + Number(isRoad(col - 1, row)) + Number(isRoad(col + 1, row));
+      if (sides === 2 && lengthways && crossways) placeOnWalk(b, mask, 'street_lamp', col * TILE_SIZE + 8, row * TILE_SIZE + 12);
+    }
+  }
+}
+
+/** Open stretches of kerb along one side of a road, cut where another street crosses. */
+function kerbRuns(b: MapBuilder, mask: Uint8Array, road: Road, line: number): { from: number; to: number }[] {
+  const start = road.horizontal ? road.c0 : road.r0;
+  const end = road.horizontal ? road.c1 : road.r1;
+  const runs: { from: number; to: number }[] = [];
+  let from = -1;
+  for (let tile = start; tile <= end; tile++) {
+    const open = tile < end && (road.horizontal ? mask[line * b.cols + tile] : mask[tile * b.cols + line]) === 0;
+    if (open && from < 0) from = tile;
+    if (!open && from >= 0) {
+      runs.push({ from, to: tile - 1 });
+      from = -1;
+    }
+  }
+  return runs;
+}
+
+/**
+ * Lamps along one kerb at an even pitch between the corners, so they read as a street's lighting and
+ * not scatter. Avenues light both sides in pairs; narrow streets stagger them side to side.
+ */
+function lightKerb(b: MapBuilder, mask: Uint8Array, road: Road, line: number, opposed: boolean, farSide: boolean): void {
+  const start = road.horizontal ? road.c0 : road.r0;
+  const end = road.horizontal ? road.c1 : road.r1;
+  for (const run of kerbRuns(b, mask, road, line)) {
+    // A run that stops at a crossing already has its corner lamp; one that reaches the town's edge starts a margin in.
+    const a = run.from > start ? run.from : run.from + END_MARGIN_TILES;
+    const z = run.to < end - 1 ? run.to : run.to - END_MARGIN_TILES;
+    if (z - a < 2) continue;
+    const gaps = Math.max(1, Math.ceil((z - a) / LAMP_SPACING_TILES));
+    const stagger = !opposed && farSide;
+    const marks: number[] = [];
+    for (let i = stagger ? 0 : 1; i < gaps; i++) marks.push((i + (stagger ? 0.5 : 0)) / gaps);
+    if (run.from <= start) marks.unshift(0);
+    if (run.to >= end - 1) marks.push(1);
+    for (const mark of marks) {
+      const along = Math.round((a + mark * (z - a) + 0.5) * TILE_SIZE);
+      const across = line * TILE_SIZE + 12;
+      const spot = road.horizontal ? { x: along, y: across } : { x: across, y: along };
+      placeLamp(b, mask, 'street_lamp', spot.x, spot.y, road.horizontal);
+    }
+    if (b.rng() < 0.3 && z - a > 4) {
+      const hydrantAlong = Math.round((a + randRange(b.rng, 0.25, 0.75) * (z - a)) * TILE_SIZE);
+      const hydrant = road.horizontal ? { x: hydrantAlong, y: line * TILE_SIZE + 12 } : { x: line * TILE_SIZE + 12, y: hydrantAlong };
+      placeOnWalk(b, mask, 'hydrant', hydrant.x, hydrant.y);
+    }
+  }
+}
+
 /** Lamps, hydrants, wrecks and roadblocks along one road, leaving at least a lane open. */
 function dressRoad(b: MapBuilder, road: Road, mask: Uint8Array): void {
   const { rng } = b;
   const start = road.horizontal ? road.c0 : road.r0;
   const end = road.horizontal ? road.c1 : road.r1;
   const width = road.horizontal ? road.r1 - road.r0 : road.c1 - road.c0;
-  const nearSide = ((road.horizontal ? road.r0 : road.c0) - 1) * TILE_SIZE + 12;
-  const farSide = (road.horizontal ? road.r1 : road.c1) * TILE_SIZE + 12;
   const middle = ((road.horizontal ? road.r0 + road.r1 : road.c0 + road.c1) / 2) * TILE_SIZE;
   const alongRoad = (along: number, across: number): { x: number; y: number } =>
     road.horizontal ? { x: along, y: across } : { x: across, y: along };
 
-  let side = rng() < 0.5;
-  for (let tile = start + randInt(rng, 2, 8); tile < end; tile += LAMP_SPACING_TILES) {
-    const lamp = alongRoad(tile * TILE_SIZE + 8, side ? nearSide : farSide);
-    placeOnWalk(b, mask, 'street_lamp', lamp.x, lamp.y);
-    side = !side;
-    if (rng() < 0.3) {
-      const hydrant = alongRoad((tile + 4) * TILE_SIZE, side ? nearSide : farSide);
-      placeOnWalk(b, mask, 'hydrant', hydrant.x, hydrant.y);
-    }
-  }
+  const wide = width >= 5;
+  lightKerb(b, mask, road, (road.horizontal ? road.r0 : road.c0) - 1, wide, false);
+  lightKerb(b, mask, road, road.horizontal ? road.r1 : road.c1, wide, true);
 
-  for (let tile = start + END_MARGIN_TILES; tile < end - END_MARGIN_TILES; tile += WRECK_SPACING_TILES) {
+  const wreckSpacing = Math.max(8, Math.round(WRECK_SPACING_TILES / b.biome.wrecks));
+  for (let tile = start + END_MARGIN_TILES; tile < end - END_MARGIN_TILES; tile += wreckSpacing) {
     const along = (tile + randInt(rng, 0, 10)) * TILE_SIZE;
     if (width < 5) {
       const spot = alongRoad(along, middle);
@@ -141,8 +210,10 @@ function dressRoad(b: MapBuilder, road: Road, mask: Uint8Array): void {
       const block = alongRoad(along + 96, middle);
       b.place(pick<PropKind>(rng, ['barrier', 'sandbags']), block.x, block.y);
     }
-    const rubble = alongRoad(along + randRange(rng, -60, 60), middle + randRange(rng, -30, 30));
-    b.place('rubble', rubble.x, rubble.y);
+    for (let pile = 0; pile < Math.ceil(b.biome.debris); pile++) {
+      const rubble = alongRoad(along + randRange(rng, -60, 60), middle + randRange(rng, -30, 30));
+      b.place('rubble', rubble.x, rubble.y);
+    }
   }
 
   // The town's edge: a street that reaches the fence ends in a barricade with a way round it.
@@ -154,6 +225,20 @@ function dressRoad(b: MapBuilder, road: Road, mask: Uint8Array): void {
   }
 }
 
+/** The biome's own growth pushing up through the kerbs, never solid enough to block a pavement. */
+function creepKerbs(b: MapBuilder, mask: Uint8Array): void {
+  const { chance, kinds } = b.biome.creep;
+  if (chance <= 0) return;
+  for (let row = 0; row < b.rows; row++) {
+    for (let col = 0; col < b.cols; col++) {
+      const onKerb = mask[row * b.cols + col] === 0 && (b.tileIs(col, row, 'curb_n') || b.tileIs(col, row, 'curb_s') || b.tileIs(col, row, 'curb_e') || b.tileIs(col, row, 'curb_w'));
+      if (onKerb && b.rng() < chance) placeOnWalk(b, mask, pick<PropKind>(b.rng, kinds), col * TILE_SIZE + 8, row * TILE_SIZE + 12);
+    }
+  }
+}
+
 export function dressStreets(b: MapBuilder, roads: readonly Road[], mask: Uint8Array): void {
+  lightCorners(b, mask);
   for (const road of roads) dressRoad(b, road, mask);
+  creepKerbs(b, mask);
 }

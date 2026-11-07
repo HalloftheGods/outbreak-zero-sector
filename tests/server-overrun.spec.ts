@@ -130,13 +130,14 @@ describe('the overrun over sockets', () => {
       await openRoom();
       const first = await joined();
       expect(viewOf(first)).toMatchObject({ phase: 'counting', slowed: false, total: 0 });
-      overrunOf(state).left = 120;
+      const wound = OVERRUN_CLOCK_SEC * 0.4;
+      overrunOf(state).left = wound;
       const second = await joined();
       await first.nextFrame();
       const [a, b] = [first, second].map((tab) => viewOf(tab) as OverrunView);
       expect(b.phase).toBe('counting');
-      expect(b.left).toBeLessThanOrEqual(120);
-      expect(b.left).toBeGreaterThan(110);
+      expect(b.left).toBeLessThanOrEqual(wound);
+      expect(b.left).toBeGreaterThan(wound - 10);
       expect(Math.abs(a.left - b.left)).toBeLessThan(1);
       expect(overrunOf(state).left).toBeLessThan(OVERRUN_CLOCK_SEC / 2);
     });

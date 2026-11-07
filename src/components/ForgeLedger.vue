@@ -19,8 +19,8 @@
       </li>
       <li class="ledger-row">
         <span class="ledger-icon"><SpriteImg
-          v-if="icons"
-          :sprite="icons.silver"
+          v-if="coin"
+          :sprite="coin"
         /></span>
         <span class="ledger-text">
           <span class="ledger-label">Silver</span>
@@ -70,7 +70,7 @@ import type { ForgeCard } from '../game/home/forge-card.ts';
 import { SMELT_SECONDS } from '../game/home/forge.ts';
 import SpriteImg from './SpriteImg.vue';
 
-const { card, icons } = defineProps<{ card: ForgeCard; icons: UiArt['pickupIcons'] | null }>();
+const { card, icons, coin } = defineProps<{ card: ForgeCard; icons: UiArt['pickupIcons'] | null; coin: UiArt['silverIcon'] | null }>();
 </script>
 
 <style scoped>

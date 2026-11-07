@@ -142,6 +142,8 @@ export interface UiArt {
   readonly crosshairHead: PixelSprite;
   readonly weaponIcons: Record<WeaponId, PixelSprite>;
   readonly pickupIcons: Record<PickupType, PixelSprite>;
+  /** The money icon: a pile of silver coins. Towns hold no coin, so it is not a pickup. */
+  readonly silverIcon: PixelSprite;
   readonly heart: PixelSprite;
   /** The HUD's count of bottles to throw. */
   readonly bottle: PixelSprite;

@@ -11,10 +11,16 @@ import { OVERRUN_CHEST_FINDS, OVERRUN_CHEST_STACKS } from './overrun.ts';
 import { isAmmoPickup } from './pickups.ts';
 import { randInt } from './rng.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
-import { SILVER_STACK_MAX, SILVER_STACK_MIN } from './treasure.ts';
 
 /** The room's highest level from which the chest holds a small jewel. */
 export const OVERRUN_CHEST_JEWEL_FROM = 5;
+
+/**
+ * One of the chest's silver stacks. Towns no longer hold coin, so the chest keeps its own range: six stacks come to
+ * 75 silver on average, about a tenth of a level 1 town's jewels, as when towns held stacks too. Same draws on `sim.rng`.
+ */
+export const CHEST_STACK_MIN = 5;
+export const CHEST_STACK_MAX = 20;
 
 export interface ChestRoll {
   gear: Loadout;
@@ -36,7 +42,7 @@ export function rollChest(sim: SimState, highest: number): ChestRoll {
   }
   gear.medkits = 1;
   let silver = 0;
-  for (let i = 0; i < OVERRUN_CHEST_STACKS; i += 1) silver += randInt(sim.rng, SILVER_STACK_MIN, SILVER_STACK_MAX);
+  for (let i = 0; i < OVERRUN_CHEST_STACKS; i += 1) silver += randInt(sim.rng, CHEST_STACK_MIN, CHEST_STACK_MAX);
   return { gear, silver, jewels: { small: highest >= OVERRUN_CHEST_JEWEL_FROM ? 1 : 0, large: 0 } };
 }
 

@@ -24,9 +24,9 @@ export interface QuestFilter {
 export type Objective =
   | { kind: 'visit'; station: StationId }
   | { kind: 'bank'; count: number }
-  /** Banked trips in a row. A died receipt resets it. */
+  /** Banked trips in a row. A death on a trip the filter counts resets it, unless it is already finished. */
   | { kind: 'streak'; count: number }
-  | { kind: 'receipt_total'; field: 'hordes' | 'kills' | 'silver'; count: number }
+  | { kind: 'receipt_total'; field: 'hordes' | 'kills'; count: number }
   /** One banked trip at or under this many seconds. */
   | { kind: 'fast'; seconds: number }
   | { kind: 'bring_home'; what: 'gun' | 'medkit' | 'jewel' | WeaponId; count: number }
@@ -68,17 +68,17 @@ const item = (merchant: MerchantId, id: string, count = 1): QuestReward => ({ ki
 export const QUESTS: readonly QuestDef[] = [
   // Starters
   { id: 'report_in', giver: 'quartermaster', title: 'Report in', brief: 'Check in at the quartermaster.', objective: { kind: 'visit', station: 'quartermaster' }, reward: [item('quartermaster', 'bottle', 2), silver(20)], repeat: 'once', starter: true },
-  { id: 'bring_iron', giver: 'gunsmith', title: 'Bring iron', brief: 'Bring a gun home. The free pistol counts.', objective: { kind: 'bring_home', what: 'gun', count: 1 }, reward: [item('gunsmith', 'barrel')], repeat: 'once', starter: true },
-  { id: 'pharmacy_run', giver: 'medic', title: 'Pharmacy run', brief: 'Bring home a medkit.', objective: { kind: 'bring_home', what: 'medkit', count: 1 }, reward: [silver(60)], repeat: 'once', starter: true },
-  { id: 'first_smelt', giver: 'powder', title: 'First smelt', brief: 'Melt a jewel at the forge.', objective: { kind: 'smelt', count: 1 }, reward: [item('powder', 'tranq_kit')], repeat: 'once', starter: true },
+  { id: 'bring_iron', giver: 'gunsmith', title: 'Bring iron', brief: 'Take the van from the garage and bring a gun home. The pistol counts.', objective: { kind: 'bring_home', what: 'gun', count: 1 }, reward: [item('gunsmith', 'barrel')], repeat: 'once', starter: true },
+  { id: 'pharmacy_run', giver: 'medic', title: 'Pharmacy run', brief: 'Take the van from the garage and bring home a medkit.', objective: { kind: 'bring_home', what: 'medkit', count: 1 }, reward: [silver(60)], repeat: 'once', starter: true },
+  { id: 'first_smelt', giver: 'powder', title: 'First smelt', brief: 'Take the van from the garage for a jewel, then melt it at the forge.', objective: { kind: 'smelt', count: 1 }, reward: [item('powder', 'tranq_kit')], repeat: 'once', starter: true },
   // One-time
-  { id: 'out_and_back', giver: 'quartermaster', title: 'Out and back', brief: 'Bring one trip home.', objective: { kind: 'bank', count: 1 }, after: ['report_in'], reward: [silver(50), item('quartermaster', 'pistol_ammo')], repeat: 'once' },
+  { id: 'out_and_back', giver: 'quartermaster', title: 'Out and back', brief: 'Take the van out and bring one trip home.', objective: { kind: 'bank', count: 1 }, after: ['report_in'], reward: [silver(50), item('quartermaster', 'pistol_ammo')], repeat: 'once' },
   { id: 'evidence_locker', giver: 'gunsmith', title: 'Evidence locker', brief: 'Bring home a carbine. The police station always has one.', objective: { kind: 'bring_home', what: 'carbine', count: 1 }, after: ['bring_iron'], reward: [item('gunsmith', 'grip'), silver(60)], repeat: 'once' },
   { id: 'headhunter', giver: 'gunsmith', title: 'Headhunter', brief: 'Land 15 headshots in one trip.', objective: { kind: 'tally', counter: 'headshots', count: 15, scope: 'trip' }, gate: 2, reward: [silver(150)], repeat: 'once' },
   { id: 'ghost_walk', giver: 'gunsmith', title: 'Ghost walk', brief: 'As Night, find 8 things in a trip without one noisy search.', objective: { kind: 'tally', counter: 'finds', count: 8, scope: 'trip', atMost: { counter: 'noisy', count: 0 } }, filter: { survivor: 'night', minLevel: 3 }, gate: 4, reward: [item('gunsmith', 'suppressor')], repeat: 'once' },
   { id: 'hold_the_line', giver: 'quartermaster', title: 'Hold the line', brief: 'Survive 10 hordes across your trips.', objective: { kind: 'receipt_total', field: 'hordes', count: 10 }, after: ['out_and_back'], reward: [item('quartermaster', 'knife')], repeat: 'once' },
   { id: 'shove_and_stab', giver: 'quartermaster', title: 'Shove and stab', brief: 'As Rex, land 30 shoves in a trip.', objective: { kind: 'tally', counter: 'shoves', count: 30, scope: 'trip' }, filter: { survivor: 'rex' }, gate: 2, reward: [silver(120), item('quartermaster', 'bottle', 3)], repeat: 'once' },
-  { id: 'fast_hands', giver: 'quartermaster', title: 'Fast hands', brief: 'As Bandus, make 50 kills in a trip at level 4 or higher.', objective: { kind: 'tally', counter: 'kills', count: 50, scope: 'trip' }, filter: { survivor: 'bandus', minLevel: 4 }, gate: 4, owns: 'carbine', reward: [item('quartermaster', 'carbine_ammo', 2)], repeat: 'once' },
+  { id: 'fast_hands', giver: 'quartermaster', title: 'Fast hands', brief: 'As Bandus, make 50 kills in a trip at level 4 or higher.', objective: { kind: 'tally', counter: 'kills', count: 50, scope: 'trip' }, filter: { survivor: 'bandus', minLevel: 4 }, gate: 4, owns: 'carbine', reward: [silver(150)], repeat: 'once' },
   { id: 'patch_up', giver: 'medic', title: 'Patch up', brief: 'Use 2 medkits across your trips.', objective: { kind: 'tally', counter: 'medkits', count: 2, scope: 'total' }, after: ['pharmacy_run'], reward: [item('medic', 'medkit'), silver(40)], repeat: 'once' },
   { id: 'steady_hands', giver: 'medic', title: 'Steady hands', brief: 'Bring 3 trips home in a row at level 2 or higher.', objective: { kind: 'streak', count: 3 }, filter: { minLevel: 2 }, gate: 2, reward: [item('medic', 'medkit', 2)], repeat: 'once' },
   { id: 'run_for_it', giver: 'medic', title: 'Run for it', brief: 'As Queen, bring a level 3 or higher trip home in 8 minutes or less.', objective: { kind: 'fast', seconds: 480 }, filter: { survivor: 'satori', minLevel: 3 }, gate: 3, reward: [item('medic', 'medkit'), silver(100)], repeat: 'once' },

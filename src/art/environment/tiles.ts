@@ -10,6 +10,7 @@ import type { Legend } from '../kit.ts';
 import { RAMPS } from '../palette.ts';
 import type { Color } from '../palette.ts';
 import { buildFloors } from './floors.ts';
+import { buildTerrain } from './terrain.ts';
 import { ASPHALT, CRACKED, DIRT, GRASS, LANE_WEAR, SLABS, ZEBRA_WEAR } from './tile-grids.ts';
 import type { Rows, Slab } from './tile-grids.ts';
 
@@ -150,6 +151,7 @@ function bunkerWall(banded: boolean): PixelCanvas {
 }
 
 export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
+  const terrain = buildTerrain();
   const bases = [ASPHALT[0], ASPHALT[1], ASPHALT[2]];
   const lanes = LANE_WEAR.map((wear, i) => laneDash(wear, bases[i]));
   const zebras = ZEBRA_WEAR.map(zebra);
@@ -172,6 +174,7 @@ export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
     // On the same base as dirt, so a lawn dissolves into a lot instead of stopping at a tile edge.
     grass: GRASS.map((rows) => tile(olive[0], rows, LAWN)),
     dirt: DIRT.map((rows) => tile(olive[0], rows, EARTH)),
+    ...terrain,
     ...buildFloors(),
     bunker_wall: [bunkerWall(true), bunkerWall(false)],
   };

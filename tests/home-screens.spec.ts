@@ -7,8 +7,10 @@ import { FINAL_LEVEL } from '../shared/levels.ts';
 import { NO_HOME_ACTIONS } from '../src/game/home-hud.ts';
 import type { HomeUi } from '../src/game/home-hud.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
+import { emptyTally } from '../src/game/home/quest-tally.ts';
 import {
   aimsCursor,
+  carriedLines,
   closeLocker,
   deathSummary,
   forgeView,
@@ -30,7 +32,7 @@ function homeUi(patch: Partial<HomeUi> = {}): HomeUi {
     stationHold: 0,
     shop: null,
     ready: false,
-    carried: { silver: 0, jewels: { small: 0, large: 0 } },
+    carried: { jewels: { small: 0, large: 0 }, worth: 0 },
     pickedLevel: null,
     roomHighest: 1,
     overrun: null,
@@ -40,6 +42,7 @@ function homeUi(patch: Partial<HomeUi> = {}): HomeUi {
     save: null,
     forgeProgress: 0,
     saveError: null,
+    quests: { tally: emptyTally() },
     death: null,
     chest: null,
     ...patch,
@@ -150,17 +153,33 @@ describe('the death summary', () => {
     const receipt = {
       outcome: 'died',
       level: 4,
-      silver: 120,
+      silver: 0,
       jewels: { small: 2, large: 1 },
     } as TripReceipt;
     const lost = gear({ guns: { shotgun: {} }, medkits: 1, bottles: 2, knife: true });
     const lines = deathSummary({ receipt, lost });
-    expect(lines).toEqual(['120 silver', '2 small jewels', '1 large jewel', 'Shotgun', '1 medkit', '2 bottles', 'Knife']);
+    expect(lines).toEqual(['2 small jewels', '1 large jewel', '2 gold 80 silver once smelted', 'Shotgun', '1 medkit', '2 bottles', 'Knife']);
+  });
+
+  it('shows silver left in the receipt\'s slot as gold and silver', () => {
+    const receipt = { outcome: 'died', level: 1, silver: 120, jewels: { small: 0, large: 0 } } as TripReceipt;
+    expect(deathSummary({ receipt, lost: gear() })).toEqual(['1 gold 20 silver']);
   });
 
   it('says nothing was lost when nothing was', () => {
     const receipt = { outcome: 'died', level: 1, silver: 0, jewels: { small: 0, large: 0 } } as TripReceipt;
     expect(deathSummary({ receipt, lost: gear() })).toEqual(['Nothing was lost']);
+  });
+});
+
+describe('the carried jewels chip', () => {
+  it('leads with what the jewels come to, then counts each size', () => {
+    expect(carriedLines({ jewels: { small: 3, large: 1 }, worth: 320 })).toEqual({ worth: '3 gold 20 silver in jewels', counts: ['3 small jewels', '1 large jewel'] });
+    expect(carriedLines({ jewels: { small: 1, large: 0 }, worth: 40 })).toEqual({ worth: '40 silver in jewels', counts: ['1 small jewel'] });
+  });
+
+  it('says so when nothing is carried', () => {
+    expect(carriedLines({ jewels: { small: 0, large: 0 }, worth: 0 })).toEqual({ worth: 'No jewels', counts: [] });
   });
 });
 

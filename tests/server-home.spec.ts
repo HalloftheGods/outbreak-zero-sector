@@ -449,17 +449,17 @@ describe('home over sockets', () => {
       const unlucky = await joined({ hands: GEAR });
       await outOnATrip(lucky, unlucky);
       const body = bodyOf(unlucky);
-      homeOf(body).silver = 40;
+      homeOf(body).jewels = { small: 1, large: 0 };
       hurtPlayer(state, body, body.maxHealth * 2);
       body.bleedout = 0;
       sim.step();
       expect(body.status).toBe('dead');
-      expect(state.pickups.map((item) => item.type)).toContain('silver');
+      expect(state.pickups.map((item) => item.type)).toContain('jewel_small');
       bankTrip(sim, state);
       await waitFor(() => unlucky.save.ledger.length === 1);
       await waitFor(() => lucky.save.ledger.length === 1);
-      expect(unlucky.save.ledger[0]).toMatchObject({ outcome: 'died', silver: 40 });
-      expect(unlucky.save).toMatchObject({ silver: 0, locker: emptyLoadout() });
+      expect(unlucky.save.ledger[0]).toMatchObject({ outcome: 'died', jewels: { small: 1, large: 0 } });
+      expect(unlucky.save).toMatchObject({ silver: 0, rawJewels: { small: 0, large: 0 }, locker: emptyLoadout() });
       expect(lucky.save.ledger[0].outcome).toBe('banked');
     });
 
@@ -483,12 +483,12 @@ describe('home over sockets', () => {
       const tab = await joined({ hands: GEAR });
       await outOnATrip(friend, tab);
       const body = bodyOf(tab);
-      homeOf(body).silver = 30;
+      homeOf(body).jewels = { small: 0, large: 1 };
       hurtPlayer(state, body, body.maxHealth * 2);
       tab.crash();
       await left(1);
-      expect(state.pickups.filter((item) => item.type === 'silver').map((item) => item.rounds)).toEqual([30]);
-      expect(homeOf(body).silver).toBe(0);
+      expect(state.pickups.filter((item) => item.type === 'jewel_large').map((item) => item.rounds)).toEqual([200]);
+      expect(homeOf(body).jewels).toEqual({ small: 0, large: 0 });
     });
   });
 });

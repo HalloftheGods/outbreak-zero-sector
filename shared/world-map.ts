@@ -2,11 +2,13 @@ import { generateBunkerMap } from './bunker-map.ts';
 import { isBunkerSeed } from './home-protocol.ts';
 import { TILE_KINDS, TILE_SIZE } from './protocol.ts';
 import type { MapLight, PropInstance, WorldMap } from './protocol.ts';
+import { biomeFor } from './biomes.ts';
 import { MapBuilder } from './map-builder.ts';
-import { createRng } from './rng.ts';
+import { createRng, randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
 import { raiseBuildings } from './town-buildings.ts';
-import { MAP_TILES, planTown, rectBox } from './town-plan.ts';
+import { raiseTownPieces } from './town-pieces.ts';
+import { EDGE_TILES, MAP_TILES, planTown, rectBox } from './town-plan.ts';
 import { dressStreets, paintStreets } from './town-streets.ts';
 import { fillPark, fillVerge, raiseFence } from './world-blocks.ts';
 import { blockedTiles, isSolidProp, propBox } from './world-query.ts';
@@ -88,6 +90,18 @@ function connectedProps(base: WorldMap): PropInstance[] {
   }
 }
 
+/** Drifts, flood, ash or sludge laid over the finished town in ragged patches, inside the fence. */
+function spreadTerrain(b: MapBuilder): void {
+  const { terrain } = b.biome;
+  if (!terrain) return;
+  const size = MAP_TILES * TILE_SIZE;
+  const inner = EDGE_TILES * TILE_SIZE + TILE_SIZE;
+  for (let i = 0; i < terrain.count; i++) {
+    const radius = randRange(b.rng, terrain.radius[0], terrain.radius[1]);
+    b.blob(randRange(b.rng, inner, size - inner), randRange(b.rng, inner, size - inner), radius, terrain.tile, terrain.over);
+  }
+}
+
 function lightsFor(props: readonly PropInstance[], rng: Rng): MapLight[] {
   const lights: MapLight[] = [];
   for (const prop of props) {
@@ -103,26 +117,29 @@ function lightsFor(props: readonly PropInstance[], rng: Rng): MapLight[] {
   return lights;
 }
 
-/** Deterministic: the same seed yields the same map on the server and every client. */
-export function generateWorldMap(seed: number): WorldMap {
+/** Deterministic: the same seed and level yield the same map on the server and every client. The level picks the biome. */
+export function generateWorldMap(seed: number, level = 1): WorldMap {
   if (isBunkerSeed(seed)) return generateBunkerMap();
   const rng = createRng(seed);
   const size = MAP_TILES * TILE_SIZE;
   const plan = planTown(rng);
-  const builder = new MapBuilder(MAP_TILES, MAP_TILES, rng, plan.spawn);
+  const builder = new MapBuilder(MAP_TILES, MAP_TILES, rng, plan.spawn, biomeFor(level));
 
-  builder.fill({ x0: 0, y0: 0, x1: size, y1: size }, 'grass');
+  builder.fill({ x0: 0, y0: 0, x1: size, y1: size }, builder.biome.ground);
   fillPark(builder, rectBox(plan.park));
   const roadMask = paintStreets(builder, plan.roads);
   raiseFence(builder);
   raiseBuildings(builder, plan);
   dressStreets(builder, plan.roads, roadMask);
+  raiseTownPieces(builder, plan);
 
   const verge = VERGE_TILES * TILE_SIZE;
   fillVerge(builder, { x0: 0, y0: 0, x1: size, y1: verge });
   fillVerge(builder, { x0: 0, y0: size - verge, x1: size, y1: size });
   fillVerge(builder, { x0: 0, y0: verge, x1: verge, y1: size - verge });
   fillVerge(builder, { x0: size - verge, y0: verge, x1: size, y1: size - verge });
+
+  spreadTerrain(builder);
 
   const base: WorldMap = {
     seed,

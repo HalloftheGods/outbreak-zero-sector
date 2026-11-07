@@ -94,6 +94,8 @@ export type OverrunEnd = Extract<OverrunPhase, 'held' | 'lost'>;
 /** The room's overrun as every client draws it, on RoomHomeView. */
 export interface OverrunView {
   phase: OverrunPhase;
+  /** The clock's full length in seconds, which the difficulty sets. A view from a build without it is read as `OVERRUN_CLOCK_SEC`. */
+  spanSec?: number;
   /** Seconds on the clock to the breach, which pass at the menu rate while the room is in menus. 0 once breached. */
   left: number;
   /** The clock ran at the menu rate on the last tick. */

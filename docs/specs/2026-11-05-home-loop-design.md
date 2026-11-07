@@ -17,25 +17,32 @@ The Home Loop turns Undead of Night from one all-or-nothing run into a campaign 
 
 ### Treasure
 
-- **Silver coins** are common: drawers, wallets, cars.
-- **Jewels** are rarer, mostly in houses and apartments, and most of all in bedroom furniture.
-- **100 silver = 1 gold.** Money is stored as whole silver and shown as gold and silver.
-- Starting numbers, tuned with the bot runs:
+- **Towns hold jewels only, never coin.** Jewels lie mostly in houses and apartments, and most of all in bedroom furniture.
+- **The forge turns jewels into silver**, 3 seconds a jewel while you stand at it. Besides the forge, silver comes only from quest rewards and the overrun chest, both straight into the bank.
+- **100 silver = 1 gold.** Money is stored as whole silver and shown as gold and silver (`coinText`).
+- Each level holds what it was worth when towns also had silver stacks (30 to 45 stacks of 5 to 20 silver), within 5%, with large jewels taking a bigger share as levels rise so a full town smelts in under a minute. `TOWN_JEWELS` in `shared/treasure.ts`:
 
-| | Value | Per town at level 1 | At level 10 |
-|---|---|---|---|
-| Silver stack | 5 to 20 silver | about 30 | about 45 |
-| Small jewel | 40 silver | about 5 | about 8 |
-| Large jewel | 200 silver | about 1 | about 3 |
+| Level | Small (40 silver) | Large (200 silver) | Worth once smelted | Was, with stacks | Smelt time |
+|---|---|---|---|---|---|
+| 1 | 9 | 2 | 760 | 775 | 33 s |
+| 2 | 10 | 2 | 800 | 800 | 36 s |
+| 3 | 11 | 2 | 840 | 852 | 39 s |
+| 4 | 7 | 4 | 1,080 | 1,078 | 33 s |
+| 5 | 8 | 4 | 1,120 | 1,102 | 36 s |
+| 6 | 9 | 4 | 1,160 | 1,155 | 39 s |
+| 7 | 10 | 4 | 1,200 | 1,180 | 42 s |
+| 8 | 10 | 5 | 1,400 | 1,405 | 45 s |
+| 9 | 11 | 5 | 1,460 | 1,458 | 48 s |
+| 10 | 12 | 5 | 1,480 | 1,482 | 51 s |
 
-- A **replay**, a level below the highest anyone in the room has reached, places half as many treasures, rounded down. Each treasure keeps its full value, so a jewel is the same jewel wherever it came from.
+- A **replay**, a level below the highest anyone in the room has reached, places half as many jewels of each size, rounded down. Each jewel keeps its full value, so a jewel is the same jewel wherever it came from.
 - Treasure is placed from its own generator, off the town's seed, as `shared/radio.ts` does, and takes a container only if it was empty. It uses its own id counter, never `entityId()`, both when placed and when a search drops it, because zombie sense timing reads `sim.nextEntity`. A search of a treasure container still makes the luck roll and the bottle roll, so Sol's finds and bottles stay as they are.
 
 ### A trip
 
 1. In the bunker, choose gear at the locker and a level at the garage map. Closing the locker puts the gear **in hand**. It is still safe.
 2. Stand at the van. When the home save has recorded the trip as open, the player counts as ready. Once everyone standing is ready and has stood there for 2 seconds, the van leaves.
-3. Pick up treasure. It counts as **carried**, and the HUD shows a running total.
+3. Pick up jewels. They count as **carried**, and the HUD shows what they come to in gold and silver, then each size counted.
 4. Survive the level's hordes as today, then reach the exit van.
 5. The van brings you back and everything you are holding comes home: see below. Reaching it unlocks the next level for everyone aboard.
 
@@ -47,8 +54,7 @@ Everything on you at the van is yours, found or taken out. The locker holds up t
 
 | Item | Rule |
 |---|---|
-| Silver | Banked, no cap |
-| Raw jewels | Banked, no cap |
+| Raw jewels | Banked, no cap, for the forge |
 | Guns and their mods | One of each gun. If a second copy comes home, the one with more mods stays and the other is stripped, its parts returned |
 | Ammo | Magazines empty into your rounds, kept up to each gun's reserve cap, and anything over is lost |
 | Medkits, parts, round kits | Up to their carry caps |
@@ -118,7 +124,7 @@ Four people keep stalls in the main hall. Each stands behind a stall as a solid 
 | | Acid or piercing kit | 150 | |
 | | Flame kit | 200 | |
 
-- **Prices are starting numbers.** A level 1 town holds about 775 silver, so a player who finds a third of it earns about 260 a trip. The spending half of the soak tunes them.
+- **Prices are starting numbers.** A level 1 town holds jewels worth 760 silver once smelted, so a player who finds a third of it earns about 253 a trip, after the forge. The spending half of the soak tunes them.
 - **Shop guns are a convenience.** Every town still has a carbine at the police station and a shotgun at the gun shop, free if you can reach them. Buying one saves you that run after a death. Level gates read the player's own highest level.
 - **Ammo stays scarce because stock is small, not because it is dear.** Sarge's full stock is about 12% of a level 1 town's ammo. Boxes scale with difficulty as town pickups do (`scaleRounds`), so Undead Tired boxes hold fewer rounds. A spec holds bought ammo under 15% of the town's budget. Each co-op player has their own stock while the town does not grow, which is accepted, and the balance spec reports it.
 - **Everything bought goes to the locker,** so it is safe until you take it out. Caps and "own" count the locker and gear in hand together, so shops are no way past the carry caps. A box is refused unless all of it fits. A gun you own is not offered, and a bought gun comes empty.
@@ -171,22 +177,22 @@ The constants live in a new `shared/overrun.ts`. They are starting numbers for t
 
 | Constant | Value | What it sets |
 |---|---|---|
-| `OVERRUN_CLOCK_SEC` | 300 | Seconds from arrival to the breach at full speed |
+| `OVERRUN_CLOCK_BY_DIFFICULTY` | 240, 180, 150, 120 | Seconds from arrival to the breach at full speed on Night Light On, Stay Close, Lights Out and Undead Tired. `overrunClockSec(difficulty)` reads it; `OVERRUN_CLOCK_SEC` (150, the baseline's) is only what a view without a length is read as |
 | `OVERRUN_MENU_RATE` | 0.5 | How fast the clock runs while the room is in menus |
-| `OVERRUN_WARNINGS` | 0.5, 0.25, 0.1 | Share of the clock left at each warning: 2:30, 1:15, 0:30 |
-| `OVERRUN_ARM_FRACTION` | 0.1 | Guns are free from the last warning on |
+| `OVERRUN_WARNINGS` | 0.5, 0.25, 0.1 | Share of the clock left at each warning: on 150 seconds, 1:15, 0:38 and 0:15; on 120, 1:00, 0:30 and 0:12 |
+| `OVERRUN_ARM_FRACTION` | 0.1 | Guns are free from the last warning on: 24 seconds on the longest clock and 12 on the shortest, never more than a quarter of the shortest clock |
 | `OVERRUN_FIRST_HIGHEST` | 2 | No clock until someone in the room has reached level 2 |
 | `OVERRUN_HORDE_MAX` | 40 | Most zombies one breach sends, for the bunker's floor space |
 | `OVERRUN_SPAWN_INTERVAL_SEC` | 0.6 | Gap between zombies coming through the door |
 | `OVERRUN_MAX_KILLED` | 3 | Most merchants one flight kills, so one stall always survives |
 | `OVERRUN_RECOVERY_TRIPS` | 3 | Banked trips until a stall reopens or a thin stock is full |
-| `OVERRUN_CHEST_FINDS`, `OVERRUN_CHEST_STACKS` | 3, 6 | Ammo finds and silver stacks in a chest |
+| `OVERRUN_CHEST_FINDS`, `OVERRUN_CHEST_STACKS` | 3, 6 | Ammo finds and silver stacks (5 to 20 each, `CHEST_STACK_MIN`/`MAX`) in a chest |
 
-- **It starts on arrival.** The clock starts when the room enters the bunker: `enterBunker` after a trip or a wipe, or the first player into a fresh home sim. Every arrival is a fresh clock at `OVERRUN_CLOCK_SEC`. Someone joining later joins the room's clock where it stands.
+- **It starts on arrival.** The clock starts when the room enters the bunker: `enterBunker` after a trip or a wipe, or the first player into a fresh home sim. Every arrival is a fresh clock of `overrunClockSec(sim.difficulty)` seconds. The span rides in `OverrunState.spanSec` and on `OverrunView.spanSec` (optional on the wire, so a view from an older build is read as `OVERRUN_CLOCK_SEC`), so the warning shares and the door's buckling threshold follow the run's own length. Someone joining later joins the room's clock where it stands.
 - **There is no clock on a first visit.** It does not run while the room's highest level is below `OVERRUN_FIRST_HIGHEST`, so a new player learns the bunker in peace.
 - **One clock per room.** It is sim state, `sim.overrun`, advanced by `step()` in the bunker branch, so solo and co-op run the same code and the server only runs the sim.
 - **Slowed in menus, never stopped.** Each tick takes `TICK_DT × rate` off the clock. The rate is `OVERRUN_MENU_RATE` while every player who counts has a station open, and 1 otherwise. Who counts is who the van waits for: alive and not gone quiet (60 seconds with no key and no station). If nobody counts, the clock runs at full speed. Any station counts: the shops, the locker, the bench, the forge, the garage map and the jukebox.
-- **Why half speed.** A full stop would make the clock meaningless. Input is held while a station is open, so a player who goes from screen to screen would only spend clock on the short walks between stations, and the horde would never come. Full speed punishes reading a shop. At half speed, a player who spends the whole visit in screens gets 10 minutes and one who wanders the floor gets 5. A jewel's 3 seconds at the forge cost 1.5. It is also easy to say and to show: "the clock runs at half speed in menus". At 0.25 only the walk would cost anything, and 0.75 is too small a change to notice.
+- **Why half speed.** A full stop would make the clock meaningless. Input is held while a station is open, so a player who goes from screen to screen would only spend clock on the short walks between stations, and the horde would never come. Full speed punishes reading a shop. At half speed, a player who spends the whole visit in screens gets twice the clock and one who wanders the floor gets the clock (5 and 2.5 minutes on Lights Out). A jewel's 3 seconds at the forge cost 1.5. It is also easy to say and to show: "the clock runs at half speed in menus". At 0.25 only the walk would cost anything, and 0.75 is too small a change to notice.
 - **Why everyone, not anyone and not each player.** There is one door, one horde and so one clock. If anyone is free to act, the room is acting. It is the same test the van uses, so players learn one rule. With "slowed if anyone is in a menu", one friend parked at the jukebox would stretch the clock for everybody.
 - **The solo pause menu stops it.** Pausing solo already stops the whole sim (`LocalSession.setPaused` stops its clock), so the overrun clock stops too, as a town horde does. That is a pause, not a menu. Esc puts a station away before the pause menu opens, so nothing can be bought, smelted or equipped while paused. The co-op pause menu stops nothing and is not a station, so the clock runs at full speed under it. Settled: question 2 below.
 - **Leaving before the breach costs nothing.** `startTrip` sets `sim.overrun` to null. The clock is a deadline for shopping, not a sentence.
@@ -234,7 +240,7 @@ The sim emits `overrun_warning { step, left }` once at each step, then `overrun_
 
 **Kill the horde (`held`).** Everyone in the room at that moment gets a chest, the dead included, since they stand back up then.
 - The chest stands at `CHEST_SPOT`, in the hall's south-west corner, clear of every station's circle. It is a station, `chest`, live only while that player's chest is unopened. Holding E opens it, and the sim rolls it and writes a held receipt.
-- The roll uses tables that already exist, in a new `shared/overrun-chest.ts`. It makes `OVERRUN_CHEST_FINDS` draws from `CONTAINER_LOOT.police` through `rollFind`, as full boxes (`scaleRounds` of the `AMMO_PICKUPS` rounds, not the half-used drawer rule). It adds one medkit, `OVERRUN_CHEST_STACKS` silver stacks valued the way `treasure.ts` values a stack, and one small jewel once the room's highest level is 5 or more.
+- The roll uses tables that already exist, in a new `shared/overrun-chest.ts`. It makes `OVERRUN_CHEST_FINDS` draws from `CONTAINER_LOOT.police` through `rollFind`, as full boxes (`scaleRounds` of the `AMMO_PICKUPS` rounds, not the half-used drawer rule). It adds one medkit, `OVERRUN_CHEST_STACKS` silver stacks of 5 to 20 silver each (`CHEST_STACK_MIN`/`CHEST_STACK_MAX`, 75 on average, about a tenth of a level 1 town; the chest is the one place silver still comes as coin), and one small jewel once the room's highest level is 5 or more.
 - The chest goes to the locker through `mergeHome`, so the carry caps hold. Silver and the jewel go to the bank.
 - If the van leaves before a chest is opened, `startTrip` writes that chest's receipt first, so leaving never costs a chest. A player who disconnects before opening theirs loses it.
 
@@ -295,7 +301,7 @@ The sim emits `overrun_warning { step, left }` once at each step, then `overrun_
 
 These are the calls only Xopher can make. Settled ones are marked; the others keep the default the build follows until they are answered.
 
-1. **Settled:** 300 seconds and half speed in menus. The soak (#7223) reports against them; they stay `OVERRUN_CLOCK_SEC` and `OVERRUN_MENU_RATE`.
+1. **Settled:** half speed in menus (`OVERRUN_MENU_RATE`), and a clock that depends on difficulty: 240, 180, 150 and 120 seconds (`OVERRUN_CLOCK_BY_DIFFICULTY`). The first settling was a flat 300 seconds; the user changed it after seeing it, because 300 felt like too much waiting, and made the hardest run the shortest. The soak (#7223) reports at each difficulty's own length.
 2. **Settled:** the solo pause menu stops the clock, as a true pause. Leaving the tab pauses solo too, so a phone call costs nothing.
 3. **Default kept, not yet confirmed:** should the first visit be free of the clock (no clock below level 2), or should it run from the very first visit? Default: free.
 4. **Settled:** the horde is sized by the room's highest level only, capped at 40.

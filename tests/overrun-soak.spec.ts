@@ -8,7 +8,7 @@ import { TICK_RATE } from '../shared/constants.ts';
 import type { DifficultyId } from '../shared/difficulty.ts';
 import type { Loadout } from '../shared/home-protocol.ts';
 import { emptyLoadout } from '../shared/loadout.ts';
-import { OVERRUN_CLOCK_SEC, OVERRUN_FIRST_HIGHEST, OVERRUN_HORDE_MAX, OVERRUN_MENU_RATE } from '../shared/overrun.ts';
+import { OVERRUN_CLOCK_BY_DIFFICULTY, OVERRUN_FIRST_HIGHEST, OVERRUN_HORDE_MAX, OVERRUN_MENU_RATE, overrunClockSec } from '../shared/overrun.ts';
 import type { PlayerState, SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import { playerNamed, standAtStation } from './helpers/home-harness.ts';
@@ -43,10 +43,10 @@ function room(highest: number, difficulty: DifficultyId): { sim: GameSimulation;
 const overrunOf = (state: SimState): NonNullable<SimState['overrun']> => state.overrun as NonNullable<SimState['overrun']>;
 
 /** Seconds from arrival to the breach with the bot's station open (or shut) the whole time. */
-function shopSeconds(highest: number, inMenu: boolean): number {
-  const { sim, state, me } = room(highest, 'lights_out');
+function shopSeconds(highest: number, inMenu: boolean, difficulty: DifficultyId): number {
+  const { sim, state, me } = room(highest, difficulty);
   let ticks = 0;
-  while (overrunOf(state).phase !== 'breached' && ticks < TICK_RATE * OVERRUN_CLOCK_SEC * 3) {
+  while (overrunOf(state).phase !== 'breached' && ticks < TICK_RATE * overrunClockSec(difficulty) * 3) {
     if (inMenu) standAtStation(state, me, 'gunsmith');
     if (me.home) me.home.station = inMenu ? 'gunsmith' : null;
     sim.step();
@@ -87,16 +87,19 @@ function fight(highest: number, difficulty: DifficultyId): Visit {
 
 describe('the overrun soak', () => {
   it('runs the clock at the menu rate while a station is open, and at full speed otherwise', () => {
-    const open = shopSeconds(5, true);
-    const shut = shopSeconds(5, false);
-    expect(shut).toBeCloseTo(OVERRUN_CLOCK_SEC, 0);
-    expect(open).toBeCloseTo(OVERRUN_CLOCK_SEC / OVERRUN_MENU_RATE, 0);
+    for (const difficulty of DIFFICULTIES) {
+      const open = shopSeconds(5, true, difficulty);
+      const shut = shopSeconds(5, false, difficulty);
+      expect(shut, difficulty).toBeCloseTo(overrunClockSec(difficulty), 0);
+      expect(open, difficulty).toBeCloseTo(overrunClockSec(difficulty) / OVERRUN_MENU_RATE, 0);
+    }
   });
 
   it('reports the clear rate and minutes per visit at highest 1, 5 and 10 on every difficulty', () => {
-    const shopOpen = shopSeconds(5, true);
     const rows: string[] = [];
     for (const difficulty of DIFFICULTIES) {
+      const clockSec = overrunClockSec(difficulty);
+      const shopOpen = shopSeconds(5, true, difficulty);
       for (const highest of HIGHEST) {
         if (!hasClock(highest)) {
           rows.push(`${difficulty.padEnd(13)} highest ${String(highest).padStart(2)}  no clock: a first visit is in peace`);
@@ -107,12 +110,13 @@ describe('the overrun soak', () => {
         rows.push(
           `${difficulty.padEnd(13)} highest ${String(highest).padStart(2)}  horde ${String(visit.hostiles).padStart(2)}/${OVERRUN_HORDE_MAX}  ` +
             `${visit.outcome.padEnd(7)}  fight ${minutes(visit.fightSec)} min  health left ${visit.health}%  ` +
-            `visit ${minutes(OVERRUN_CLOCK_SEC + visit.fightSec)}-${minutes(shopOpen + visit.fightSec)} min`,
+            `clock ${clockSec} s  visit ${minutes(clockSec + visit.fightSec)}-${minutes(shopOpen + visit.fightSec)} min`,
         );
         expect(visit.hostiles).toBeLessThanOrEqual(OVERRUN_HORDE_MAX);
         expect(['held', 'lost', 'stalled']).toContain(visit.outcome);
       }
     }
-    process.stdout.write(`overrun soak (clock ${OVERRUN_CLOCK_SEC} s, menu rate ${OVERRUN_MENU_RATE}, shopping 5-${(shopOpen / 60).toFixed(1)} min)\n${rows.join('\n')}\n`);
+    const clocks = Object.entries(OVERRUN_CLOCK_BY_DIFFICULTY).map(([id, sec]) => `${id} ${sec}`).join(', ');
+    process.stdout.write(`overrun soak (clock by difficulty: ${clocks} s, menu rate ${OVERRUN_MENU_RATE})\n${rows.join('\n')}\n`);
   });
 });

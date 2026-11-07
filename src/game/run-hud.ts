@@ -1,3 +1,4 @@
+import { displayName } from '../../shared/callsign.ts';
 import { BUILDING_DEFS } from '../../shared/protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, PlayerStatus, WorldMap } from '../../shared/protocol.ts';
 import type { SceneView } from '../engine/scene.ts';
@@ -185,7 +186,7 @@ export class RunHud {
     tapLocalPlayer(local.id);
     const viewer = scene.viewerId === local.id ? null : scene.players.find((player) => player.id === scene.viewerId);
     this.publish({
-      hud: buildHud(snapshot, local, viewer?.name ?? null),
+      hud: buildHud(snapshot, local, viewer ? displayName(viewer.name, viewer.skin) : null),
       home: homeUi(snapshot, local, this.homeFacts()),
       signalWeak: frame.networked && ms - frame.lastSnapshotMs > SIGNAL_WEAK_MS,
       ...this.notices.expired(this.ui(), ms),

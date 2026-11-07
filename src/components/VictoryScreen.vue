@@ -18,7 +18,7 @@
       </thead>
       <tbody>
         <tr v-for="player in ranked" :key="player.id" :class="{ 'is-you': player.id === result.localId }">
-          <td>{{ player.name }}</td>
+          <td>{{ displayName(player.name, player.skin) }}</td>
           <td>{{ player.kills }}</td>
           <td>{{ player.score }}</td>
         </tr>
@@ -34,6 +34,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ArtBook } from '../art/types.ts';
+import { displayName } from '../../shared/callsign.ts';
 import { formatDuration } from '../game/hud-state.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import PixelButton from './PixelButton.vue';

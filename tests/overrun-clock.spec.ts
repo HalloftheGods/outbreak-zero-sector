@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { TICK_RATE } from '../shared/constants.ts';
 import { emptyLoadout } from '../shared/loadout.ts';
-import { OVERRUN_CLOCK_SEC, OVERRUN_WARNINGS } from '../shared/overrun.ts';
+import type { DifficultyId } from '../shared/difficulty.ts';
+import { OVERRUN_CLOCK_BY_DIFFICULTY, OVERRUN_CLOCK_SEC, OVERRUN_WARNINGS, overrunClockSec } from '../shared/overrun.ts';
 import type { PlayerState, SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
 import type { SimulationOptions } from '../shared/simulation.ts';
@@ -44,7 +45,7 @@ describe('the overrun clock', () => {
     expect(state.overrun).toMatchObject({ phase: 'counting', left: OVERRUN_CLOCK_SEC, slowed: false, total: 0 });
   });
 
-  it('breaches at exactly 300 s of ticks when nobody is in a menu', () => {
+  it('breaches at exactly the clock\'s length in ticks when nobody is in a menu', () => {
     const { sim, state } = overrunRoom();
     steps(sim, SECONDS(OVERRUN_CLOCK_SEC) - 1);
     expect(state.overrun?.left).toBeGreaterThan(0);
@@ -52,7 +53,7 @@ describe('the overrun clock', () => {
     expect(state.overrun?.left).toBe(0);
   });
 
-  it('takes 600 s with the one player parked at a station', () => {
+  it('takes twice as long with the one player parked at a station', () => {
     const { sim, state } = overrunRoom();
     openStation(state, playerNamed(state, 'a'));
     runSeconds(sim, state, OVERRUN_CLOCK_SEC);
@@ -158,5 +159,45 @@ describe('the overrun clock', () => {
     }
     expect(heard).toEqual([0, 1, 2]);
     expect(armedAtLast).toBe(true);
+  });
+});
+
+const DIFFICULTY_IDS: readonly DifficultyId[] = ['night_light', 'stay_close', 'lights_out', 'undead_tired'];
+
+describe('the overrun clock by difficulty', () => {
+  it('is 240, 180, 150 and 120 seconds from the easiest to the hardest', () => {
+    expect(DIFFICULTY_IDS.map(overrunClockSec)).toEqual([240, 180, 150, 120]);
+    expect(OVERRUN_CLOCK_BY_DIFFICULTY.lights_out).toBe(OVERRUN_CLOCK_SEC);
+  });
+
+  it.each(DIFFICULTY_IDS)('starts at its own length on %s and shows it to the clients', (difficulty) => {
+    const { sim, state } = overrunRoom({ difficulty });
+    const span = overrunClockSec(difficulty);
+    expect(state.overrun).toMatchObject({ phase: 'counting', spanSec: span, left: span });
+    expect(sim.snapshot().home?.overrun).toMatchObject({ spanSec: span, left: span });
+  });
+
+  it.each(DIFFICULTY_IDS)('gives the warnings at 50%, 25% and 10% of the clock on %s and breaches on time', (difficulty) => {
+    const { sim, state } = overrunRoom({ difficulty });
+    const span = overrunClockSec(difficulty);
+    const leftAt: number[] = [];
+    let armedLeft = 0;
+    for (let t = 0; t < SECONDS(span); t++) {
+      steps(sim, 1);
+      leftAt.push(...state.events.flatMap((e) => (e.type === 'overrun_warning' ? [e.left] : [])));
+      state.events.length = 0;
+      const justArmed = armedLeft === 0 && state.overrun?.phase === 'armed';
+      armedLeft = justArmed ? (state.overrun?.left ?? 0) : armedLeft;
+    }
+    expect(leftAt).toEqual(OVERRUN_WARNINGS.map((share) => Math.round(span * share)));
+    expect(armedLeft).toBeCloseTo(span * OVERRUN_WARNINGS[2], 1);
+    expect(state.overrun?.phase === 'armed' || state.overrun?.phase === 'breached').toBe(true);
+    expect(state.overrun?.left).toBe(0);
+  });
+
+  it('keeps the guns-free window to no more than a quarter of the shortest clock', () => {
+    const shortest = Math.min(...DIFFICULTY_IDS.map(overrunClockSec));
+    const longestWindow = Math.max(...DIFFICULTY_IDS.map((d) => overrunClockSec(d) * OVERRUN_WARNINGS[2]));
+    expect(longestWindow).toBeLessThanOrEqual(shortest / 4);
   });
 });

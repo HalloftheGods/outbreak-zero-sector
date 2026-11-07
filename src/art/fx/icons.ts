@@ -242,10 +242,14 @@ export function buildPickupIcons(): Record<PickupType, PixelSprite> {
     acid_kit: outlined(KIT_ART.acid_kit.rows, 15, 15),
     piercing_kit: outlined(KIT_ART.piercing_kit.rows, 15, 15),
     tranq_kit: outlined(KIT_ART.tranq_kit.rows, 15, 15),
-    silver: outlined(SILVER, 15, 15),
     jewel_small: outlined(JEWEL_SMALL, 15, 15),
     jewel_large: outlined(JEWEL_LARGE, 15, 15),
   };
+}
+
+/** The money icon, drawn at the jewels' size so a price sits level with them. */
+export function buildSilverIcon(): PixelSprite {
+  return outlined(SILVER, 15, 15);
 }
 
 export function buildHeart(): PixelSprite {

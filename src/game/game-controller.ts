@@ -1,5 +1,6 @@
 import { shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
+import { capCallsign } from '../../shared/callsign.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { WorldMap } from '../../shared/protocol.ts';
@@ -8,7 +9,7 @@ import { buildArtBook } from '../art/index.ts';
 import { AudioEngine } from '../audio/audio-engine.ts';
 import { aimAngle } from '../engine/camera.ts';
 import { CHEST_HEIGHT, EMPTY_SCENE } from '../engine/scene.ts';
-import type { SceneView } from '../engine/scene.ts';
+import type { QuestMark, SceneView } from '../engine/scene.ts';
 import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { BenchLink } from './bench-link.ts';
@@ -19,6 +20,7 @@ import type { HomeActions } from './home-hud.ts';
 import { overrunOn } from './home-mode.ts';
 import { createBrowserHomeStore } from './home/browser-home-store.ts';
 import type { HomeStore } from './home/home-store.ts';
+import { questMarks } from './home/quest-marks.ts';
 import { closedStalls } from './home/shop.ts';
 import type { UiState } from './hud-state.ts';
 import { InputManager } from './input-manager.ts';
@@ -39,7 +41,6 @@ import { fitWindow, watchDpr } from './view-fit.ts';
 
 const GAME_OVER_BEAT_MS = 1800;
 const MAX_FRAME_DT = 0.05;
-const CALLSIGN_MAX = 12;
 const TITLE_MAP_SEED = 20417;
 const ART_DELAY_MS = 40;
 
@@ -215,7 +216,7 @@ export class GameController {
   // --- Commands from the menus ---------------------------------------------
 
   setCallsign(callsign: string): void {
-    this.publish({ callsign: callsign.slice(0, CALLSIGN_MAX) });
+    this.publish({ callsign: capCallsign(callsign) });
     this.savePrefs();
   }
 
@@ -444,6 +445,7 @@ export class GameController {
     const scene: SceneView = {
       ...entities,
       closedStalls: this.closedStalls(),
+      questMarks: this.questMarks(world),
       overrunOn: this.overrunOn,
       pointerX: over || touch ? null : pointerX,
       pointerY: over || touch ? null : pointerY,
@@ -474,6 +476,12 @@ export class GameController {
   private closedStalls(): MerchantId[] {
     const { save } = this.homeLink.facts();
     return save ? closedStalls(save.shop) : [];
+  }
+
+  /** The bunker's stalls with a quest to take or to be paid for, by this player's own save. Nowhere else has stalls. */
+  private questMarks(world: ClientWorld): QuestMark[] {
+    const { save, highest } = this.homeLink.facts();
+    return questMarks(save, highest, world.bunkerProps());
   }
 
   private sendNeutralInput(): void {

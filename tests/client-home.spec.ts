@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BUNKER_SEED, isBunkerSeed } from '../shared/home-protocol.ts';
+import { BUNKER_SEED, MERCHANT_IDS, isBunkerSeed } from '../shared/home-protocol.ts';
 import type { Loadout } from '../shared/home-protocol.ts';
 import { FINAL_LEVEL } from '../shared/levels.ts';
 import { emptyLoadout } from '../shared/loadout.ts';
@@ -8,6 +8,7 @@ import { AudioEngine } from '../src/audio/audio-engine.ts';
 import { WorldRenderer } from '../src/engine/world-renderer.ts';
 import { GameController } from '../src/game/game-controller.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
+import { questTracker } from '../src/game/home/quest-view.ts';
 import type { HomeSave, HomeStore } from '../src/game/home/home-store.ts';
 import { hordeStatus } from '../src/game/hud-state.ts';
 import { levelLine } from '../src/game/level-hud.ts';
@@ -179,14 +180,12 @@ describe('the run from the bunker', () => {
     expect(setStyle).toHaveBeenLastCalledWith('campaign');
   });
 
-  describe('the hint', () => {
-    it('a first visit shows the hint pointing to the van, and a later one does not', async () => {
+  describe('the first visit', () => {
+    it('shows no hint line: the four starter quests in the tracker are the hint', async () => {
       await startHome();
-      expect(game.ui.value.banner?.title).toMatch(/van/i);
-
-      const trip = { level: 1, outcome: 'died', difficulty: 'lights_out', silver: 0, jewels: { small: 0, large: 0 }, replay: false, at: 1 } as const;
-      await startHome({ ledger: [trip] });
       expect(game.ui.value.banner).toBeNull();
+      const home = game.ui.value.home;
+      expect(home && questTracker(home).lines.map((line) => line.merchant).sort()).toEqual([...MERCHANT_IDS].sort());
     });
 
     it('standing at the van with no level picked boards for the furthest level', async () => {

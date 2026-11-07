@@ -1,4 +1,4 @@
-// Treasure on the ground and in the HUD: a pile of silver coins, a cut green stone and a large red one.
+// Treasure: a cut green stone and a large red one, on the ground and in the HUD, and a pile of silver coins, the money icon.
 // Letters are the pickup legend, plus three teal ones for the green stone.
 
 import { RAMPS } from '../palette.ts';

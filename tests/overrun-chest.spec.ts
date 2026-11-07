@@ -4,13 +4,12 @@ import { AMMO_PICKUPS, TICK_RATE, WEAPONS } from '../shared/constants.ts';
 import { rollFind } from '../shared/container-loot.ts';
 import { scaleRounds } from '../shared/difficulty.ts';
 import { emptyLoadout, mergeHome } from '../shared/loadout.ts';
-import { openChest, OVERRUN_CHEST_JEWEL_FROM, rollChest } from '../shared/overrun-chest.ts';
+import { CHEST_STACK_MAX, CHEST_STACK_MIN, openChest, OVERRUN_CHEST_JEWEL_FROM, rollChest } from '../shared/overrun-chest.ts';
 import { overrunHolds } from '../shared/overrun-fight.ts';
 import { OVERRUN_CHEST_STACKS } from '../shared/overrun.ts';
 import { isAmmoPickup } from '../shared/pickups.ts';
 import type { PlayerState, SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
-import { SILVER_STACK_MAX, SILVER_STACK_MIN } from '../shared/treasure.ts';
 import { driveToTown } from './helpers/home-harness.ts';
 import { playerNamed } from './helpers/home-harness.ts';
 import { input, SEED, stateOf, steps } from './helpers/sim-harness.ts';
@@ -49,8 +48,8 @@ describe('the chest roll', () => {
     const bag = roll.gear.ammoBag;
     expect(bag.pistol + bag.carbine + bag.shotgun).toBe(rounds);
     expect(roll.gear.medkits).toBe(1);
-    expect(roll.silver).toBeGreaterThanOrEqual(OVERRUN_CHEST_STACKS * SILVER_STACK_MIN);
-    expect(roll.silver).toBeLessThanOrEqual(OVERRUN_CHEST_STACKS * SILVER_STACK_MAX);
+    expect(roll.silver).toBeGreaterThanOrEqual(OVERRUN_CHEST_STACKS * CHEST_STACK_MIN);
+    expect(roll.silver).toBeLessThanOrEqual(OVERRUN_CHEST_STACKS * CHEST_STACK_MAX);
   });
 
   it('is the same roll from the same seed and a different one after it', () => {

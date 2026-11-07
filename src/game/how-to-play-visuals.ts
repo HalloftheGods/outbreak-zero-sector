@@ -76,7 +76,7 @@ const bunker: CardList = (art) => [
 ];
 
 const treasure: CardList = (art) => [
-  { id: 'silver', title: 'Silver', sprite: art.ui.pickupIcons.silver, scale: 4, tag: 'No. 301', caption: 'One hundred make a gold.' },
+  { id: 'silver', title: 'Silver', sprite: art.ui.silverIcon, scale: 4, tag: 'No. 301', caption: 'Forge-made. One hundred make a gold.' },
   { id: 'jewel-small', title: 'Small jewel', sprite: art.ui.pickupIcons.jewel_small, scale: 4, tag: 'No. 302', caption: 'Forty silver, once smelted.' },
   { id: 'jewel-large', title: 'Large jewel', sprite: art.ui.pickupIcons.jewel_large, scale: 4, tag: 'No. 303', caption: 'Two hundred. Lift with your knees.' },
 ];

@@ -5,13 +5,16 @@ import { BASELINE_DIFFICULTY } from '../../shared/difficulty.ts';
 import type { DifficultyId } from '../../shared/difficulty.ts';
 import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { HomeAction, JoinHome, Loadout, MerchantId, OverrunPhase, OverrunReceipt, StationId, TripReceipt } from '../../shared/home-protocol.ts';
+import { characterOf } from '../../shared/characters.ts';
 import { emptyLoadout } from '../../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { GameTransport, TransportKind } from '../network/transport.ts';
-import { shopContext } from './home-hud.ts';
-import type { ChestOpened, HomeActions, HomeDeath, HomeFacts } from './home-hud.ts';
+import { questContext, shopContext } from './home-hud.ts';
+import type { ChestOpened, HomeActions, HomeDeath, HomeFacts, HomeUi } from './home-hud.ts';
 import type { HomeStore } from './home/home-store.ts';
 import { HomeSync, joinHomeFor } from './home/home-sync.ts';
+import type { QuestResult } from './home/quest-sync.ts';
+import { QuestTally } from './home/quest-tally.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
 import { loadCampaignProgress, recordCampaignFinished, recordLevelCleared } from './level-progress.ts';
 import { inSightSince } from './stage-cut.ts';
@@ -19,8 +22,6 @@ import { endingResult, recordTrip } from './trip-record.ts';
 
 /** The death summary stays this long in plain sight before Enter can wake past it, so a mashed key cannot skip what was lost. */
 const SUMMARY_READ_MS = 1000;
-
-const VAN_HINT: Omit<Banner, 'key'> = { title: 'THE VAN IS IN THE GARAGE', subtitle: 'STAND BESIDE IT TO LEAVE. THE MAP PICKS ANOTHER LEVEL', tone: 'hope' };
 
 /** The parts of the controller a home session reaches into. */
 export interface HomeLinkHost {
@@ -67,8 +68,10 @@ export class HomeLink {
   private ending = false;
   /** The gear this trip took out, which a death takes with it. */
   private takenOut: Loadout = emptyLoadout();
-  private greeted = false;
   private saidError: string | null = null;
+  /** What the local player has done this trip. Lives only here, and is cleared once the save that counted it lands. */
+  private readonly tally = new QuestTally();
+  private wasDead = false;
 
   constructor({ store, host }: HomeLinkOptions) {
     this.createStore = store;
@@ -83,6 +86,9 @@ export class HomeLink {
       // The forge runs by itself for as long as the player stays at it.
       smelt: () => {},
       buy: (merchant, item) => this.buy(merchant, item),
+      acceptQuest: (merchant, id) => this.quest((home, sync) => sync.acceptQuest(merchant, id, questContext(home))),
+      turnInQuest: (merchant) => this.quest((home, sync) => sync.turnInQuest(merchant, questContext(home))),
+      abandonQuest: (merchant) => this.quest((home, sync) => sync.abandonQuest(merchant, questContext(home))),
       wake: () => this.wake(),
       closeChest: () => this.putChestAway(),
       continueFromEnding: () => this.continueFromEnding(),
@@ -100,6 +106,7 @@ export class HomeLink {
       saveError: sync?.saveError ?? null,
       death: this.death,
       chest: this.chest,
+      tally: this.tally.snapshot(),
     };
   }
 
@@ -123,6 +130,8 @@ export class HomeLink {
       onChange: () => current() && this.host.refresh(),
       onReceipt: (receipt) => current() && this.onReceipt(receipt),
       onOverrunReceipt: (receipt) => current() && this.onOverrunReceipt(receipt),
+      tally: () => this.tally.snapshot(),
+      highest: () => this.highest,
     });
     this.sync = sync;
     const save = await sync.open();
@@ -144,9 +153,9 @@ export class HomeLink {
     const trip = sync.save?.openTrip ?? null;
     if (trip) this.takenOut = sync.save?.hands ?? this.takenOut;
     this.watchOverrun(snapshot, entity);
+    this.feedTally(snapshot, entity, localId);
     sync.observe(snapshot, localId);
     this.watchStation(entity?.home?.station ?? null);
-    this.greet(snapshot, nowMs);
     this.sayError(nowMs);
   }
 
@@ -195,8 +204,19 @@ export class HomeLink {
     this.inBunker = false;
     this.ending = false;
     this.takenOut = emptyLoadout();
-    this.greeted = false;
     this.saidError = null;
+    this.tally.reset();
+    this.wasDead = false;
+  }
+
+  /** Counts what this snapshot says the local player did. Dying loses the count, as it loses the gear; being revived keeps it. */
+  private feedTally(snapshot: SnapshotPacket, entity: PlayerEntity | undefined, localId: string): void {
+    if (!entity) return;
+    this.tally.observe(snapshot.events, localId);
+    this.tally.setContext(snapshot.players.length, characterOf(entity.skin).id);
+    const dead = entity.status === 'dead';
+    if (dead && !this.wasDead) this.tally.reset();
+    this.wasDead = dead;
   }
 
   private send(action: HomeAction): void {
@@ -207,16 +227,8 @@ export class HomeLink {
     const changed = station !== this.station;
     this.station = station;
     if (changed) this.host.syncControls();
-  }
-
-  /** A new player is told once where the van is. Anyone who has made a trip knows. */
-  private greet(snapshot: SnapshotPacket, nowMs: number): void {
-    const save = this.sync?.save ?? null;
-    const firstLook = !this.greeted && save !== null && isBunkerSeed(snapshot.mapSeed);
-    if (!firstLook) return;
-    this.greeted = true;
-    const newHere = save.ledger.length === 0;
-    if (newHere) this.host.say(VAN_HINT, nowMs);
+    const opened = changed && station !== null;
+    if (opened) this.sync?.visit(station);
   }
 
   /** A save that did not land can hold the van back, and the locker and shops are not the only place to hear of it. */
@@ -229,6 +241,7 @@ export class HomeLink {
 
   /** Credited here, once. */
   private onReceipt(receipt: TripReceipt): void {
+    this.tally.reset();
     const isNewBest = recordTrip(receipt, this.host.ui().callsign);
     const died = receipt.outcome === 'died';
     if (died) this.die(receipt);
@@ -322,6 +335,15 @@ export class HomeLink {
     this.ending = false;
     this.host.hideEnding();
     this.host.syncControls();
+  }
+
+  /** A quest step at a counter. Like a sale it never retries, and the screens refresh whatever the outcome. */
+  private quest(step: (home: HomeUi, sync: HomeSync) => Promise<QuestResult>): void {
+    const home = this.host.ui().home;
+    const { sync } = this;
+    const canWork = sync !== null && home !== null;
+    if (!canWork) return;
+    void step(home, sync).then(() => this.host.refresh());
   }
 
   private buy(merchant: MerchantId, item: string): void {

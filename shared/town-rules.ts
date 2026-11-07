@@ -1,3 +1,4 @@
+import { groundEffect } from './ground.ts';
 import { levelDef } from './levels.ts';
 import type { LevelTheme } from './levels.ts';
 import type { EntityId, WorldMap } from './protocol.ts';
@@ -68,7 +69,8 @@ export function townRule(level: number): TownRule | null {
 /** Shared with the client, so prediction wades at the sim's pace. */
 export function groundSpeedScale(level: number, map: WorldMap, x: number, y: number): number {
   const wading = themeOf(level) === 'flooded' && buildingAt(map, x, y) === null;
-  return wading ? FLOOD_SPEED_SCALE : 1;
+  const town = wading ? FLOOD_SPEED_SCALE : 1;
+  return Math.min(town, groundEffect(map, x, y).speed);
 }
 
 export function sightScale(level: number): number {

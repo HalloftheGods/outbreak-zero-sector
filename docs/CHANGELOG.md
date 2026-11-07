@@ -2,11 +2,21 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-06] - Towns hold jewels only
+
+### Changed
+- Towns drop jewels only: silver stacks are gone from towns, and the forge is where silver comes from (with quest rewards and the overrun chest). Each level is worth what it was, within 5%: `TOWN_JEWELS` in `shared/treasure.ts` holds 9 small and 2 large jewels at level 1 (760 silver once smelted, was 775) up to 12 small and 5 large at level 10 (1,480, was 1,482), with large jewels taking a bigger share as levels rise. A full town smelts in 33 to 51 seconds at 3 seconds a jewel. A replay still holds half of each, rounded down. Arcade runs place no treasure and are unchanged, as is every draw on `sim.rng` (#7266).
+- The HUD's carried chip shows what the jewels come to in gold and silver (`coinText`, `jewelWorth`), then each size counted; the death summary counts the jewels lost and what they would have smelted to.
+- The overrun chest keeps paying silver straight to the bank: six stacks of 5 to 20, now its own `CHEST_STACK_MIN`/`CHEST_STACK_MAX` in `shared/overrun-chest.ts`, with the same draws on `sim.rng`.
+
+### Removed
+- The `silver` pickup type, its ground sprite, its pickup sound (`pickup_silver`) and its floating label. The coin pile stays as the money icon, `art.ui.silverIcon`, on the shop, the forge and the How to Play card. The trip receipt and the body keep their `silver` slot, which a trip now leaves at 0.
+
 ## [2026-11-06] - The Overrun (behind a switch)
 
 ### Added
-- The overrun: a 300 second clock on every arrival in the bunker, at half speed while everyone who counts has a station open and stopped by the solo pause menu. Warnings, then the blast door bursts and a horde (sized by the room's highest level, at most 40) comes in. Killing it pays each player a reward chest; running for the van kills merchants and thins the rest; dying costs the gear in hand. A first visit (below level 2) has no clock. It is built across #7213 to #7222 with HUD, sound, art, screens, save receipts and co-op specs.
-- It is **off for players**: `OVERRUN_LIVE` in `shared/home-protocol.ts` stays false. A dev build turns it on with `?overrun` in the address (solo only; a co-op server follows `OVERRUN_LIVE`). Tuning constants: `OVERRUN_CLOCK_SEC` and `OVERRUN_MENU_RATE` in `shared/overrun.ts`.
+- The overrun: a clock on every arrival in the bunker whose length depends on difficulty (240 seconds on Night Light On, 180 on Stay Close, 150 on Lights Out, 120 on Undead Tired; a flat 300 felt too long, #7264), at half speed while everyone who counts has a station open and stopped by the solo pause menu. Warnings, then the blast door bursts and a horde (sized by the room's highest level, at most 40) comes in. Killing it pays each player a reward chest; running for the van kills merchants and thins the rest; dying costs the gear in hand. A first visit (below level 2) has no clock. It is built across #7213 to #7222 with HUD, sound, art, screens, save receipts and co-op specs.
+- It is **off for players**: `OVERRUN_LIVE` in `shared/home-protocol.ts` stays false. A dev build turns it on with `?overrun` in the address (solo only; a co-op server follows `OVERRUN_LIVE`). Tuning constants: `OVERRUN_CLOCK_BY_DIFFICULTY` (read through `overrunClockSec(difficulty)`) and `OVERRUN_MENU_RATE` in `shared/overrun.ts`. The clock length is on `OverrunState.spanSec` and the wire's `OverrunView.spanSec` (optional, so an older view reads as `OVERRUN_CLOCK_SEC`, 150), and the warnings, the door's buckling and the soak follow it.
 - `tests/overrun-soak.spec.ts`: a bot that shops at menu speed and holds the quarters, printing the clear rate and minutes per visit at highest 1, 5 and 10 on each difficulty.
 - How to Play does not mention the overrun yet; its chapter goes in with the flip, since the text would describe a feature players cannot reach.
 

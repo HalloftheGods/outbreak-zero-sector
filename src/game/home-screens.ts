@@ -8,6 +8,7 @@ import type { Jewels, Loadout } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, LEVELS } from '../../shared/levels.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { WeaponId } from '../../shared/protocol.ts';
+import { coinText, jewelWorth } from '../../shared/treasure.ts';
 import type { ChestOpened, HomeActions, HomeDeath, HomeUi } from './home-hud.ts';
 import type { HomeSave } from './home/home-store.ts';
 import { COOP_LEVEL_NOTE, startAtLabel } from './level-select.ts';
@@ -212,11 +213,31 @@ export function deathSummary(death: HomeDeath): readonly string[] {
   if (death.overrun) return overrunLost(death.lost);
   const { receipt, lost } = death;
   const lines: string[] = [];
-  if (receipt.silver > 0) lines.push(`${receipt.silver} silver`);
-  if (receipt.jewels.small > 0) lines.push(plural(receipt.jewels.small, 'small jewel'));
-  if (receipt.jewels.large > 0) lines.push(plural(receipt.jewels.large, 'large jewel'));
+  if (receipt.silver > 0) lines.push(coinText(receipt.silver));
+  lines.push(...jewelLines(receipt.jewels));
   for (const row of loadoutRows(lost)) lines.push(gearLine(row));
   return lines.length > 0 ? lines : ['Nothing was lost'];
+}
+
+/** Each size of jewel counted, leaving out a size there is none of. */
+function jewelCounts(jewels: Jewels): string[] {
+  const counts: string[] = [];
+  if (jewels.small > 0) counts.push(plural(jewels.small, 'small jewel'));
+  if (jewels.large > 0) counts.push(plural(jewels.large, 'large jewel'));
+  return counts;
+}
+
+/** Each size of jewel counted, then what they come to at the forge in gold and silver. Nothing when there are none. */
+export function jewelLines(jewels: Jewels): string[] {
+  const worth = jewelWorth(jewels);
+  const hasWorth = worth > 0;
+  return hasWorth ? [...jewelCounts(jewels), `${coinText(worth)} once smelted`] : [];
+}
+
+/** The HUD's jewels in hand: what they come to at the forge first, then each size counted. */
+export function carriedLines({ jewels, worth }: HomeUi['carried']): { readonly worth: string; readonly counts: readonly string[] } {
+  const carrying = worth > 0;
+  return { worth: carrying ? `${coinText(worth)} in jewels` : 'No jewels', counts: jewelCounts(jewels) };
 }
 
 const UNIT_ROWS = /^(gun:|knife)/;
@@ -242,8 +263,7 @@ export const CHEST_NOTE = 'The gear is in your locker. The silver and jewels are
 export function chestLines(chest: ChestOpened): readonly string[] {
   const lines: string[] = [];
   if (chest.silver > 0) lines.push(`${chest.silver} silver`);
-  if (chest.jewels.small > 0) lines.push(plural(chest.jewels.small, 'small jewel'));
-  if (chest.jewels.large > 0) lines.push(plural(chest.jewels.large, 'large jewel'));
+  lines.push(...jewelCounts(chest.jewels));
   for (const row of loadoutRows(chest.gear)) lines.push(gearLine(row));
   return lines;
 }

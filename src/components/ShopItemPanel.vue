@@ -1,7 +1,7 @@
 <template>
   <div class="item-panel" :style="artBox">
     <p class="item-silver">
-      <SpriteImg :sprite="icons.pickupIcons.silver" />
+      <SpriteImg :sprite="icons.silverIcon" />
       <span class="item-silver-label">Silver</span>
       <strong class="item-silver-count">{{ silver }}</strong>
     </p>
@@ -31,6 +31,7 @@
  */
 import { computed } from 'vue';
 import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { UiArt } from '../art/types.ts';
 import type { MerchantLine } from '../game/home/merchant-view.ts';
 import { itemSprite } from '../game/home/shop-item-art.ts';
 import type { ShopIcons } from '../game/home/shop-item-art.ts';
@@ -42,7 +43,7 @@ import SpriteImg from './SpriteImg.vue';
 
 interface ItemPanelProps {
   line: MerchantLine | null;
-  icons: ShopIcons;
+  icons: ShopIcons & Pick<UiArt, 'silverIcon'>;
   silver: number;
   difficulty: DifficultyId;
   /** The largest icon on this shelf, so the column draws at one scale for all of them. */

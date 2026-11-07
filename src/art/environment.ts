@@ -15,6 +15,9 @@ import { buildGrocery } from './environment/grocery.ts';
 import { buildGunShop } from './environment/gun-shop.ts';
 import { buildBungalow, buildGableHouse, buildHipHouse } from './environment/house.ts';
 import { buildMerchantProps } from './environment/merchants.ts';
+import { buildCactus, buildDeadTree, buildScrub } from './environment/desert.ts';
+import { buildReeds, buildFungus } from './environment/blight.ts';
+import { buildPine } from './environment/evergreen.ts';
 import { buildBush, buildRubble, buildTree } from './environment/nature.ts';
 import { buildBlastDoor, buildBlastDoorBuckling, buildBlastDoorBurst, buildChest, buildChestOpen } from './environment/overrun-props.ts';
 import { buildPharmacy } from './environment/pharmacy.ts';
@@ -49,6 +52,12 @@ export function buildEnvironment(): EnvironmentArt {
       fire_barrel: buildFireBarrel(),
       street_lamp: buildStreetLamp(),
       hydrant: buildHydrant(),
+      pine: buildPine(),
+      cactus: buildCactus(),
+      dead_tree: buildDeadTree(),
+      scrub: buildScrub(),
+      reeds: buildReeds(),
+      fungus: buildFungus(),
       bush: buildBush(),
       rubble: buildRubble(),
       fence_h: buildFenceH(),

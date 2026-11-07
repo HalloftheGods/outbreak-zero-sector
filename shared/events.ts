@@ -7,7 +7,8 @@ import { KIT_ORDER } from './round-effect-data.ts';
 
 export const GAME_PHASES = ['intermission', 'wave', 'gameover'] as const;
 
-export const TREASURE_TYPES = ['silver', 'jewel_small', 'jewel_large'] as const;
+/** Towns hold jewels only; silver comes from the forge, quests and the overrun chest, straight into the bank. */
+export const TREASURE_TYPES = ['jewel_small', 'jewel_large'] as const;
 
 export const PICKUP_TYPES = [
   'bandage', 'medkit', 'pistol_ammo', 'carbine_ammo', 'shells', 'carbine', 'shotgun', 'knife', 'radio',

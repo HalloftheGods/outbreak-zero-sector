@@ -117,7 +117,8 @@ describe('the bunker art', () => {
       for (const frame of clip.frames) expect(opaque(frame), type).toBeGreaterThan(20);
       expect(opaque(art.ui.pickupIcons[type]), type).toBeGreaterThan(20);
     }
-    const icons = TREASURE_TYPES.map((type) => art.ui.pickupIcons[type]);
+    const icons = [...TREASURE_TYPES.map((type) => art.ui.pickupIcons[type]), art.ui.silverIcon];
+    expect(opaque(art.ui.silverIcon)).toBeGreaterThan(20);
     for (const [index, icon] of icons.entries()) {
       for (const other of icons.slice(index + 1)) expect(same(icon, other)).toBe(false);
     }
@@ -152,7 +153,7 @@ describe('the bunker music', () => {
 });
 
 describe('treasure sounds', () => {
-  it('gives silver and each jewel a sound of their own', () => {
+  it('gives each jewel a sound of its own', () => {
     const names = TREASURE_TYPES.map((type) => PICKUP_SFX[type]);
     expect(new Set(names).size).toBe(TREASURE_TYPES.length);
     for (const name of names) expect(SFX_NAMES).toContain(name);

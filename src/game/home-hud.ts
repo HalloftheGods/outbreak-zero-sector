@@ -6,7 +6,11 @@ import { isBunkerSeed, isMerchantId } from '../../shared/home-protocol.ts';
 import type { Jewels, Loadout, MerchantId, OverrunView, StationId, TripReceipt } from '../../shared/home-protocol.ts';
 import { FIRST_LEVEL } from '../../shared/levels.ts';
 import type { PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
+import { jewelWorth } from '../../shared/treasure.ts';
 import type { HomeSave } from './home/home-store.ts';
+import { emptyTally } from './home/quest-tally.ts';
+import type { TripTally } from './home/quest-tally.ts';
+import type { QuestContext } from './home/quests.ts';
 import type { ShopContext } from './home/shop.ts';
 
 /** What a death on a trip cost, held on screen until the player wakes. */
@@ -45,8 +49,8 @@ export interface HomeUi {
   /** The merchant whose shop is open. Follows `station`, so it shuts the moment the station clears. */
   readonly shop: MerchantId | null;
   readonly ready: boolean;
-  /** Treasure in hand on this trip. */
-  readonly carried: { readonly silver: number; readonly jewels: Jewels };
+  /** Jewels in hand on this trip, and the silver they come to once smelted. Towns hold no coin. */
+  readonly carried: { readonly jewels: Jewels; readonly worth: number };
   readonly pickedLevel: number | null;
   /** The highest level anyone in the room can pick. */
   readonly roomHighest: number;
@@ -65,6 +69,8 @@ export interface HomeUi {
   readonly death: HomeDeath | null;
   /** The chest just opened, held on screen until the player puts it away. */
   readonly chest: ChestOpened | null;
+  /** What the quest screens read beyond the save: the live count of this trip. */
+  readonly quests: { readonly tally: TripTally };
 }
 
 /** What the home screens can ask for. Results come back through `UiState.home`. */
@@ -77,6 +83,10 @@ export interface HomeActions {
   smelt(): void;
   /** Builds its `ShopContext` from `UiState.home` with `shopContext`, so a screen never has to. */
   buy(merchant: MerchantId, item: string): void;
+  /** Like `buy`, the context is built from `UiState.home` with `questContext`. A screen reads the outcome from the refreshed save. */
+  acceptQuest(merchant: MerchantId, id: string): void;
+  turnInQuest(merchant: MerchantId): void;
+  abandonQuest(merchant: MerchantId): void;
   wake(): void;
   /** Puts the opened chest's card away. */
   closeChest(): void;
@@ -91,6 +101,9 @@ export const NO_HOME_ACTIONS: HomeActions = {
   closeWith() {},
   smelt() {},
   buy() {},
+  acceptQuest() {},
+  turnInQuest() {},
+  abandonQuest() {},
   wake() {},
   closeChest() {},
   continueFromEnding() {},
@@ -109,6 +122,8 @@ export interface HomeFacts {
   readonly death?: HomeDeath | null;
   /** The chest just opened. Left off for none. */
   readonly chest?: ChestOpened | null;
+  /** The running count of this trip's events. Left off for none. */
+  readonly tally?: TripTally;
 }
 
 /** Outside a home session there is nothing to know. */
@@ -117,6 +132,12 @@ const NO_HOME_FACTS: HomeFacts = { save: null, highest: FIRST_LEVEL, difficulty:
 export function shopContext(home: HomeUi): ShopContext {
   const { highest, station, difficulty } = home;
   return { highest, station, difficulty };
+}
+
+/** What a quest step needs beyond the save, read from the screen's own state. */
+export function questContext(home: HomeUi): QuestContext {
+  const { highest, station, difficulty } = home;
+  return { highest, station, difficulty, now: Date.now() };
 }
 
 /** Null outside home mode, which is how every screen tells the two games apart once a run is on. */
@@ -131,7 +152,7 @@ export function homeUi(snapshot: SnapshotPacket, local: PlayerEntity, facts: Hom
     stationHold: home.stationHold,
     shop: atStall ? station : null,
     ready: home.ready,
-    carried: { silver: home.silver, jewels: home.jewels },
+    carried: { jewels: home.jewels, worth: jewelWorth(home.jewels) },
     pickedLevel: snapshot.home?.pickedLevel ?? null,
     roomHighest: snapshot.home?.roomHighest ?? FIRST_LEVEL,
     overrun: snapshot.home?.overrun ?? null,
@@ -143,5 +164,6 @@ export function homeUi(snapshot: SnapshotPacket, local: PlayerEntity, facts: Hom
     saveError: facts.saveError ?? null,
     death: facts.death ?? null,
     chest: facts.chest ?? null,
+    quests: { tally: facts.tally ?? emptyTally() },
   };
 }

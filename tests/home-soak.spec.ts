@@ -12,7 +12,7 @@ import { WEAPON_ORDER } from '../shared/protocol.ts';
 import type { PickupType } from '../shared/protocol.ts';
 import type { PlayerState, SimState } from '../shared/sim-state.ts';
 import type { GameSimulation } from '../shared/simulation.ts';
-import { isTreasurePickup } from '../shared/treasure.ts';
+import { isTreasurePickup, jewelWorth } from '../shared/treasure.ts';
 import { armedHands, settleHands } from '../src/game/home/gear-pool.ts';
 import { emptySave } from '../src/game/home/home-store.ts';
 import type { HomeSave } from '../src/game/home/home-store.ts';
@@ -45,16 +45,16 @@ const NOTHING: Haul = { silver: 0, small: 0, large: 0 };
 const plus = (a: Haul, b: Haul): Haul => ({ silver: a.silver + b.silver, small: a.small + b.small, large: a.large + b.large });
 const total = (hauls: readonly Haul[]): Haul => hauls.reduce(plus, NOTHING);
 
-function worth(type: PickupType, rounds: number): Haul {
-  if (type === 'silver') return { ...NOTHING, silver: rounds };
+/** Towns hold jewels only, so a treasure is one jewel. `silver` stays in the haul for the receipt's slot, which a trip leaves at 0. */
+function worth(type: PickupType): Haul {
   return type === 'jewel_small' ? { ...NOTHING, small: 1 } : { ...NOTHING, large: 1 };
 }
 
 const everyBody = (state: SimState): PlayerState[] => [...state.players, ...state.departed.values()];
 
 function lyingInTown(state: SimState): Haul {
-  const shut = state.containers.flatMap(({ loot }) => (loot && isTreasurePickup(loot.type) ? [worth(loot.type, loot.rounds)] : []));
-  const dropped = state.pickups.flatMap((item) => (isTreasurePickup(item.type) ? [worth(item.type, item.rounds)] : []));
+  const shut = state.containers.flatMap(({ loot }) => (loot && isTreasurePickup(loot.type) ? [worth(loot.type)] : []));
+  const dropped = state.pickups.flatMap((item) => (isTreasurePickup(item.type) ? [worth(item.type)] : []));
   return total([...shut, ...dropped]);
 }
 
@@ -302,10 +302,12 @@ describe('the loop, over and over', () => {
     expect(rows).toHaveLength(SOAK_TRIPS * ids.length);
     expect(rows.some((row) => row.outcome === 'died')).toBe(true);
     expect(rows.some((row) => row.outcome === 'banked')).toBe(true);
-    expect(banked.silver).toBeGreaterThan(0);
-    expect(forfeited.silver).toBeGreaterThan(0);
+    // Towns hold jewels only: no coin is placed, banked or forfeited, and jewels are both brought home and lost.
+    expect([placed.silver, banked.silver, forfeited.silver]).toEqual([0, 0, 0]);
+    expect(banked.small + banked.large).toBeGreaterThan(0);
+    expect(forfeited.small + forfeited.large).toBeGreaterThan(0);
     const perTrip = (value: number): string => (value / SOAK_TRIPS).toFixed(1);
-    console.info(`home soak: ${SOAK_TRIPS} trips, per trip placed ${perTrip(placed.silver)} silver and ${perTrip(placed.small + placed.large)} jewels, banked ${perTrip(banked.silver)} silver and ${perTrip(banked.small + banked.large)} jewels`);
+    console.info(`home soak: ${SOAK_TRIPS} trips, per trip placed ${perTrip(placed.small + placed.large)} jewels worth ${perTrip(jewelWorth(placed))} silver, banked ${perTrip(banked.small + banked.large)} jewels worth ${perTrip(jewelWorth(banked))} silver`);
   }, SOAK_TIMEOUT_MS);
 
   /** The most a player can find on one trip, on top of what they took out. */

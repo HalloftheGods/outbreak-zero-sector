@@ -13,6 +13,7 @@
           <ForgeLedger
             :card
             :icons
+            :coin="art?.ui.silverIcon ?? null"
           />
         </SceneCard>
       </div>

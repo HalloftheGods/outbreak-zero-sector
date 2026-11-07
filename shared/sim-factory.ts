@@ -46,7 +46,7 @@ export function announceRunStart(sim: SimState): void {
 export function createSimState(options: SimulationOptions): SimState {
   const home = options.home === true;
   const startLevel = home ? BUNKER_LEVEL : clampLevel(options.startLevel);
-  const map = generateWorldMap(home ? BUNKER_SEED : levelSeed(options.seed, startLevel));
+  const map = generateWorldMap(home ? BUNKER_SEED : levelSeed(options.seed, startLevel), startLevel);
   const sim: SimState = {
     runSeed: options.seed,
     difficulty: options.difficulty ?? BASELINE_DIFFICULTY,

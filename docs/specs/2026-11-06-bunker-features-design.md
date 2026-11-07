@@ -67,8 +67,8 @@ The tally can undercount in co-op if a snapshot is dropped, and is lost on a mid
 - **Objective kinds**:
   - `visit` a station;
   - `bank` N trips;
-  - `streak` of N banked trips in a row (a died receipt resets it);
-  - `receipt_total` of `hordes`, `kills` or `silver`;
+  - `streak` of N banked trips in a row (a death on a trip the quest's filter counts resets it, unless the streak is already finished);
+  - `receipt_total` of `hordes` or `kills` (never silver: towns pay no silver since the jewels-only economy);
   - `fast` (one banked trip at or under S seconds);
   - `bring_home` a gun, any gun, N medkits or N jewels;
   - `tally` of a counter, scoped to one trip or the total, with an optional `atMost` second counter that fails the trip, not the quest;
@@ -93,7 +93,7 @@ A blank save gets `starterQuests(seed)`, so an old save loads with the four star
 
 **Pure steps** (`src/game/home/quests.ts`, in the `shop.ts` style: each returns a new save or null):
 
-- `accept`, `abandon` and `turnIn` are refused unless the station is that merchant and no trip is open. Abandoning loses progress; a one-time quest goes back on offer.
+- `accept`, `abandon` and `turnIn` are refused unless the station is that merchant and no trip is open. Abandoning loses progress; a one-time quest goes back on offer, and a job goes back on the counter as the same job. A finished quest cannot be abandoned, and the button asks for a second press (Confirm) before it gives up an open one.
 - `applyTripToQuests(save, receipt, tally)` is the only path that moves trip progress.
 - `noteSmelted`, `noteVisit`.
 - `rollJobs(save, highest)` gives each merchant one job from the rows its gates allow.
@@ -109,7 +109,7 @@ return after === save ? save : applyTripToQuests(after, receipt, tally);
 
 Quest progress lands in the same `save()` as the credit, under the same `appliedReceipts` key. On a conflict the write re-reads and reapplies with the same in-memory tally, which is cleared only once the save lands.
 
-`rollJobs` runs in that write on a banked receipt, beside `rollStock`. It replaces only offers nobody has accepted. A died receipt moves nothing except resetting streaks, and never rolls jobs, so boarding empty and quitting cannot re-roll offers. A quit or crash is a death, as `resolveOpenTrip` already says. Quests never fail or expire.
+`rollJobs` runs in that write on a banked receipt, beside `rollStock`. It replaces only offers nobody has accepted. A died receipt moves nothing except resetting streaks that are still running, and never rolls jobs, so boarding empty and quitting cannot re-roll offers. A quit or crash is a death, as `resolveOpenTrip` already says, and it goes through the same streak reset (`resolveOpenTripWithQuests`); having no tally, only the trip's level can be checked against the filter. Quests never fail or expire: a finished streak keeps its pay through a death.
 
 The tally resets when the local player's status becomes `dead`. A spectator who comes back with the return kit counts only what they do afterwards, which mirrors gear lost on death. Being revived keeps it.
 
@@ -119,7 +119,7 @@ The tally resets when the local player's status becomes `dead`. A spectator who 
 - **Turn-in is at the counter.** It works like a sale: one `save()`; a failed save changes nothing; a conflict re-reads and does not retry. Two tabs turning in the same quest pay once.
 - **Item rewards go to the locker** under `buy()`'s rules: caps count the locker and hands together, and a box counts its scaled rounds. What does not fit is paid in silver at that item's shop price, and the reward chip says so before turn-in. Turn-in never sticks and never passes a cap (open question 4).
 - **Rewards never include fitted upgrades or perks.** Parts and kits still go through the bench, where `gunStats` holds the 1.5x cap.
-- **Jobs pay silver only**, so repeat play cannot grow ammo. The one-time table's ammo totals 38 rounds: one pistol box (8) plus two carbine boxes (15 each).
+- **Jobs pay silver only**, so repeat play cannot grow ammo. The one-time table's ammo totals 8 rounds: one pistol box (`out_and_back`). `fast_hands` pays 150 silver instead of carbine boxes (commit 9cad0e22, to fit the 15% budget).
 - **Job silver scales** by the player's own highest level: `JOB_BANDS` ×1 for levels 1-3, ×1.5 for 4-6, ×2 for 7-10. These are starting numbers for the soak (#7235). Difficulty scales nothing, because treasure does not scale with it either. Replays count unless a filter excludes them.
 
 ### Co-op
@@ -147,7 +147,7 @@ Quests that read `OverrunReceipt` ("hold the bunker once") are a later table row
   - `MerchantCard` keeps the bust, nameplate and greeting. Its slot shows `QuestPanel`: title, one-line brief, objective bars in the `ShopItemBars` style (5 cells, `STAT_SLOTS`; one per unit up to 5, proportional above, with an "11 / 25" value), and a second bar for `atMost`.
   - A reward row of `ShopItemArt` tiles, with "Paid as N silver" where needed. Accept, Turn in or Abandon. Refusals in `refusalOf` wording.
   - `QuestShelf` follows `ShopShelf`: radiogroup, arrow keys.
-- **HUD tracker** (#7233). `QuestTracker.vue` under the treasure chip shows one line per active quest. In town it shows live trip tallies, with "Lost if you die" on lines with trip progress. On a phone it collapses to "Work: N of 4 ready". The starters replace the one-line first-visit hint: the tracker is the hint.
+- **HUD tracker** (#7233). `QuestTracker.vue` under the treasure chip shows one line per active quest. In town it shows live trip tallies, with "Lost if you die" on lines with trip progress. On a phone it collapses to "Work: N of M ready", M being the quests open ("No work" when none is). One shared "Lost if you die" line sits under the lines rather than one per line. The starters replace the one-line first-visit hint: the tracker is the hint.
 - **Stall marker** (#7234): a "!" over a merchant with a new or ready quest, and the prompt "Hold E: Sarge has your pay".
 - **View model** (#7231): `src/game/home/quest-view.ts` builds lines and panels from `HomeUi` plus the tally, as `merchant-view.ts` does. `HomeUi` gains `quests`. `HomeActions` gains `acceptQuest`, `turnInQuest` and `abandonQuest`.
 
@@ -166,9 +166,9 @@ All rows are content to tune in the soak, not settled data.
 |---|---|---|---|---|
 | **Starters** | | | | |
 | `report_in` | Sarge | visit the quartermaster (done in the bunker) | | 2 bottles + 20 silver |
-| `bring_iron` | Mags | bring home any gun (the free pistol counts) | | 1 barrel |
-| `pharmacy_run` | Doc | bring home 1 medkit | | 60 silver |
-| `first_smelt` | Cinder | smelt 1 jewel | | 1 tranq kit |
+| `bring_iron` | Mags | bring home any gun (the free pistol counts); the brief says to take the van from the garage | | 1 barrel |
+| `pharmacy_run` | Doc | bring home 1 medkit; the brief says to take the van from the garage | | 60 silver |
+| `first_smelt` | Cinder | smelt 1 jewel (found on a trip; the brief points at the van) | | 1 tranq kit |
 | **One-time** | | | | |
 | `out_and_back` | Sarge | bank 1 trip | after `report_in` | 50 silver + 1 pistol box |
 | `evidence_locker` | Mags | bring home a carbine (always at the police station) | after `bring_iron` | 1 grip + 60 silver |
@@ -176,7 +176,7 @@ All rows are content to tune in the soak, not settled data.
 | `ghost_walk` | Mags | as Night, 8 finds in a trip at level 3+, no noisy search | gate 4 | 1 suppressor |
 | `hold_the_line` | Sarge | 10 hordes in total (levels 1-4 give 2+2+3+3) | after `out_and_back` | 1 knife (silver if carried) |
 | `shove_and_stab` | Sarge | as Rex, 30 landed shoves in a trip | gate 2 | 120 silver + 3 bottles |
-| `fast_hands` | Sarge | as Bandus, 50 kills in a trip at level 4+ | gate 4, owns carbine | 2 carbine boxes |
+| `fast_hands` | Sarge | as Bandus, 50 kills in a trip at level 4+ | gate 4, owns carbine | 150 silver |
 | `patch_up` | Doc | use 2 medkits in total | after `pharmacy_run` | 1 medkit + 40 silver |
 | `steady_hands` | Doc | 3 banked trips in a row at level 2+ | gate 2 | 2 medkits |
 | `run_for_it` | Doc | as Queen, bank a level 3+ trip in 480 s or less | gate 3 | 1 medkit + 100 silver |

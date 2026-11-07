@@ -1,4 +1,5 @@
 import type { ShallowRef } from 'vue';
+import { cleanCallsign } from '../../shared/callsign.ts';
 import { playsFromHome } from '../../shared/game-style.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { JoinHome } from '../../shared/home-protocol.ts';
@@ -23,8 +24,6 @@ import type { RunHud } from './run-hud.ts';
 import type { RunStage } from './run-stage.ts';
 import { loadLeaderboard } from './storage.ts';
 import { loadBests } from './trip-record.ts';
-
-const FALLBACK_CALLSIGN = 'SURVIVOR';
 
 /** What a run keeps between snapshots, shared by the session and the snapshot handler. */
 export interface RunState {
@@ -142,7 +141,7 @@ export class RunSession {
     const { state, stage } = this.host;
     state.welcomed = true;
     this.host.home.welcomed(packet);
-    state.world = new ClientWorld(stage.open(packet.mapSeed), packet.yourId);
+    state.world = new ClientWorld(stage.open(packet.mapSeed, packet.level), packet.yourId);
     this.beginRun();
   }
 
@@ -194,7 +193,8 @@ export class RunSession {
     transport.onSnapshot = this.onSnapshot;
     transport.onClosed = (reason) => this.onClosed(reason);
     this.followStyle(style);
-    const options = { name: ui.value.callsign.trim() || FALLBACK_CALLSIGN, difficulty: loadDifficulty(), character: loadCharacter(), style };
+    // No callsign (blank or refused) goes out as '': every screen then labels the player by survivor name.
+    const options = { name: cleanCallsign(ui.value.callsign), difficulty: loadDifficulty(), character: loadCharacter(), style };
     const roomDecides = transport.kind === 'coop';
     if (roomDecides || !playsFromHome(style)) transport.connect({ ...options, startLevel });
     else this.readHome(transport, (home) => transport.connect({ ...options, home }));

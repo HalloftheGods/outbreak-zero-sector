@@ -4,21 +4,27 @@ import { EXIT_RADIUS, TICK_RATE } from '../../../shared/constants.ts';
 import { BASELINE_DIFFICULTY } from '../../../shared/difficulty.ts';
 import type { DifficultyId } from '../../../shared/difficulty.ts';
 import { isBunkerSeed } from '../../../shared/home-protocol.ts';
-import type { HomeAction, HomeView, JoinHome, Loadout, MerchantId, OverrunReceipt, OverrunView, TripReceipt } from '../../../shared/home-protocol.ts';
+import type { HomeAction, HomeView, JoinHome, Loadout, MerchantId, OverrunReceipt, OverrunView, StationId, TripReceipt } from '../../../shared/home-protocol.ts';
 import { emptyLoadout, loadoutOfEntity, validateLoadout } from '../../../shared/loadout.ts';
 import type { PlayerEntity, SnapshotPacket, WelcomePacket } from '../../../shared/protocol.ts';
 import type { TransportKind } from '../../network/transport.ts';
 import type { LevelProgress } from '../level-progress.ts';
-import { SMELT_SECONDS, smeltTick } from './forge.ts';
+import { SMELT_SECONDS } from './forge.ts';
 import { armedHands, settleHands } from './gear-pool.ts';
 import type { HomeSave, HomeStore, SaveResult } from './home-store.ts';
 import { applyOverrunReceipt, clearOpenOverrun, diedUnseen, openOverrunOf, overrunKey, resolveOpenOverrun, watchBreach } from './overrun-ledger.ts';
 import type { BreachWatch } from './overrun-ledger.ts';
+import { emptyTally } from './quest-tally.ts';
+import type { TripTally } from './quest-tally.ts';
+import { abandon } from './quests.ts';
+import type { QuestContext } from './quests.ts';
+import { acceptAt, applyReceiptWithQuests, resolveOpenTripWithQuests, smeltWithQuests, turnInAt, visited } from './quest-sync.ts';
+import type { QuestResult } from './quest-sync.ts';
 import { SaveQueue } from './save-queue.ts';
 import type { SaveChange } from './save-queue.ts';
 import { buy, rollStock } from './shop.ts';
 import type { ShopContext } from './shop.ts';
-import { applyReceipt, receiptKey, resolveOpenTrip } from './trip-ledger.ts';
+import { receiptKey } from './trip-ledger.ts';
 
 /** How long a co-op trip found open waits for the server to say whether the body is still there. */
 export const OPEN_TRIP_WAIT_MS = 10_000;
@@ -43,6 +49,10 @@ export interface HomeSyncOptions {
   readonly onReceipt?: (receipt: TripReceipt) => void;
   /** An overrun receipt was credited here, once. */
   readonly onOverrunReceipt?: (receipt: OverrunReceipt) => void;
+  /** What the local player did this trip, as last counted. Left off for none. */
+  readonly tally?: () => TripTally;
+  /** The player's own highest level, which the jobs rolled for a banked trip are gated by. Left off for none. */
+  readonly highest?: () => number;
 }
 
 /** A trip or a breach still on file has the gear in hand at stake: the room's body has it, or nobody does. */
@@ -132,7 +142,7 @@ export class HomeSync {
   async open(): Promise<HomeSave> {
     await this.saves.load();
     const resumed = this.options.mode === 'solo' ? false : null;
-    await this.saves.write((save) => putBackRefused(firstStock(resolveOpenOverrun(resolveOpenTrip(save, resumed), resumed))));
+    await this.saves.write((save) => putBackRefused(firstStock(resolveOpenOverrun(resolveOpenTripWithQuests(save, resumed), resumed))));
     const save = this.saves.save as HomeSave;
     const stillOpen = save.openTrip !== null || save.openOverrun !== null;
     if (stillOpen) this.tripWait = setTimeout(() => this.settleOpenTrip(false), OPEN_TRIP_WAIT_MS);
@@ -180,6 +190,31 @@ export class HomeSync {
     return sold ? 'bought' : 'refused';
   }
 
+  /** Takes a quest on at its giver's counter. Like a sale it never retries: on a conflict the screen has already refreshed. */
+  acceptQuest(merchant: MerchantId, id: string, context: QuestContext): Promise<QuestResult> {
+    return this.counter((save) => acceptAt(save, merchant, id, context));
+  }
+
+  turnInQuest(merchant: MerchantId, context: QuestContext): Promise<QuestResult> {
+    return this.counter((save) => turnInAt(save, merchant, context));
+  }
+
+  abandonQuest(merchant: MerchantId, context: QuestContext): Promise<QuestResult> {
+    return this.counter((save) => abandon(save, merchant, context));
+  }
+
+  /** One write that stops at its first conflict. A step that returns null leaves the save as it was. */
+  private async counter(step: (save: HomeSave) => HomeSave | null): Promise<QuestResult> {
+    let stepped = false;
+    const result = await this.saves.write((save) => {
+      const next = step(save);
+      stepped = next !== null;
+      return next ?? save;
+    }, 0);
+    if (result.kind !== 'saved') return result.kind;
+    return stepped ? 'saved' : 'refused';
+  }
+
   /** Resolves once every save asked for so far has finished. */
   settled(): Promise<void> {
     return this.saves.settled();
@@ -223,7 +258,7 @@ export class HomeSync {
 
   private settleOpenTrip(resumed: boolean): void {
     this.clearTripWait();
-    void this.saves.write((save) => resolveOpenOverrun(resolveOpenTrip(save, resumed), resumed));
+    void this.saves.write((save) => resolveOpenOverrun(resolveOpenTripWithQuests(save, resumed), resumed));
   }
 
   private isOverrunApplied(receipt: OverrunReceipt): boolean {
@@ -281,8 +316,9 @@ export class HomeSync {
     if (nothingToDo) return;
     this.receiptInFlight = key;
     let credited = false;
+    const tally = this.options.tally?.() ?? emptyTally();
     void this.saves.write((save) => {
-      const next = applyReceipt(save, receipt);
+      const next = applyReceiptWithQuests(save, receipt, tally, this.options.highest?.() ?? 0);
       credited = next !== save;
       return next;
     }).then((result) => {
@@ -406,7 +442,13 @@ export class HomeSync {
     const finished = this.forgeSeconds >= SMELT_SECONDS;
     if (!finished) return;
     this.forgeSeconds -= SMELT_SECONDS;
-    void this.saves.write((save) => smeltTick(save, SMELT_SECONDS));
+    void this.saves.write((save) => smeltWithQuests(save, SMELT_SECONDS));
+  }
+
+  /** The player opened a station, which a visit quest counts. */
+  visit(station: StationId): void {
+    const canWrite = !this.mustWait;
+    if (canWrite) void this.saves.write((save) => visited(save, station));
   }
 
   /** Gear in hand follows the player. An answer to an equip moves it out of the locker; a bench action just changes it. */

@@ -208,6 +208,8 @@ export interface HomeRun {
 /** The room's horde clock, from an arrival in the bunker to the horde killed or the room fallen. */
 export interface OverrunState {
   phase: OverrunPhase;
+  /** The clock's length in seconds at the start, from the run's difficulty. */
+  spanSec: number;
   /** Seconds on the clock to the breach. */
   left: number;
   /** The clock ran at the menu rate on the last tick. */

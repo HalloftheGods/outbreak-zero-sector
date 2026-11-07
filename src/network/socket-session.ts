@@ -1,6 +1,8 @@
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
+import { closeText } from '../../shared/close-codes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
+import { PROTOCOL_VERSION } from '../../shared/protocol.ts';
 import type { ClientInputPacket, ClientPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { tapRoomDifficulty } from '../game/analytics/event-tap.ts';
@@ -9,8 +11,6 @@ import { tabToken } from './tab-token.ts';
 import type { ConnectOptions, GameTransport } from './transport.ts';
 
 const CONNECT_TIMEOUT_MS = 6000;
-const ROOM_FULL_CLOSE_CODE = 4000;
-const SERVER_BUSY_CLOSE_CODE = 4001;
 
 interface PageLocation {
   readonly hostname: string;
@@ -77,13 +77,13 @@ export class SocketSession implements GameTransport {
     }, CONNECT_TIMEOUT_MS);
 
     socket.onmessage = (event) => this.receive(event.data);
-    socket.onclose = (event) => this.finish(this.closeReason(event.code));
+    socket.onclose = (event) => this.finish(this.closeReason(event.code, event.reason));
   }
 
   /** Asks in, as the style the room said it plays. Campaign brings its gear; Arcade has none to bring. */
   join(style: GameStyle, home?: JoinHome): void {
     const { name, difficulty, character } = this.joiner;
-    this.send({ type: 'join', name, token: tabToken(), difficulty, character, style, home });
+    this.send({ type: 'join', name, token: tabToken(), difficulty, character, style, home, protocol: PROTOCOL_VERSION });
   }
 
   sendInput(input: ClientInputPacket): void {
@@ -117,7 +117,9 @@ export class SocketSession implements GameTransport {
   private receive(raw: unknown): void {
     const packet = parseServerPacket(raw);
     if (!packet || this.finished) return;
-    if (packet.type === 'room') {
+    if (packet.type === 'bye') {
+      this.finish(this.closeReason(packet.code, packet.reason));
+    } else if (packet.type === 'room') {
       if (!this.welcomed) this.onRoom(packet.style);
     } else if (packet.type === 'welcome') {
       this.welcomed = true;
@@ -129,9 +131,9 @@ export class SocketSession implements GameTransport {
     }
   }
 
-  private closeReason(code: number): string {
-    if (code === ROOM_FULL_CLOSE_CODE) return 'That room is full.';
-    if (code === SERVER_BUSY_CLOSE_CODE) return 'That server is busy. Try again in a moment.';
+  private closeReason(code: number, reason = ''): string {
+    const told = closeText(code, reason);
+    if (told) return told;
     if (this.welcomed) return 'The connection to the server dropped.';
     return `Could not reach ${this.url}. Is the server running?`;
   }

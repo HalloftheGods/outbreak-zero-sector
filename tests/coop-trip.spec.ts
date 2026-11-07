@@ -32,7 +32,6 @@ function coopTrip(): CoopTrip {
   quietTown(state);
   sim.snapshot();
   const b = playerNamed(state, 'b');
-  homeOf(b).silver = 60;
   homeOf(b).jewels = { small: 1, large: 1 };
   return { sim, state, a: playerNamed(state, 'a'), b };
 }
@@ -81,19 +80,19 @@ describe('a teammate down in town', () => {
     b.owned = ['carbine'];
     b.weapon = 'carbine';
     bleedOut(sim, state, b);
-    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS, lost: { silver: 60, jewels: { small: 1, large: 1 } } });
-    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small', 'silver']);
+    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS, lost: { silver: 0, jewels: { small: 1, large: 1 } } });
+    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small']);
     expect(sim.level).toBe(FIRST_LEVEL);
 
     surviveHorde(sim, state);
     quietTown(state);
     expect(b.status).toBe('alive');
     expect(b.owned).toEqual(['pistol']);
-    homeOf(b).silver = 15;
+    homeOf(b).jewels = { small: 1, large: 0 };
     bankTrip(sim, state);
-    expect(homeOf(a).receipt).toMatchObject({ outcome: 'banked', silver: 0 });
+    expect(homeOf(a).receipt).toMatchObject({ outcome: 'banked', silver: 0, jewels: NO_JEWELS });
     const receipt = homeOf(b).receipt;
-    expect(receipt).toMatchObject({ outcome: 'banked', silver: 15, jewels: NO_JEWELS });
+    expect(receipt).toMatchObject({ outcome: 'banked', silver: 0, jewels: { small: 1, large: 0 } });
     expect(Object.keys(receipt?.gear?.guns ?? {})).toEqual(['pistol']);
   });
 
@@ -101,7 +100,7 @@ describe('a teammate down in town', () => {
     const { sim, state, a, b } = coopTrip();
     bleedOut(sim, state, b);
     bankTrip(sim, state);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 60, jewels: { small: 1, large: 1 }, gear: null });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 0, jewels: { small: 1, large: 1 }, gear: null });
     expect(homeOf(a).receipt).toMatchObject({ outcome: 'banked' });
     expect(b).toMatchObject({ status: 'alive', health: b.maxHealth });
   });
@@ -112,7 +111,7 @@ describe('a teammate down in town', () => {
     b.status = 'alive';
     b.health = b.maxHealth / 2;
     bankTrip(sim, state);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'banked', silver: 60 });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'banked', jewels: { small: 1, large: 1 } });
   });
 
   it('downed when the van leaves counts as dead', () => {
@@ -120,7 +119,7 @@ describe('a teammate down in town', () => {
     down(state, b);
     bankTrip(sim, state);
     expect(isBunkerMap(sim.map)).toBe(true);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 60, jewels: { small: 1, large: 1 }, gear: null });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 0, jewels: { small: 1, large: 1 }, gear: null });
     expect(homeOf(a).receipt).toMatchObject({ outcome: 'banked' });
     expect(loadoutOf(b)).toEqual(emptyLoadout());
     expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS });
@@ -141,41 +140,41 @@ describe('someone leaving mid-trip', () => {
     const { sim, state, b } = coopTrip();
     sim.removePlayer('b');
     steps(sim, GRACE_TICKS - 1);
-    expect(homeOf(b)).toMatchObject({ silver: 60, jewels: { small: 1, large: 1 } });
+    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: { small: 1, large: 1 } });
     expect(state.pickups).toEqual([]);
     sim.step();
-    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS, lost: { silver: 60, jewels: { small: 1, large: 1 } } });
-    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small', 'silver']);
+    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS, lost: { silver: 0, jewels: { small: 1, large: 1 } } });
+    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small']);
     bankTrip(sim, state);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 60, jewels: { small: 1, large: 1 }, gear: null });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 0, jewels: { small: 1, large: 1 }, gear: null });
   });
 
   it('a body that was downed lets go at once', () => {
     const { sim, state, b } = coopTrip();
     down(state, b);
     sim.removePlayer('b');
-    expect(homeOf(b)).toMatchObject({ silver: 0, jewels: NO_JEWELS, lost: { silver: 60 } });
-    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small', 'silver']);
+    expect(homeOf(b)).toMatchObject({ jewels: NO_JEWELS, lost: { jewels: { small: 1, large: 1 } } });
+    expect(pilesOf(state)).toEqual(['jewel_large', 'jewel_small']);
     bankTrip(sim, state);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 60, gear: null });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', jewels: { small: 1, large: 1 }, gear: null });
   });
 
   it('a body nobody can come back for lets go at once', () => {
     const { sim, state } = tripSim({ players: ['a', 'b'] });
-    homeOf(playerNamed(state, 'b')).silver = 25;
+    homeOf(playerNamed(state, 'b')).jewels = { small: 1, large: 0 };
     sim.removePlayer('b');
-    expect(pilesOf(state)).toEqual(['silver']);
+    expect(pilesOf(state)).toEqual(['jewel_small']);
   });
 
   it('counts anyone not back when the van leaves as left behind, with what they carried gone', () => {
     const { sim, state, b } = coopTrip();
     sim.removePlayer('b');
     bankTrip(sim, state);
-    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', silver: 60, gear: null });
+    expect(homeOf(b).receipt).toMatchObject({ outcome: 'died', jewels: { small: 1, large: 1 }, gear: null });
     expect(sim.hasBodyFor('token-b')).toBe(true);
     sim.addPlayer('b2', 'b', 'token-b');
     const back = playerNamed(state, 'b2');
-    expect(homeOf(back).receipt).toMatchObject({ outcome: 'died', silver: 60 });
+    expect(homeOf(back).receipt).toMatchObject({ outcome: 'died', silver: 0 });
     expect(loadoutOf(back)).toEqual(emptyLoadout());
     expect(back.status).toBe('alive');
     expect(sim.level).toBe(BUNKER_LEVEL);
@@ -189,11 +188,11 @@ describe('someone leaving mid-trip', () => {
     sim.addPlayer('b2', 'b', 'token-b');
     steps(sim, TICK_RATE * 2);
     const back = playerNamed(state, 'b2');
-    expect(homeOf(back)).toMatchObject({ silver: 60, jewels: { small: 1, large: 1 }, lost: { silver: 0 }, leftTick: null });
+    expect(homeOf(back)).toMatchObject({ silver: 0, jewels: { small: 1, large: 1 }, lost: { silver: 0 }, leftTick: null });
     expect(loadoutOf(back)).toEqual(gear);
     expect(state.pickups).toEqual([]);
     bankTrip(sim, state);
-    expect(homeOf(back).receipt).toMatchObject({ outcome: 'banked', silver: 60 });
+    expect(homeOf(back).receipt).toMatchObject({ outcome: 'banked', jewels: { small: 1, large: 1 } });
   });
 
   it('a refresh after the grace period gets the body back without the treasure', () => {
@@ -203,7 +202,7 @@ describe('someone leaving mid-trip', () => {
     steps(sim, GRACE_TICKS + 1);
     sim.addPlayer('b2', 'b', 'token-b');
     const back = playerNamed(state, 'b2');
-    expect(homeOf(back)).toMatchObject({ silver: 0, lost: { silver: 60 } });
+    expect(homeOf(back)).toMatchObject({ jewels: NO_JEWELS, lost: { jewels: { small: 1, large: 1 } } });
     expect(loadoutOf(back)).toEqual(gear);
   });
 
@@ -220,7 +219,7 @@ describe('someone leaving mid-trip', () => {
 
   it('the last one standing refreshing in a room of the dead keeps the trip through the grace period', () => {
     const { sim, state, a, b } = coopTrip();
-    homeOf(a).silver = 500;
+    homeOf(a).jewels = { small: 0, large: 2 };
     bleedOut(sim, state, b);
     sim.removePlayer('a');
     expect(sim.level).toBe(FIRST_LEVEL);
@@ -231,15 +230,15 @@ describe('someone leaving mid-trip', () => {
 
   it('a refresh that gets the body back inside the grace period banks', () => {
     const { sim, state, a, b } = coopTrip();
-    homeOf(a).silver = 500;
+    homeOf(a).jewels = { small: 0, large: 2 };
     bleedOut(sim, state, b);
     sim.removePlayer('a');
     steps(sim, 5 * TICK_RATE);
     sim.addPlayer('a2', 'a', 'token-a');
     const back = playerNamed(state, 'a2');
-    expect(homeOf(back).silver).toBe(500);
+    expect(homeOf(back).jewels).toEqual({ small: 0, large: 2 });
     bankTrip(sim, state);
-    expect(homeOf(back).receipt).toMatchObject({ outcome: 'banked', silver: 500 });
+    expect(homeOf(back).receipt).toMatchObject({ outcome: 'banked', jewels: { small: 0, large: 2 } });
   });
 
   it('the last one standing leaving a room of the dead wipes it once the grace period ends', () => {
@@ -256,10 +255,9 @@ describe('a banked receipt nobody has applied yet', () => {
   /** b banks, then a takes the van again while b is dropped or idle in the bunker. */
   function bankedThenTripAgain(bStaysConnected: boolean) {
     const { sim, state, b } = coopTrip();
-    homeOf(b).silver = 300;
     bankTrip(sim, state);
     const receipt = homeOf(b).receipt;
-    expect(receipt).toMatchObject({ outcome: 'banked', silver: 300 });
+    expect(receipt).toMatchObject({ outcome: 'banked', jewels: { small: 1, large: 1 } });
     if (!bStaysConnected) sim.removePlayer('b');
     const a = playerNamed(state, 'a');
     sim.homeCommand('a', { kind: 'pick_level', level: FIRST_LEVEL });

@@ -4,9 +4,10 @@
 import { townContainers } from './containers.ts';
 import type { Container } from './containers.ts';
 import { TREASURE_TYPES } from './events.ts';
+import type { Jewels } from './home-protocol.ts';
 import { FINAL_LEVEL, FIRST_LEVEL } from './levels.ts';
 import type { PickupType } from './protocol.ts';
-import { createRng, randInt, shuffle } from './rng.ts';
+import { createRng, shuffle } from './rng.ts';
 import type { PickupState, PlayerState, SimState } from './sim-state.ts';
 
 const SILVER_PER_GOLD = 100;
@@ -16,8 +17,6 @@ const TREASURE_SALT = 0x54524541;
 
 export const SMALL_JEWEL_SILVER = 40;
 export const LARGE_JEWEL_SILVER = 200;
-export const SILVER_STACK_MIN = 5;
-export const SILVER_STACK_MAX = 20;
 
 export type TreasurePickup = (typeof TREASURE_TYPES)[number];
 
@@ -28,29 +27,45 @@ export function silverToCoins(silver: number): { gold: number; silver: number } 
   return { gold: Math.floor(silver / SILVER_PER_GOLD), silver: silver % SILVER_PER_GOLD };
 }
 
-interface TreasureCounts {
-  silver: number;
-  small: number;
-  large: number;
+/** Money as a player reads it: "2 gold 80 silver", "3 gold" or "80 silver". */
+export function coinText(silver: number): string {
+  const coins = silverToCoins(silver);
+  if (coins.gold === 0) return `${coins.silver} silver`;
+  return coins.silver === 0 ? `${coins.gold} gold` : `${coins.gold} gold ${coins.silver} silver`;
 }
 
-/** What a town holds at its first level and at its last, with the levels between in step. */
-const FIRST_LEVEL_COUNTS: TreasureCounts = { silver: 30, small: 5, large: 1 };
-const FINAL_LEVEL_COUNTS: TreasureCounts = { silver: 45, small: 8, large: 3 };
+/** What jewels come to once the forge has smelted them. */
+export function jewelWorth(jewels: Jewels): number {
+  return jewels.small * SMALL_JEWEL_SILVER + jewels.large * LARGE_JEWEL_SILVER;
+}
+
+/**
+ * The jewels a town holds at each level, first to last. Towns hold no coin: silver comes from the forge.
+ * Each level is worth what it held when towns also had silver stacks, within 5% (760 at level 1, 1,480 at level 10).
+ * Large jewels take a bigger share as levels rise, so a full town smelts in under a minute at 3 seconds a jewel.
+ */
+export const TOWN_JEWELS: readonly Jewels[] = [
+  { small: 9, large: 2 },
+  { small: 10, large: 2 },
+  { small: 11, large: 2 },
+  { small: 7, large: 4 },
+  { small: 8, large: 4 },
+  { small: 9, large: 4 },
+  { small: 10, large: 4 },
+  { small: 10, large: 5 },
+  { small: 11, large: 5 },
+  { small: 12, large: 5 },
+];
 
 /** A replay of a level the room has already got past holds half as many of each, rounded down. */
-export function treasureCounts(level: number, replay: boolean): TreasureCounts {
-  const along = (Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, level)) - FIRST_LEVEL) / (FINAL_LEVEL - FIRST_LEVEL);
-  const count = (first: number, last: number): number => {
-    const full = Math.round(first + (last - first) * along);
-    return replay ? Math.floor(full / 2) : full;
-  };
-  return {
-    silver: count(FIRST_LEVEL_COUNTS.silver, FINAL_LEVEL_COUNTS.silver),
-    small: count(FIRST_LEVEL_COUNTS.small, FINAL_LEVEL_COUNTS.small),
-    large: count(FIRST_LEVEL_COUNTS.large, FINAL_LEVEL_COUNTS.large),
-  };
+export function treasureCounts(level: number, replay: boolean): Jewels {
+  const full = TOWN_JEWELS[Math.min(FINAL_LEVEL, Math.max(FIRST_LEVEL, level)) - FIRST_LEVEL];
+  if (!replay) return { ...full };
+  return { small: Math.floor(full.small / 2), large: Math.floor(full.large / 2) };
 }
+
+/** What a town's jewels come to in silver once smelted. */
+export const townWorth = (level: number, replay: boolean): number => jewelWorth(treasureCounts(level, replay));
 
 /** Jewels live in people's homes, and most of all in the bedroom furniture. */
 const BEDROOM_FURNITURE: ReadonlySet<Container['kind']> = new Set(['drawer', 'cabinet']);
@@ -69,12 +84,12 @@ export function spawnTreasure(sim: SimState, type: TreasurePickup, x: number, y:
   sim.pickups.push({ id: `t${serial}`, type, x, y, ttl: null, rounds });
 }
 
-/** Takes the first `count` containers off the list and puts one treasure in each. */
-function putAway(sim: SimState, places: Container[], type: TreasurePickup, count: number, worth: () => number): void {
-  for (const container of places.splice(0, count)) sim.containers[container.id].loot = { type, rounds: worth() };
+/** Takes the first `count` containers off the list and puts one jewel in each. */
+function putAway(sim: SimState, places: Container[], type: TreasurePickup, count: number, worth: number): void {
+  for (const container of places.splice(0, count)) sim.containers[container.id].loot = { type, rounds: worth };
 }
 
-/** Leaves treasure in town containers that were empty, picked from the town's seed alone. Does nothing outside a home room. */
+/** Leaves jewels in town containers that were empty, picked from the town's seed alone. Does nothing outside a home room. */
 export function placeTownTreasure(sim: SimState): void {
   const run = sim.homeRun;
   if (!run) return;
@@ -82,17 +97,14 @@ export function placeTownTreasure(sim: SimState): void {
   const counts = treasureCounts(sim.level, sim.level < run.roomHighest);
   const empty = townContainers(sim.map).filter((container) => sim.containers[container.id].loot === null);
   const byJewelRank = shuffle(rng, [...empty]).sort((a, b) => jewelRank(a) - jewelRank(b));
-  putAway(sim, byJewelRank, 'jewel_large', counts.large, () => LARGE_JEWEL_SILVER);
-  putAway(sim, byJewelRank, 'jewel_small', counts.small, () => SMALL_JEWEL_SILVER);
-  const rest = shuffle(rng, byJewelRank);
-  putAway(sim, rest, 'silver', counts.silver, () => randInt(rng, SILVER_STACK_MIN, SILVER_STACK_MAX));
+  putAway(sim, byJewelRank, 'jewel_large', counts.large, LARGE_JEWEL_SILVER);
+  putAway(sim, byJewelRank, 'jewel_small', counts.small, SMALL_JEWEL_SILVER);
 }
 
 /** Whoever touches it carries it. False leaves the item on the ground. */
 export function takeTreasure(p: PlayerState, item: PickupState): boolean {
   const { home } = p;
   if (!home) return false;
-  if (item.type === 'silver') home.silver += item.rounds;
   if (item.type === 'jewel_small') home.jewels.small += 1;
   if (item.type === 'jewel_large') home.jewels.large += 1;
   // Zero rounds is how the pickup loop knows it is spent.
@@ -100,12 +112,14 @@ export function takeTreasure(p: PlayerState, item: PickupState): boolean {
   return true;
 }
 
-/** Everything carried falls where they stood, and is written down in `p.home.lost`. Runs on every death. */
+/**
+ * Every jewel carried falls where they stood, and everything carried is written down in `p.home.lost`. Runs on every death.
+ * Towns hold no coin, so `home.silver` stays 0 on a trip; the receipt keeps the slot, and anything in it is lost, not dropped.
+ */
 export function dropCarried(sim: SimState, p: PlayerState): void {
   const { home } = p;
   if (!sim.homeRun || !home) return;
   const { silver, jewels } = home;
-  if (silver > 0) spawnTreasure(sim, 'silver', p.x, p.y, silver);
   for (let n = 0; n < jewels.small; n++) spawnTreasure(sim, 'jewel_small', p.x, p.y, SMALL_JEWEL_SILVER);
   for (let n = 0; n < jewels.large; n++) spawnTreasure(sim, 'jewel_large', p.x, p.y, LARGE_JEWEL_SILVER);
   home.lost = { silver: home.lost.silver + silver, jewels: { small: home.lost.jewels.small + jewels.small, large: home.lost.jewels.large + jewels.large } };

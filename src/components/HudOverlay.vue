@@ -14,7 +14,10 @@
           {{ signalWeak ? 'Signal weak' : 'Linked' }}
         </span>
       </div>
-      <TreasureChip v-if="home && !home.inBunker" :home />
+      <div v-if="home" class="hud-home">
+        <TreasureChip v-if="!home.inBunker" :home />
+        <QuestTracker :home />
+      </div>
     </header>
 
     <ul v-if="hud.teammates.length" class="hud-team">
@@ -95,6 +98,7 @@ import { effectOf } from '../../shared/gun-upgrades.ts';
 import { GUN_EFFECTS } from '../../shared/round-effect-data.ts';
 import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
+import QuestTracker from './QuestTracker.vue';
 import TreasureChip from './TreasureChip.vue';
 
 const LOW_HEALTH = 0.34;
@@ -147,6 +151,12 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 
 .hud-top {
   align-items: flex-start;
+}
+
+.hud-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u);
 }
 
 .hud-chip {

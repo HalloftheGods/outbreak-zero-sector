@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameEvent } from '../shared/protocol.ts';
 import { AudioEngine } from '../src/audio/audio-engine.ts';
 import { Mixer } from '../src/audio/mixer.ts';
+import { TILE_KINDS } from '../shared/protocol.ts';
+import type { PlayerEntity, WorldMap } from '../shared/protocol.ts';
 
 const stats = { created: 0, closed: 0 };
 
@@ -39,6 +41,7 @@ class FakeAudioContext {
 }
 
 const P = 'p1';
+const STEP_MAP = { cols: 200, rows: 4, tiles: new Array(800).fill(TILE_KINDS.indexOf('grass')) } as unknown as WorldMap;
 const EVENTS: GameEvent[] = [
   { type: 'shot', playerId: P, weapon: 'pistol', x: 0, y: 0, angle: 0 },
   { type: 'shot', playerId: 'p2', weapon: 'carbine', x: 40, y: 0, angle: 0 },
@@ -114,6 +117,7 @@ describe('AudioEngine without Web Audio', () => {
     for (const e of EVENTS) a.handleEvent(e, P);
     a.handleEvent(EVENTS[0], null);
     a.tick(0.016, [{ x: 0, y: 0, type: 'walker' }]);
+    a.stepPlayers([], P, STEP_MAP, 0.016);
     a.dispose();
     a.dispose();
   });
@@ -179,6 +183,49 @@ describe('AudioEngine with a fake AudioContext', () => {
     a.handleEvent({ type: 'shot', playerId: P, weapon: 'pistol', x: 9000, y: 9000, angle: 0 }, P);
     expect(stats.created).toBeGreaterThan(before);
     a.dispose();
+  });
+
+  describe('footsteps', () => {
+    /** Walks a player at walking pace for a second and returns how many footsteps reached the mixer. */
+    async function stepsMade(setup: (a: AudioEngine) => void, id = P): Promise<number> {
+      const play = vi.spyOn(Mixer.prototype, 'play');
+      const a = new AudioEngine();
+      await a.unlock();
+      setup(a);
+      a.setListener(0, 0);
+      const pace = 84;
+      for (let i = 0; i <= 60; i += 1) {
+        const p = { id, skin: 0, x: pace * (i / 60), y: 16, status: 'alive' } as unknown as PlayerEntity;
+        a.stepPlayers([p], P, STEP_MAP, 1 / 60);
+      }
+      const made = play.mock.calls.filter(([name]) => String(name).startsWith('step_')).length;
+      play.mockRestore();
+      a.dispose();
+      return made;
+    }
+
+    it('plays steps for a walking player', async () => {
+      expect(await stepsMade(() => undefined)).toBeGreaterThan(0);
+      expect(await stepsMade(() => undefined)).toBeLessThan(6);
+    });
+
+    it('is silent when muted or at zero volume', async () => {
+      expect(await stepsMade((a) => { a.muted = true; })).toBe(0);
+      expect(await stepsMade((a) => { a.volume = 0; })).toBe(0);
+    });
+
+    it('culls a distant walker but never the local one', async () => {
+      const far = { id: 'far', skin: 0, x: 5000, y: 16, status: 'alive' } as unknown as PlayerEntity;
+      const a = new AudioEngine();
+      await a.unlock();
+      a.setListener(0, 0);
+      const before = stats.created;
+      for (let i = 0; i <= 60; i += 1) {
+        a.stepPlayers([{ ...far, x: 5000 + 84 * (i / 60) }], P, STEP_MAP, 1 / 60);
+      }
+      expect(stats.created).toBe(before);
+      a.dispose();
+    });
   });
 
   it('limits polyphony under a burst of full-auto fire', async () => {
