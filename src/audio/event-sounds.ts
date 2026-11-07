@@ -1,7 +1,7 @@
 // What each game event sounds like: a table from event type to the sounds it plays.
 import type { GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import type { GunEffect } from '../../shared/round-effect-data.ts';
-import type { Mixer, PlayOpts } from './mixer.ts';
+import type { Mixer } from './mixer.ts';
 import type { SfxName } from './sfx-registry.ts';
 
 const SHOT: Record<WeaponId, SfxName> = { pistol: 'pistol', carbine: 'carbine', shotgun: 'shotgun' };
@@ -23,18 +23,26 @@ const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrod
 /** A can on the end of a gun: still a shot, but a dull one. */
 const SUPPRESSED_GAIN = 0.35;
 
+/** Where a sound plays: a spot in the world, or the local player's own unattenuated sound. */
+export interface SoundSpot { readonly x: number; readonly y: number; readonly local: boolean }
+
 /** What an event's sound may reach: the mixer, where a player stands, and the engine's shared timers. */
 export interface SoundCue {
   readonly mixer: Mixer;
   /** Where a sound plays; the local player's own sounds play unattenuated. */
-  readonly at: (x: number, y: number, playerId?: string) => PlayOpts;
+  readonly at: (x: number, y: number, playerId?: string) => SoundSpot;
   /** A far, faint sound somewhere around the listener. */
   readonly playAmbient: (name: 'distant_groan' | 'distant_crash') => void;
   /** True once per alert window, so a pack waking at once snarls only once. */
   readonly claimAlert: () => boolean;
+  /** A reload's opening and closing sounds, which the engine shapes per gun (a shotgun loads shell by shell). */
+  readonly reloadStart: (weapon: WeaponId, playerId: string, where: SoundSpot) => void;
+  readonly reloadEnd: (weapon: WeaponId, playerId: string, where: SoundSpot) => void;
+  /** Stops a shotgun's shell-by-shell loading, as when its owner switches guns. */
+  readonly dropShells: (playerId: string) => void;
 }
 
-type EventOf<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>;
+type EventOf<K extends GameEvent['type']> = GameEvent & { readonly type: K };
 type EventSound<K extends GameEvent['type']> = (e: EventOf<K>, cue: SoundCue) => void;
 type EventSounds = { readonly [K in GameEvent['type']]?: EventSound<K> };
 
@@ -46,8 +54,8 @@ const EVENT_SOUNDS: EventSounds = {
     if (isShotgun) mixer.play('pump', { ...p, delay: 0.45, gain: 0.8 });
   },
   dry_fire: (e, { mixer, at }) => mixer.play('dry_click', at(e.x, e.y, e.playerId)),
-  reload_start: (e, { mixer, at }) => mixer.play(e.weapon === 'shotgun' ? 'shell_load' : 'mag_out', at(e.x, e.y, e.playerId)),
-  reload_end: (e, { mixer, at }) => mixer.play(e.weapon === 'shotgun' ? 'pump' : 'mag_in', at(e.x, e.y, e.playerId)),
+  reload_start: (e, { at, reloadStart }) => reloadStart(e.weapon, e.playerId, at(e.x, e.y, e.playerId)),
+  reload_end: (e, { at, reloadEnd }) => reloadEnd(e.weapon, e.playerId, at(e.x, e.y, e.playerId)),
   melee: (e, { mixer, at }) => mixer.play(e.hit ? 'melee_thud' : 'melee_swing', at(e.x, e.y, e.playerId)),
   heal: (e, { mixer, at }) => mixer.play('heal', at(e.x, e.y, e.playerId)),
   zombie_alert: (e, { mixer, claimAlert }) => {
@@ -55,11 +63,16 @@ const EVENT_SOUNDS: EventSounds = {
     if (isFirstAlert) mixer.play(ALERT[e.zombieType], { x: e.x, y: e.y });
   },
   zombie_track: (e, { mixer }) => mixer.play('sniff', { x: e.x, y: e.y }),
-  weapon_switch: (e, { mixer, at }) => mixer.play('weapon_switch', at(e.x, e.y, e.playerId)),
+  weapon_switch: (e, { mixer, at, dropShells }) => {
+    dropShells(e.playerId);
+    mixer.play('weapon_switch', at(e.x, e.y, e.playerId));
+  },
   bullet_impact: (e, { mixer }) => mixer.play('impact', { x: e.x, y: e.y }),
   zombie_hit: (e, { mixer }) => mixer.play('flesh_hit', { x: e.x, y: e.y }),
   headshot: (e, { mixer, at }) => mixer.play('headshot', at(e.x, e.y, e.playerId)),
   zombie_die: (e, { mixer }) => mixer.play(DEATH[e.zombieType], { x: e.x, y: e.y }),
+  // Everyone hears a boss go down, wherever they are in town.
+  boss_down: (_e, { mixer }) => mixer.play('boss_fall', { local: true }),
   zombie_status: (e, { mixer }) => mixer.play(STATUS[e.effect], { x: e.x, y: e.y }),
   zombie_attack: (e, { mixer }) => mixer.play('claw', { x: e.x, y: e.y }),
   bloater_burst: (e, { mixer }) => mixer.play('bloater_burst', { x: e.x, y: e.y }),

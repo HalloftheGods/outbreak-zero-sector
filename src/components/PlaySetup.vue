@@ -1,7 +1,7 @@
 <template>
   <TitlePage :heading size="extra-wide" boxed steady @close="back">
     <template #lead>
-      <SetupStepper :stops="stepper" @pick="jump" />
+      <SetupStepper :stops="stepper" :thumbs @pick="jump" />
     </template>
 
     <StyleSelect v-if="flow.step === 'style'" ref="styles" :art="ui.art" :game-style="ui.style" @choose="chooseStyle" />
@@ -75,6 +75,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } f
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import { trackTitlePage } from '../game/analytics/index.ts';
+import type { PixelSprite } from '../art/types.ts';
+import { loadCharacter } from '../game/character-pref.ts';
+import { loadDifficulty } from '../game/difficulty-pref.ts';
 import { setupLevelLines } from '../game/home-screens.ts';
 import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
@@ -117,6 +120,21 @@ const startLine = computed(() => levelLines.value.startLine);
 const coopNote = computed(() => levelLines.value.coopNote);
 const heading = computed(() => playHeading(flow.value));
 const stepper = computed(() => playStepper(flow.value));
+/**
+ * What each step settled, as its own picture, for the stepper to show once the step is done.
+ * Difficulty and survivor are saved prefs, read again whenever the flow moves (it is replaced on every step), the only time a done step can change.
+ */
+const thumbs = computed<Partial<Record<PlayStep, PixelSprite>>>(() => {
+  const art = ui.art;
+  const isArtLoading = art === null;
+  if (isArtLoading) return {};
+  return {
+    style: art.ui.style[runStyle.value],
+    mode: art.ui.mode[flow.value.mode],
+    difficulty: art.ui.difficulty[loadDifficulty()],
+    who: art.survivors[loadCharacter()]?.select,
+  };
+});
 /** Co-op on either step: the mode decides how the run starts. The server field shows on the first step only. */
 const multi = computed(() => flow.value.mode === 'multi');
 const serverShown = computed(() => showsServer(flow.value));

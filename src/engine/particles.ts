@@ -1,5 +1,5 @@
 import type { Clip, PixelSprite } from '../art/types.ts';
-import { drawOutlinedText, FONT_HEIGHT } from './bitmap-font.ts';
+import { FloatingTexts } from './floating-texts.ts';
 import { clipDuration, clipFrame, drawSprite } from './sprite-cache.ts';
 
 const GRAVITY = 260;
@@ -8,9 +8,6 @@ const CASING_FRICTION = 0.6;
 const MAX_DOTS = 320;
 const MAX_CASINGS = 48;
 const MAX_CLIPS = 64;
-const MAX_TEXTS = 24;
-const TEXT_LIFE = 0.9;
-const TEXT_RISE = 16;
 
 export interface Dot {
   x: number;
@@ -44,14 +41,6 @@ interface ClipEffect {
   y: number;
   age: number;
   emissive: boolean;
-}
-
-interface FloatingText {
-  text: string;
-  x: number;
-  y: number;
-  age: number;
-  color: string;
 }
 
 function removeWhere<T>(items: T[], gone: (item: T) => boolean): void {
@@ -100,7 +89,7 @@ export class ParticleSystem {
   readonly dots: Dot[] = [];
   readonly casings: Casing[] = [];
   private readonly clips: ClipEffect[] = [];
-  private readonly texts: FloatingText[] = [];
+  private readonly texts = new FloatingTexts();
   private readonly stamp: (sprite: PixelSprite, x: number, y: number) => void;
 
   constructor(stamp: (sprite: PixelSprite, x: number, y: number) => void) {
@@ -111,7 +100,7 @@ export class ParticleSystem {
     this.dots.length = 0;
     this.casings.length = 0;
     this.clips.length = 0;
-    this.texts.length = 0;
+    this.texts.clear();
   }
 
   addDot(dot: Dot): void {
@@ -131,9 +120,7 @@ export class ParticleSystem {
   }
 
   addText(text: string, x: number, y: number, color: string): void {
-    const isTextsFull = this.texts.length >= MAX_TEXTS;
-    if (isTextsFull) this.texts.shift();
-    this.texts.push({ text, x, y, age: 0, color });
+    this.texts.add(text, x, y, color);
   }
 
   update(dt: number): void {
@@ -147,10 +134,7 @@ export class ParticleSystem {
       effect.age += dt;
       return effect.age >= clipDuration(effect.clip);
     });
-    removeWhere(this.texts, (text) => {
-      text.age += dt;
-      return text.age >= TEXT_LIFE;
-    });
+    this.texts.update(dt);
   }
 
   private drawDots(ctx: CanvasRenderingContext2D, left: number, top: number, emissive: boolean): void {
@@ -186,9 +170,6 @@ export class ParticleSystem {
   }
 
   drawTexts(ctx: CanvasRenderingContext2D, left: number, top: number): void {
-    for (const text of this.texts) {
-      const rise = Math.round((text.age / TEXT_LIFE) * TEXT_RISE);
-      drawOutlinedText(ctx, text.text, Math.round(text.x) - left, Math.round(text.y) - top - rise - FONT_HEIGHT, text.color);
-    }
+    this.texts.draw(ctx, left, top);
   }
 }

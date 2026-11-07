@@ -10,10 +10,8 @@ import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { normalizeRoomCode } from '../../shared/lobby/room-code.ts';
-import { HostSession } from '../network/host-session.ts';
-import { onlineRoomsLive, PLAY_API } from '../network/play-api.ts';
-import { RemoteSession, type RoomSession } from '../network/remote-session.ts';
-import { RtcGuestPipe } from '../network/rtc-pipe.ts';
+import { onlineRoomsLive } from '../network/play-api.ts';
+import type { RoomSession } from '../network/remote-session.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
 import type { GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
@@ -68,8 +66,7 @@ export interface RunHost {
   hitStop(ms: number): void;
 }
 
-/** WebRTC needs a signal round trip and ICE before the room can answer. */
-const ONLINE_CONNECT_TIMEOUT_MS = 20_000;
+const ONLINE_UNLOADED = 'Could not load online play. Check the connection and try again.';
 
 export function newRunState(): RunState {
   return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null, daily: null };
@@ -112,45 +109,58 @@ export class RunSession {
     if (hasLevel) this.startSolo('arcade', level);
   }
 
-  /** `style` is offered to an empty room. A room already playing keeps its own, and this run follows it. */
+  /**
+   * `style` is offered to an empty room. A room already playing keeps its own, and this run follows it.
+   * In a build with online rooms, a blank field hosts one from this tab and a room code joins one over WebRTC.
+   * Anything else, and every address in a build without them, is a LAN server.
+   */
   startCoop(style: GameStyle): void {
     if (!this.canStart()) return;
     this.host.state.daily = null;
     this.host.audio.unlock();
-    const session = this.coopSession(this.host.ui.value.serverAddress, style);
-    if (!session) {
+    const text = this.host.ui.value.serverAddress.trim();
+    const code = normalizeRoomCode(text);
+    const online = onlineRoomsLive() && (!text || code.ok);
+    if (online) {
+      void this.startOnline(style, code.ok ? code.code : null);
+      return;
+    }
+    const url = resolveServerUrl(text, window.location);
+    const badAddress = url === null;
+    if (badAddress) {
       this.host.publish({ error: 'That server address does not look right.' });
       return;
     }
+    this.openCoop(new SocketSession(url), style);
+  }
+
+  /** The online room code is fetched on first use, with the menu held in its connecting state meanwhile. */
+  private async startOnline(style: GameStyle, code: string | null): Promise<void> {
+    this.host.publish({ connecting: true, error: null });
+    let rooms: typeof import('../network/online-session.ts');
+    try {
+      rooms = await import('../network/online-session.ts');
+    } catch {
+      this.host.publish({ connecting: false, error: ONLINE_UNLOADED });
+      return;
+    }
+    // Left the menu, or something else started, while the code was on its way.
+    const { screen, connecting } = this.host.ui.value;
+    const stillWanted = screen === 'title' && connecting && this.host.state.transport === null;
+    if (!stillWanted) return;
+    const events = {
+      onHosted: (room: string) => this.host.publish({ onlineRoom: room }),
+      onUnlisted: () => this.host.publish({ onlineRoom: null }),
+    };
+    const session = code === null ? rooms.hostRoom(style, events) : rooms.joinRoom(code);
+    this.openCoop(session, style);
+  }
+
+  private openCoop(session: RoomSession, style: GameStyle): void {
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'coop', error: null, connecting: true, onlineRoom: null });
     session.onRoom = (room) => this.answerRoom(session, room ?? style);
     this.beginSession(session, style);
-  }
-
-  /**
-   * In a build with online rooms, a blank field hosts one from this tab and a room code joins one over WebRTC.
-   * Anything else, and every address in a build without them, is a LAN server.
-   */
-  private coopSession(address: string, style: GameStyle): RoomSession | null {
-    const text = address.trim();
-    const areRoomsLive = onlineRoomsLive();
-    if (areRoomsLive) {
-      if (!text) {
-        const hosting = new HostSession(style);
-        hosting.onHosted = (code) => this.host.publish({ onlineRoom: code });
-        // The game goes on, but nobody new can join, so the invite stops being offered.
-        hosting.onUnlisted = () => this.host.publish({ onlineRoom: null });
-        return hosting;
-      }
-      const code = normalizeRoomCode(text);
-      if (code.ok) {
-        const words = { badAddress: 'That room code does not look right.', noAnswer: 'Could not reach that game. Ask the host to check it is still open.', unreachable: 'Could not reach that game.' };
-        return new RemoteSession(new RtcGuestPipe(PLAY_API, code.code), words, ONLINE_CONNECT_TIMEOUT_MS);
-      }
-    }
-    const url = resolveServerUrl(text, window.location);
-    return url === null ? null : new SocketSession(url);
   }
 
   playAgain(fromLevel?: number): void {

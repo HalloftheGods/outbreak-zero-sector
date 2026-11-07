@@ -6,6 +6,7 @@ import type { WorldRenderer } from '../engine/world-renderer.ts';
 import type { ClientWorld } from './client-world.ts';
 import { questMarks } from './home/quest-marks.ts';
 import { closedStalls } from './home/shop.ts';
+import { Heartbeat } from './heartbeat.ts';
 import { tickRunAudio } from './run-audio.ts';
 import { deathFade, healthFraction } from './run-hud.ts';
 import type { RunHost } from './run-session.ts';
@@ -28,6 +29,8 @@ export class RunFrame {
   private lastScene: SceneView = EMPTY_SCENE;
   /** A hit-stop holds the picture until this frame time. */
   private heldUntilMs = 0;
+  /** The low-health heart, one clock for its sound and the screen's red pulse. */
+  private readonly heart = new Heartbeat();
 
   constructor(private readonly host: RunFrameHost) {}
 
@@ -81,7 +84,7 @@ export class RunFrame {
     this.lastScene = scene;
     const sending = transport !== null && !over;
     if (sending) this.host.parts.inputs.send(transport, world, aim, dirX, dirY, dt);
-    tickRunAudio(this.host.parts.audio, world, scene, dt);
+    renderer.effects.setHeartPulse(tickRunAudio(this.host.parts.audio, world, scene, dt, this.heart));
     renderer.effects.setHealth(healthFraction(world.localPlayer));
     renderer.effects.setDesaturation(deathFade(world.localPlayer?.status, over));
     renderer.render(scene, dt);

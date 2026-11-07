@@ -11,6 +11,7 @@ import { burstFor } from './status-bursts.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { ScreenEffects } from './screen-effects.ts';
 import type { VisualStore } from './visuals.ts';
+import { hitPalette } from './hit-palette.ts';
 
 const HIT_FLASH_SEC = 0.09;
 const BLOOD = ['#8c1a14', '#a8231a', '#5e100c'];
@@ -30,12 +31,10 @@ function stashLabel(event: Extract<GameEvent, { type: 'container_opened' }>): st
 const FIRE_DOTS_PER_SEC = 70;
 const FLARE_DOTS_PER_SEC = 24;
 const SKULL_CHIPS = ['#e4dcc3', '#c9bd9c', '#a8231a'];
-const HEADSHOT_COLOR = '#ff5a3c';
 /** The word goes over the head it names. */
 const HEADSHOT_NOTE_GAP = 10;
 const HEADSHOT_KICK = 0.22;
 const SCORE_COLOR = '#e8a33d';
-const PICKUP_COLOR = '#b6d65a';
 const REFUSED_COLOR = '#d9b98a';
 /** Notices sit over the head, not on the ground at the feet. */
 const NOTE_HEIGHT = 26;
@@ -51,6 +50,8 @@ const STATUS_LIGHT_RADIUS = 46;
 const STATUS_LIGHT_LIFE = 0.25;
 /** The blast door bursting: the screen-effects scale takes it down for reduced motion. */
 const OVERRUN_BURST_SHAKE = 0.6;
+/** A boss hitting the ground shakes the screen hardest of anything (reduced motion scales it down). */
+const BOSS_DOWN_SHAKE = 0.95;
 const SHOT_KICK: Record<WeaponId, number> = { pistol: 0.16, carbine: 0.12, shotgun: 0.42 };
 
 const PICKUP_LABEL: Record<PickupType, string> = {
@@ -119,7 +120,8 @@ function spread(amount: number): number {
 }
 
 /** Turns sim events into everything visual that follows from them. */
-type FxHandler<K extends GameEvent['type']> = (event: Extract<GameEvent, { type: K }>, ctx: FxContext) => void;
+/** The event of one type; an intersection, so a member shared by several types (the boss events) still narrows. */
+type FxHandler<K extends GameEvent['type']> = (event: GameEvent & { readonly type: K }, ctx: FxContext) => void;
 type FxHandlers = { readonly [K in GameEvent['type']]?: FxHandler<K> };
 
 export class FxDirector {
@@ -168,8 +170,8 @@ export class FxDirector {
     bloater_burst: (event) => this.onBurst(event.x, event.y, event.radius),
     player_hurt: (event, ctx) => this.onPlayerHurt(event.playerId, event.x, event.y, event.damage, ctx),
     player_downed: (event) => this.stampBlood(event.x, event.y),
-    player_revived: (event) => this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR),
-    candy_eaten: (event) => this.particles.addText(event.saved ? 'SAVED BY CARAMEL' : CANDIES[event.candy].name.toUpperCase(), event.x, event.y - 14, PICKUP_COLOR),
+    player_revived: (event) => this.particles.addText('REVIVED', event.x, event.y - 14, hitPalette().safe),
+    candy_eaten: (event) => this.particles.addText(event.saved ? 'SAVED BY CARAMEL' : CANDIES[event.candy].name.toUpperCase(), event.x, event.y - 14, hitPalette().safe),
     pickup: (event, ctx) => this.onPickup(event, ctx),
     container_opened: (event, ctx) => this.onContainerOpened(event, ctx),
     bottle_smash: (event) => this.onBottleSmash(event.x, event.y),
@@ -180,6 +182,7 @@ export class FxDirector {
     car_alarm: (event) => this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR),
     zombie_status: (event) => this.onZombieStatus(event),
     overrun_breach: () => this.effects.addShake(OVERRUN_BURST_SHAKE),
+    boss_down: (event) => this.onBossDown(event.x, event.y),
   };
 
   handle(event: GameEvent, ctx: FxContext): void {
@@ -220,7 +223,7 @@ export class FxDirector {
     const isLocal = event.playerId === ctx.localId;
     const x = isLocal ? ctx.localX : event.x;
     const y = isLocal ? ctx.localY : event.y;
-    this.particles.addText(`+${Math.round(event.amount)} HEALTH`, x, y - NOTE_HEIGHT, PICKUP_COLOR);
+    this.particles.addText(`+${Math.round(event.amount)} HEALTH`, x, y - NOTE_HEIGHT, hitPalette().safe);
   }
 
   private ejectCasing(weapon: WeaponId, x: number, y: number, dirX: number, dirY: number): void {
@@ -268,7 +271,7 @@ export class FxDirector {
     this.burstDots(x, groundY, angle, SKULL_CHIPS, 6, 140, false, 1.1);
     const shotHere = event.playerId === ctx.localId;
     if (!shotHere) return;
-    this.particles.addText(`HEADSHOT +${event.points}`, x, y - HEADSHOT_NOTE_GAP, HEADSHOT_COLOR);
+    this.particles.addText(`HEADSHOT +${event.points}`, x, y - HEADSHOT_NOTE_GAP, hitPalette().strike);
     this.effects.addShake(HEADSHOT_KICK);
   }
 
@@ -317,7 +320,7 @@ export class FxDirector {
     const x = isLocal ? ctx.localX : event.x;
     const y = isLocal ? ctx.localY : event.y;
     const label = isLocal && ctx.pickupNote ? ctx.pickupNote : PICKUP_LABEL[event.pickup];
-    this.particles.addText(label, x, y - NOTE_HEIGHT, PICKUP_COLOR);
+    this.particles.addText(label, x, y - NOTE_HEIGHT, hitPalette().safe);
     this.pulses.push({ x: event.x, y: event.y, radius: 30, color: '#d8c89a', life: 0.18, maxLife: 0.18 });
   }
 
@@ -327,7 +330,7 @@ export class FxDirector {
     const gotBottle = event.bottle === true && event.playerId === ctx.localId;
     if (event.noisy) this.particles.addText('CLATTER', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR);
     else if (gotBottle) this.note('BOTTLE', event.x, event.y);
-    else if (event.stash && event.playerId === ctx.localId) this.particles.addText(stashLabel(event), event.x, event.y - NOTE_HEIGHT, PICKUP_COLOR);
+    else if (event.stash && event.playerId === ctx.localId) this.particles.addText(stashLabel(event), event.x, event.y - NOTE_HEIGHT, hitPalette().safe);
     else if (emptyHanded) this.note('NOTHING', event.x, event.y);
   }
 
@@ -345,12 +348,21 @@ export class FxDirector {
     this.effects.addShake(0.3);
   }
 
+  /** The boss lands for good: a ring of dust, a flash of light where it fell and the hardest shake in the game. */
+  private onBossDown(x: number, y: number): void {
+    this.burstDots(x, y, -Math.PI / 2, DUST, 48, 160, false, Math.PI);
+    this.burstDots(x, y, 0, BLOOD, 24, 120, false, Math.PI);
+    for (let i = 0; i < 4; i += 1) this.particles.addClip(this.art.fx.smokePuff, x + spread(22), y - 4 + spread(10), false);
+    this.pulses.push({ x, y, radius: 140, color: '#ffd28a', life: 0.4, maxLife: 0.4 });
+    this.effects.addShake(BOSS_DOWN_SHAKE);
+  }
+
   /** The crate hits the street: dust, splinters and a thump felt by anyone near. */
   private onDropLanded(x: number, y: number): void {
     this.burstDots(x, y, -Math.PI / 2, DUST, 26, 110, false, Math.PI);
     this.particles.addClip(this.art.fx.smokePuff, x + spread(8), y - 4, false);
     this.particles.addClip(this.art.fx.smokePuff, x + spread(12), y - 2, false);
-    this.particles.addText('SUPPLIES', x, y - NOTE_HEIGHT, PICKUP_COLOR);
+    this.particles.addText('SUPPLIES', x, y - NOTE_HEIGHT, hitPalette().safe);
     this.effects.addShake(0.35);
   }
 

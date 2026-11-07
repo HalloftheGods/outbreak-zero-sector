@@ -104,3 +104,67 @@ export class FootstepTracker {
     }
   }
 }
+
+/** The zombies heavy enough to be heard walking. */
+export interface Stomper {
+  readonly id: EntityId;
+  readonly x: number;
+  readonly y: number;
+  readonly type: string;
+  readonly boss?: string;
+}
+
+/** Brutes and bosses: the ones heavy enough to be heard walking. */
+function isHeavy(z: Stomper): boolean {
+  return z.boss !== undefined || z.type === 'brute';
+}
+
+/** World pixels between a heavy zombie's footfalls: a boss's stride is longer. */
+const STOMP_STRIDE = 34;
+const BOSS_STRIDE = 46;
+/** A jump this far in one frame is a respawn or a stairwell, not a stride. */
+const STOMP_JUMP = 60;
+
+/** Footfalls for brutes and bosses, so a big one is heard before it is seen. Others shuffle quietly. */
+export class StompTracker {
+  private readonly walkers = new Map<EntityId, Walker>();
+  private frame = 0;
+
+  tick(zombies: readonly Stomper[], play: StepPlayer): void {
+    this.frame += 1;
+    for (const z of zombies) if (isHeavy(z)) this.step(z, play);
+    for (const [id, w] of this.walkers) this.forgetIfGone(id, w);
+  }
+
+  reset(): void {
+    this.walkers.clear();
+  }
+
+  private forgetIfGone(id: EntityId, w: Walker): void {
+    const gone = w.seen !== this.frame;
+    if (gone) this.walkers.delete(id);
+  }
+
+  private step(z: Stomper, play: StepPlayer): void {
+    const w = this.walkers.get(z.id);
+    if (!w) {
+      this.walkers.set(z.id, { x: z.x, y: z.y, acc: 0, seen: this.frame });
+      return;
+    }
+    w.seen = this.frame;
+    const dist = Math.hypot(z.x - w.x, z.y - w.y);
+    w.x = z.x;
+    w.y = z.y;
+    const jumped = dist > STOMP_JUMP;
+    if (jumped) {
+      w.acc = 0;
+      return;
+    }
+    const stride = z.boss ? BOSS_STRIDE : STOMP_STRIDE;
+    w.acc += dist;
+    const midStride = w.acc < stride;
+    if (midStride) return;
+    w.acc %= stride;
+    play('step_stomp', z.boss ? { x: z.x, y: z.y, gain: 1.5, pitch: 0.7 } : { x: z.x, y: z.y });
+  }
+}
