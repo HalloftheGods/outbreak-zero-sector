@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - The record book
+
+### Changed
+- Records is now a printed record book on the How to Play magazine's paper: four ruled pages read as two spreads (one page at a time on a tall screen), turned with Prev and Next, the arrow keys or a swipe.
+- Personal bests: a card each for Campaign and Arcade, the numbers written in by hand, stamped "No run yet" until there is one.
+- The ledger: the top five with hordes, kills, time and date as well as the score, the empty lines left ruled and waiting.
+- Daily Night: tonight's town on a ticket stub, your streak, best night and nights logged.
+- The last seven nights, each stamped Counted, Missed or Tonight (`src/game/record-book.ts`, tests in `tests/record-book.spec.ts`).
+
 ## [2026-11-07] - Daily Night
 
 ### Added
