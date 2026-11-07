@@ -17,7 +17,8 @@ import { TILE_SIZE } from './protocol.ts';
 import { randRange } from './rng.ts';
 import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { alivePlayers, emit, standingPlayers } from './sim-state.ts';
-import { buildingAt, segmentHitsSolid } from './world-query.ts';
+import type { FlowField } from './flow-field.ts';
+import { buildingAt, groundOf, segmentHitsSolid } from './world-query.ts';
 import { backToRoaming, loseTrail, updateAwareness } from './zombie-senses.ts';
 import { nextPrint, trailMakerAlive } from './snow-tracks.ts';
 import { TRACK_ARRIVE_PX, TRACKER_SPEED_SCALE } from './town-rules.ts';
@@ -61,11 +62,26 @@ function refreshFields(sim: SimState): void {
   }
 }
 
-function nearest(z: ZombieState, players: readonly PlayerState[]): PlayerState | null {
+/** Squared distance in the town's plan, so someone upstairs is as near as the house they are in. */
+function planDistance(sim: SimState, z: ZombieState, p: PlayerState): number {
+  const from = groundOf(sim.map, z.x, z.y);
+  const to = groundOf(sim.map, p.x, p.y);
+  return (to.x - from.x) ** 2 + (to.y - from.y) ** 2;
+}
+
+/** Up or down the stairs it stands on, when that is the way the field runs. */
+function takeStairs(z: ZombieState, field: FlowField): void {
+  const out = field.stairsDown(z.x, z.y);
+  if (!out) return;
+  z.x = out.x;
+  z.y = out.y;
+}
+
+function nearest(sim: SimState, z: ZombieState, players: readonly PlayerState[]): PlayerState | null {
   let best: PlayerState | null = null;
   let bestDistance = Infinity;
   for (const p of players) {
-    const distance = (p.x - z.x) ** 2 + (p.y - z.y) ** 2;
+    const distance = planDistance(sim, z, p);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = p;
@@ -175,6 +191,7 @@ function walkToward(sim: SimState, z: ZombieState, prey: PlayerState): void {
     }
   }
   stride(sim, z, dirX, dirY);
+  takeStairs(z, sim.flow);
 }
 
 /** A dead-on heading gives per-axis sliding nothing to slide along, so step off to one side. */
@@ -193,7 +210,7 @@ function startSwing(sim: SimState, z: ZombieState): void {
 
 /** The range check happens here, at the end of the wind-up, so a sidestep can dodge the blow. */
 function landSwing(sim: SimState, z: ZombieState, prey: readonly PlayerState[]): void {
-  const target = nearest(z, prey);
+  const target = nearest(sim, z, prey);
   const inReach = target !== null && bodyGap(z, target) <= z.reach + SWING_LEEWAY;
   if (inReach && canSee(sim, z, target)) hurtPlayer(sim, target, z.damage);
   z.recoveryLeft = ZOMBIE_RECOVERY_SEC;
@@ -236,6 +253,7 @@ function investigate(sim: SimState, z: ZombieState): void {
   const fieldPending = sim.noises.length > 0;
   if (waypoint) stride(sim, z, waypoint.x - z.x, waypoint.y - z.y);
   else if (!fieldPending) backToRoaming(sim, z);
+  if (waypoint) takeStairs(z, sim.noiseFlow);
 }
 
 /**
@@ -266,7 +284,7 @@ function track(sim: SimState, z: ZombieState): void {
 }
 
 function hunt(sim: SimState, z: ZombieState, prey: readonly PlayerState[], fallback: readonly PlayerState[]): void {
-  const target = nearest(z, prey.length > 0 ? prey : fallback);
+  const target = nearest(sim, z, prey.length > 0 ? prey : fallback);
   if (!target) return;
   const gap = bodyGap(z, target);
   const swingReady = target.status === 'alive' && gap <= z.reach && z.cooldownLeft === 0;
@@ -309,10 +327,10 @@ function updateZombie(sim: SimState, z: ZombieState, prey: readonly PlayerState[
   else wander(sim, z);
 }
 
-function isAsleep(z: ZombieState, players: readonly PlayerState[]): boolean {
+function isAsleep(sim: SimState, z: ZombieState, players: readonly PlayerState[]): boolean {
   if (z.horde) return false;
   const reachSquared = ZOMBIE_SLEEP_RANGE * ZOMBIE_SLEEP_RANGE;
-  return players.every((p) => (p.x - z.x) ** 2 + (p.y - z.y) ** 2 > reachSquared);
+  return players.every((p) => planDistance(sim, z, p) > reachSquared);
 }
 
 export function updateZombies(sim: SimState): void {
@@ -321,7 +339,7 @@ export function updateZombies(sim: SimState): void {
   const fallback = standingPlayers(sim);
   for (const z of sim.zombies) {
     if (z.health <= 0) continue;
-    if (!isAsleep(z, fallback)) updateZombie(sim, z, prey, fallback);
+    if (!isAsleep(sim, z, fallback)) updateZombie(sim, z, prey, fallback);
     else if (z.mode !== 'wander') backToRoaming(sim, z);
   }
 }

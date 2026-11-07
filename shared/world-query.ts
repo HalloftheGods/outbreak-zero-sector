@@ -1,5 +1,7 @@
 import { backDoorBox, partitionBoxes } from './building-plans.ts';
 import { settleVan } from './exit-van.ts';
+import type { Point } from './flow-field.ts';
+import { isStorey, voidBoxes } from './storeys.ts';
 import { BUILDING_DEFS, DOOR_WIDTH, PROP_DEFS, TILE_SIZE, WALL_THICKNESS } from './protocol.ts';
 import type { BuildingInstance, PropInstance, WorldMap } from './protocol.ts';
 
@@ -52,7 +54,20 @@ function northWall(building: BuildingInstance, x0: number, y0: number, x1: numbe
   return [{ x0, y0, x1: back.x0, y1 }, { x0: back.x1, y0, x1, y1 }];
 }
 
+/** A floor above or below has no door of its own: its stairs are the way in. */
+function closedWalls(building: BuildingInstance): Box[] {
+  const { x0, y0, x1, y1 } = buildingBox(building);
+  return [
+    { x0, y0, x1, y1: y0 + WALL_THICKNESS },
+    { x0, y0, x1: x0 + WALL_THICKNESS, y1 },
+    { x0: x1 - WALL_THICKNESS, y0, x1, y1 },
+    { x0, y0: y1 - WALL_THICKNESS, x1, y1 },
+    ...partitionBoxes(building),
+  ];
+}
+
 function wallsOf(building: BuildingInstance): Box[] {
+  if (isStorey(building)) return closedWalls(building);
   const { x0, y0, x1, y1 } = buildingBox(building);
   const door = doorBox(building);
   return [
@@ -98,6 +113,20 @@ export function buildingAt(map: WorldMap, x: number, y: number): BuildingInstanc
   return owner < 0 ? null : map.buildings[owner];
 }
 
+/**
+ * Where a point stands in the town's own plan: on a floor above or below, the same spot in the house it
+ * belongs to. Distances that ignore walls, such as hearing and dozing off, are measured between these.
+ */
+export function groundOf(map: WorldMap, x: number, y: number): Point {
+  const here = isBelowTown(map, y) ? buildingAt(map, x, y) : null;
+  const house = here?.of === undefined ? null : map.buildings.find((building) => building.id === here.of);
+  return house && here ? { x: house.x + x - here.x, y: house.y + y - here.y } : { x, y };
+}
+
+function isBelowTown(map: WorldMap, y: number): boolean {
+  return map.townRows !== undefined && y >= map.townRows * TILE_SIZE;
+}
+
 function solidIndex(map: WorldMap): SolidIndex {
   const cached = indexes.get(map);
   if (cached) return cached;
@@ -122,6 +151,7 @@ function solidIndex(map: WorldMap): SolidIndex {
     if (isSolidProp(prop)) addBox(propBox(prop));
   }
   for (const wall of wallBoxes(map)) addBox(wall);
+  for (const dark of voidBoxes(map, buildingBox)) addBox(dark);
   const index: SolidIndex = { buckets, blocked };
   // Settling the van's spot reads these solids, so they are cached first and the van joins them after.
   indexes.set(map, index);

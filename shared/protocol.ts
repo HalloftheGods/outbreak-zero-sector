@@ -218,6 +218,8 @@ export type GameEvent =
   | { readonly type: 'candy_eaten'; readonly playerId: EntityId; readonly candy: CandyId; readonly x: number; readonly y: number; readonly saved?: boolean }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
+  /** Someone took the stairs: x, y is where they came out, `to` what the stairs led to. */
+  | { readonly type: 'stairs_taken'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly to: string }
   | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean; readonly stash?: 'fuel' | 'flare' | 'candy'; readonly candy?: CandyId }
   /** A thrown bottle broke at x,y, thrown from fromX,fromY. */
   | { readonly type: 'bottle_smash'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number }
@@ -420,6 +422,8 @@ export const TILE_KINDS = [
   'floor_concrete',
   'floor_carpet',
   'bunker_wall',
+  /** The dark between the floors above and below the town, where nobody goes. */
+  'void',
 ] as const;
 export type TileKind = (typeof TILE_KINDS)[number];
 
@@ -499,6 +503,9 @@ export const BUILDING_DEFS = {
   warehouse: { label: 'Warehouse', w: 240, h: 144, doorX: 192, floor: 'floor_concrete' },
   house: { label: 'House', w: 112, h: 96, doorX: 48, floor: 'floor_wood' },
   apartment: { label: 'Apartments', w: 160, h: 128, doorX: 80, floor: 'floor_carpet' },
+  // A floor above or below a house, the same size as it. Its doorX only keeps loot off the strip a door would have.
+  upstairs: { label: 'Upstairs', w: 112, h: 96, doorX: 48, floor: 'floor_carpet' },
+  cellar: { label: 'Cellar', w: 112, h: 96, doorX: 48, floor: 'floor_concrete' },
 } as const;
 export type BuildingKind = keyof typeof BUILDING_DEFS;
 export const BUILDING_KINDS = Object.keys(BUILDING_DEFS) as BuildingKind[];
@@ -511,6 +518,8 @@ export interface BuildingInstance {
   readonly y: number;
   /** Picks a facade from the art's variants. */
   readonly variant: number;
+  /** For a floor above or below, the building it belongs to: its stairs come out in that building. */
+  readonly of?: string;
 }
 
 /** A named part of town, for the map screen. */
@@ -556,4 +565,6 @@ export interface WorldMap {
   readonly exit?: Point;
   /** What can be walked up to and opened. */
   readonly stations?: readonly Station[];
+  /** Rows of the town itself. Below them lie the floors above and below its houses, reached only by stairs. */
+  readonly townRows?: number;
 }

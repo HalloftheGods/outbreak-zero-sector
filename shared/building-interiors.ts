@@ -88,6 +88,20 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['table', 130, 80],
     ['sofa', 6, 122], ['shelf', 122, 122, 0.5],
   ],
+  // Two bedrooms either side of the same inside wall as the house below, the landing along the front.
+  // The stairs come up in the east room's south corner, which is left bare. A bed would leave the east
+  // room a sliver too narrow to follow anyone through, so it is a box room with a wardrobe.
+  upstairs: [
+    ['bed', 6, NORTH_BED], ['locker', 38, 14],
+    ['locker', 90, 14],
+    ['shelf', 6, 90], ['table', 82, 90, 0.6],
+  ],
+  // One room under the whole house, stores along the walls and the stairs coming down in the same corner.
+  cellar: [
+    ['shelf', 6, NORTH_WALL], ['workbench', 66, NORTH_DEEP],
+    ['crate_stack', 6, 62],
+    ['crate_stack', 86, 90],
+  ],
 };
 
 /** A gap narrower than this looks like a way round but is not one. */

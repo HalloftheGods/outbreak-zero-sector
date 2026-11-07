@@ -1,5 +1,7 @@
 import { townContainers } from '../../shared/containers.ts';
 import { isBunkerMap } from '../../shared/home-protocol.ts';
+import { isStorey } from '../../shared/storeys.ts';
+import { groundOf } from '../../shared/world-query.ts';
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, DropView, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
 import { drawOutlinedText, FONT_HEIGHT, textWidth } from '../engine/bitmap-font.ts';
@@ -44,6 +46,7 @@ const TILE_RGB: Record<TileKind, readonly [number, number, number]> = {
   floor_concrete: PAVEMENT,
   floor_carpet: PAVEMENT,
   bunker_wall: [26, 26, 32],
+  void: [0, 0, 0],
 };
 
 const MEDICAL = '#b04a42';
@@ -67,6 +70,8 @@ const BUILDING_COLOR: Record<BuildingKind, string> = {
   warehouse: WORK,
   house: HOMES,
   apartment: HOMES,
+  upstairs: HOMES,
+  cellar: HOMES,
 };
 
 /** What the colours mean, for the key beside the map. */
@@ -218,7 +223,8 @@ export class TownMapView {
     this.pixelsPerTile = isBunkerMap(map) ? BUNKER_TILE_PX : TILE_PX;
     this.worldPerPx = TILE_SIZE / this.pixelsPerTile;
     this.width = map.cols * this.pixelsPerTile;
-    this.height = map.rows * this.pixelsPerTile;
+    // The floors above and below lie under the town, off the edge of the map: everyone on one is drawn at their house.
+    this.height = (map.townRows ?? map.rows) * this.pixelsPerTile;
     this.base = document.createElement('canvas');
     this.base.width = this.width;
     this.base.height = this.height;
@@ -241,7 +247,7 @@ export class TownMapView {
     this.paintStations(ctx);
     const placed: LabelBox[] = [];
     for (const building of this.map.buildings) {
-      if (!isLandmark(building.kind)) continue;
+      if (!isLandmark(building.kind) || isStorey(building)) continue;
       const box = footprint(building);
       placeLabel(ctx, BUILDING_DEFS[building.kind].label, Math.round((box.x0 + box.x1) / 2), box.y1 + 3, LABEL_COLOR, placed);
     }
@@ -333,8 +339,9 @@ export class TownMapView {
   }
 
   private drawTeammate(ctx: CanvasRenderingContext2D, player: PlayerEntity): void {
-    const x = Math.round(player.x / this.worldPerPx);
-    const y = Math.round(player.y / this.worldPerPx);
+    const at = groundOf(this.map, player.x, player.y);
+    const x = Math.round(at.x / this.worldPerPx);
+    const y = Math.round(at.y / this.worldPerPx);
     ctx.fillStyle = EDGE_COLOR;
     ctx.fillRect(x - 2, y - 2, 5, 5);
     ctx.fillStyle = player.status === 'alive' ? TEAM_COLOR : DOWNED_COLOR;
@@ -388,6 +395,7 @@ export class TownMapView {
     // The local player goes last, so nobody's mark covers the cursor.
     const local = onMap.find((player) => player.id === localId);
     const hasLocal = local !== undefined;
-    if (hasLocal) drawCursor(ctx, Math.round(local.x / this.worldPerPx), Math.round(local.y / this.worldPerPx), local.angle, clock, this);
+    const here = hasLocal ? groundOf(this.map, local.x, local.y) : null;
+    if (here) drawCursor(ctx, Math.round(here.x / this.worldPerPx), Math.round(here.y / this.worldPerPx), local!.angle, clock, this);
   }
 }

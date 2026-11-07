@@ -2,7 +2,7 @@ import { characterOf } from './characters.ts';
 import { SCREAM_COOLDOWN_SEC, SCREAM_RADIUS, SNEAK_SIGHT_SCALE, TICK_DT, ZOMBIE_INVESTIGATE_SEC, ZOMBIE_LOSE_INTEREST_SEC, ZOMBIE_SIGHT_RANGE } from './constants.ts';
 import type { PlayerState, SimState, ZombieMode, ZombieState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
-import { buildingAt, segmentHitsSolid } from './world-query.ts';
+import { buildingAt, groundOf, segmentHitsSolid } from './world-query.ts';
 import { printUnder } from './snow-tracks.ts';
 import { eventOf } from './night-events.ts';
 import { hearingScale, sightScale, TRACK_REST_SEC, TRACK_SEARCH_SEC } from './town-rules.ts';
@@ -57,8 +57,11 @@ export function makeNoise(sim: SimState, x: number, y: number, radius: number): 
   sim.noises.push({ x, y });
   const heardFrom = radius * hearingScale(sim.level) * (eventOf(sim)?.hearing ?? 1);
   const radiusSquared = heardFrom * heardFrom;
+  // Upstairs and down, a noise carries as far as it would from the same spot in the house.
+  const source = groundOf(sim.map, x, y);
   for (const z of sim.zombies) {
-    const heard = !z.horde && z.health > 0 && (z.x - x) ** 2 + (z.y - y) ** 2 <= radiusSquared;
+    const ear = groundOf(sim.map, z.x, z.y);
+    const heard = !z.horde && z.health > 0 && (ear.x - source.x) ** 2 + (ear.y - source.y) ** 2 <= radiusSquared;
     if (!heard) continue;
     // A noise beats a nose: a bottle pulls a tracker off the trail.
     delete z.trail;

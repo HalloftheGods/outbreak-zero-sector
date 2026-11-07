@@ -1,6 +1,6 @@
 import { generateBunkerMap } from './bunker-map.ts';
 import { isBunkerSeed } from './home-protocol.ts';
-import { TILE_KINDS, TILE_SIZE } from './protocol.ts';
+import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from './protocol.ts';
 import type { MapLight, PropInstance, WorldMap } from './protocol.ts';
 import { biomeFor } from './biomes.ts';
 import { MapBuilder } from './map-builder.ts';
@@ -11,7 +11,9 @@ import { raiseTownPieces } from './town-pieces.ts';
 import { EDGE_TILES, MAP_TILES, planTown, rectBox } from './town-plan.ts';
 import { dressStreets, paintStreets } from './town-streets.ts';
 import { fillPark, fillVerge, raiseFence } from './world-blocks.ts';
-import { blockedTiles, isSolidProp, propBox } from './world-query.ts';
+import { furnish } from './building-interiors.ts';
+import { flightsOf, planStoreys } from './storeys.ts';
+import { blockedTiles, buildingBox, isSolidProp, propBox } from './world-query.ts';
 
 export {
   blockedTiles,
@@ -30,11 +32,13 @@ export type { Box } from './world-query.ts';
 /** Depth of the strip the verge scatter works in, along each edge of the map. */
 const VERGE_TILES = 6;
 
+const STOREY_FURNISH_SALT = 0x464c5253;
+
 const SODIUM = '#ffb066';
 const COOL = '#9ad0ff';
 const FIRE = '#ff7a2e';
 
-function freeTilesReached(blocked: Uint8Array, cols: number, rows: number, start: number): Uint8Array {
+function freeTilesReached(blocked: Uint8Array, cols: number, rows: number, start: number, stairs: ReadonlyMap<number, { readonly toIndex: number }>): Uint8Array {
   const seen = new Uint8Array(cols * rows);
   const stack = [start];
   seen[start] = 1;
@@ -46,6 +50,7 @@ function freeTilesReached(blocked: Uint8Array, cols: number, rows: number, start
       col < cols - 1 ? index + 1 : -1,
       index - cols,
       index + cols,
+      stairs.get(index)?.toIndex ?? -1,
     ];
     for (const next of neighbours) {
       const onMap = next >= 0 && next < cols * rows;
@@ -81,7 +86,7 @@ function connectedProps(base: WorldMap): PropInstance[] {
   const spawnTile = Math.floor(base.spawn.y / TILE_SIZE) * base.cols + Math.floor(base.spawn.x / TILE_SIZE);
   for (;;) {
     const blocked = blockedTiles({ ...base, props });
-    const seen = freeTilesReached(blocked, base.cols, base.rows, spawnTile);
+    const seen = freeTilesReached(blocked, base.cols, base.rows, spawnTile, flightsOf(base));
     const stranded = blocked.findIndex((isBlocked, index) => !isBlocked && !seen[index]);
     if (stranded < 0) return props;
     const x = ((stranded % base.cols) + 0.5) * TILE_SIZE;
@@ -117,6 +122,32 @@ function lightsFor(props: readonly PropInstance[], rng: Rng): MapLight[] {
   return lights;
 }
 
+/**
+ * Lays the floors above and below some houses out in a strip under the town: the town's tiles carry on
+ * unchanged at the top, then dark, then each floor with its own floorboards and furniture.
+ */
+function withStoreys(town: WorldMap): WorldMap {
+  const plan = planStoreys(town.seed, town.buildings, town.cols, town.rows);
+  if (plan.rows === 0) return town;
+  const rows = town.rows + plan.rows;
+  const annex = new MapBuilder(town.cols, rows, createRng(town.seed ^ STOREY_FURNISH_SALT), town.spawn);
+  annex.tiles.set(town.tiles);
+  annex.fill({ x0: 0, y0: town.height, x1: town.width, y1: rows * TILE_SIZE }, 'void');
+  for (const storey of plan.storeys) {
+    annex.fill(buildingBox(storey), BUILDING_DEFS[storey.kind].floor);
+    furnish(annex, storey);
+  }
+  return {
+    ...town,
+    height: rows * TILE_SIZE,
+    rows,
+    townRows: town.rows,
+    tiles: annex.tiles,
+    props: [...town.props, ...annex.props],
+    buildings: [...town.buildings, ...plan.storeys],
+  };
+}
+
 /** Deterministic: the same seed and level yield the same map on the server and every client. The level picks the biome. */
 export function generateWorldMap(seed: number, level = 1): WorldMap {
   if (isBunkerSeed(seed)) return generateBunkerMap();
@@ -141,7 +172,7 @@ export function generateWorldMap(seed: number, level = 1): WorldMap {
 
   spreadTerrain(builder);
 
-  const base: WorldMap = {
+  const town: WorldMap = {
     seed,
     width: size,
     height: size,
@@ -154,6 +185,7 @@ export function generateWorldMap(seed: number, level = 1): WorldMap {
     lights: [],
     spawn: plan.spawn,
   };
+  const base = withStoreys(town);
   const props = connectedProps(base);
   return { ...base, props, lights: lightsFor(props, rng) };
 }

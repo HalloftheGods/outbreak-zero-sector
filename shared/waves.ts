@@ -19,7 +19,8 @@ import type { ZombieType } from './protocol.ts';
 import { pick, randRange, shuffle } from './rng.ts';
 import type { PlayerState, SimState, ZombieState } from './sim-state.ts';
 import { emit, entityId, hiddenFromEveryone, standingPlayers } from './sim-state.ts';
-import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
+import { buildingAt, circleHitsSolid, groundOf, isBlockedAt } from './world-query.ts';
+import { townHeight } from './storeys.ts';
 import { SIGHT_CHECK_TICKS, backToRoaming } from './zombie-senses.ts';
 import { eventOf } from './night-events.ts';
 import { liveBoss, maybeSummonBoss } from './bosses.ts';
@@ -97,18 +98,24 @@ export function spawnZombie(sim: SimState, type: ZombieType, x: number, y: numbe
   });
 }
 
+const xy = (p: { readonly x: number; readonly y: number }): [number, number] => [p.x, p.y];
+
 function spawnPoint(sim: SimState, anchors: readonly PlayerState[], radius: number): { x: number; y: number } | null {
   const { map } = sim;
   for (let attempt = 0; attempt < SPAWN_TRIES_PER_TICK; attempt++) {
-    const anchor = pick(sim.rng, anchors);
+    // Someone upstairs or in a cellar draws the horde to their house, in town.
+    const anchor = groundOf(map, ...xy(pick(sim.rng, anchors)));
     const angle = sim.rng() * Math.PI * 2;
     const distance = randRange(sim.rng, SPAWN_MIN_DISTANCE, SPAWN_MAX_DISTANCE);
     const x = anchor.x + Math.cos(angle) * distance;
     const y = anchor.y + Math.sin(angle) * distance;
-    const onMap = x > radius && y > radius && x < map.width - radius && y < map.height - radius;
+    const onMap = x > radius && y > radius && x < map.width - radius && y < townHeight(map) - radius;
     if (!onMap || isBlockedAt(map, x, y) || circleHitsSolid(map, x, y, radius + 1)) continue;
     const outdoors = buildingAt(map, x, y) === null;
-    const outOfSight = anchors.every((p) => Math.hypot(p.x - x, p.y - y) >= SPAWN_MIN_DISTANCE);
+    const outOfSight = anchors.every((p) => {
+      const ground = groundOf(map, p.x, p.y);
+      return Math.hypot(ground.x - x, ground.y - y) >= SPAWN_MIN_DISTANCE;
+    });
     if (outdoors && outOfSight) return { x, y };
   }
   return null;

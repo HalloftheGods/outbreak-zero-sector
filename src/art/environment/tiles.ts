@@ -135,6 +135,15 @@ const BOLTS = [2, 7, 12];
  * every tile shares so a run of them reads as panels. The first has a steel band
  * bolted across it, the second a conduit and a damp stain.
  */
+/** The dark between the floors: never walked, and only seen past a floor's walls. */
+const VOID: Color = RAMPS.ink[0];
+
+/** Two dark tiles, one with a faint fleck of dust so the strip is not perfectly flat where it shows. */
+function voidTile(fleck: boolean): PixelCanvas {
+  const canvas = new PixelCanvas(S, S).fill(VOID);
+  return fleck ? canvas.px(6, 9, RAMPS.ink[1]) : canvas;
+}
+
 function bunkerWall(banded: boolean): PixelCanvas {
   const canvas = new PixelCanvas(S, S).fill(concrete[1]);
   canvas.rect(0, 0, S, 1, concrete[2]).rect(0, S - 2, S, 2, concrete[0]).rect(0, 0, 1, S, concrete[0]);
@@ -177,6 +186,7 @@ export function buildTiles(): Record<TileKind, readonly PixelSprite[]> {
     ...terrain,
     ...buildFloors(),
     bunker_wall: [bunkerWall(true), bunkerWall(false)],
+    void: [voidTile(false), voidTile(true)],
   };
   return Object.fromEntries(
     TILE_KINDS.map((kind) => [kind, canvases[kind].map((canvas) => canvas.toSprite(S, S, 0, S))]),

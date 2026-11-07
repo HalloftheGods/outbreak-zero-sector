@@ -19,6 +19,7 @@ import type { SimState } from './sim-state.ts';
 import { hiddenFromEveryone } from './sim-state.ts';
 import { spawnZombie } from './waves.ts';
 import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
+import { townBuildings, townHeight } from './storeys.ts';
 
 /** Share of the standing population that sits inside buildings. */
 const INDOOR_SHARE = 0.45;
@@ -62,7 +63,7 @@ function indoorSpot(sim: SimState, building: BuildingInstance, type: ZombieType)
 }
 
 function outdoorSpot(sim: SimState, type: ZombieType): Point | null {
-  const spot = { x: randRange(sim.rng, 0, sim.map.width), y: randRange(sim.rng, 0, sim.map.height) };
+  const spot = { x: randRange(sim.rng, 0, sim.map.width), y: randRange(sim.rng, 0, townHeight(sim.map)) };
   const outside = buildingAt(sim.map, spot.x, spot.y) === null;
   return outside && clearFor(sim, type, spot) ? spot : null;
 }
@@ -71,7 +72,7 @@ function outdoorSpot(sim: SimState, type: ZombieType): Point | null {
 function findSpot(sim: SimState, type: ZombieType, allowed: (spot: Point) => boolean): Point | null {
   for (let attempt = 0; attempt < SPOT_TRIES; attempt++) {
     const indoors = sim.rng() < INDOOR_SHARE;
-    const spot = indoors ? indoorSpot(sim, pick(sim.rng, sim.map.buildings), type) : outdoorSpot(sim, type);
+    const spot = indoors ? indoorSpot(sim, pick(sim.rng, townBuildings(sim.map)), type) : outdoorSpot(sim, type);
     const found = spot !== null && allowed(spot);
     if (found) return spot;
   }
@@ -82,7 +83,7 @@ const farFromSpawn = (sim: SimState, spot: Point): boolean =>
   Math.hypot(spot.x - sim.map.spawn.x, spot.y - sim.map.spawn.y) >= SPAWN_SAFE_RADIUS;
 
 function placeGuards(sim: SimState): void {
-  for (const building of sim.map.buildings) {
+  for (const building of townBuildings(sim.map)) {
     const guards = GUARDS[building.kind] ?? 0;
     for (let i = 0; i < guards && sim.zombies.length < sim.populationTarget; i++) {
       const spot = indoorSpot(sim, building, 'walker');

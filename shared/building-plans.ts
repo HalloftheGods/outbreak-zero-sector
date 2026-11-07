@@ -37,6 +37,7 @@ const T = WALL_THICKNESS;
 export const PARTITIONS: Readonly<Partial<Record<BuildingKind, readonly Rect[]>>> = {
   // A bedroom on the west and a kitchen with the back door on the east, both opening onto the living room.
   house: [{ x0: 54, y0: T, x1: 54 + T, y1: 56 }],
+  upstairs: [{ x0: 54, y0: T, x1: 54 + T, y1: 56 }],
   // A hall from the front door to the back, with a room on each side through a doorway.
   apartment: [
     { x0: 58, y0: T, x1: 64, y1: 48 },

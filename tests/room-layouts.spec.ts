@@ -5,6 +5,7 @@ import type { MapBuilder } from '../shared/map-builder.ts';
 import { BUILDING_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, PropInstance, WorldMap } from '../shared/protocol.ts';
 import { backDoorBox } from '../shared/building-plans.ts';
+import { stairsPoint } from '../shared/storeys.ts';
 import { blockedTiles, buildingBox, circleHitsSolid, doorBox, propBox, wallBoxes } from '../shared/world-query.ts';
 import type { Box } from '../shared/world-query.ts';
 
@@ -27,7 +28,8 @@ interface Room {
 
 /** One room on an empty map, with each optional piece in or out according to the bits of `skipped`. */
 function furnished(kind: BuildingKind, skipped: number): Room {
-  const building: BuildingInstance = { id: 'b1', kind, x: ORIGIN_TILE * TILE_SIZE, y: ORIGIN_TILE * TILE_SIZE, variant: 0 };
+  const storey = kind === 'upstairs' || kind === 'cellar';
+  const building: BuildingInstance = { id: 'b1', kind, x: ORIGIN_TILE * TILE_SIZE, y: ORIGIN_TILE * TILE_SIZE, variant: 0, ...(storey ? { of: 'b0' } : {}) };
   const props: PropInstance[] = [];
   let optional = 0;
   const builder = {
@@ -52,13 +54,21 @@ function everyVariant(kind: BuildingKind): Room[] {
   return Array.from({ length: 2 ** optional }, (_, skipped) => furnished(kind, skipped));
 }
 
-/** Every point a body of this radius can walk to from outside the door. */
+/** Where a body walks in from: outside the door, or for a floor above or below, off its stairs. */
+function entry(building: BuildingInstance): { x: number; y: number } {
+  const stairs = building.of === undefined ? null : stairsPoint(building);
+  if (stairs) return stairs;
+  const door = doorBox(building);
+  return { x: (door.x0 + door.x1) / 2, y: door.y1 + 24 };
+}
+
+/** Every point a body of this radius can walk to from where it comes in. */
 function walkable({ map, building }: Room, radius: number): Uint8Array {
   const width = map.width / STEP;
   const height = map.height / STEP;
   const seen = new Uint8Array(width * height);
-  const door = doorBox(building);
-  const start = Math.floor((door.y1 + 24) / STEP) * width + Math.floor((door.x0 + door.x1) / 2 / STEP);
+  const way = entry(building);
+  const start = Math.floor(way.y / STEP) * width + Math.floor(way.x / STEP);
   const stack = [start];
   seen[start] = 1;
   while (stack.length > 0) {

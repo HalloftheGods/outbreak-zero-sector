@@ -92,6 +92,9 @@ export function buildEnvironment(): EnvironmentArt {
       warehouse: [buildSteelWarehouse(), buildBrickWarehouse()],
       house: [buildHipHouse(), buildGableHouse(), buildBungalow()],
       apartment: [buildBrickApartment(), buildSlabApartment()],
+      // Floors above and below are only ever seen from inside, so they borrow a house's shell.
+      upstairs: [buildGableHouse()],
+      cellar: [buildGableHouse()],
     },
     interior: buildInterior(),
     barrelFire: buildBarrelFire(),

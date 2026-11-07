@@ -16,6 +16,8 @@ export interface Container {
   readonly propIndex: number;
   readonly building?: string;
   readonly buildingKind: BuildingKind | 'outdoors';
+  /** On a floor above or below a house, whose stock comes off a generator of its own. */
+  readonly upOrDown?: true;
   /** The bottom centre of the furniture it is part of. */
   readonly x: number;
   readonly y: number;
@@ -63,6 +65,8 @@ const SEARCH_REACH = PLAYER_RADIUS + SEARCH_GAP;
 const ROOM_CONTAINERS: Record<BuildingKind, Partial<Record<PropKind, ContainerKind>>> = {
   house: { bed: 'drawer', fridge: 'fridge', locker: 'locker' },
   apartment: { bed: 'drawer', fridge: 'fridge', locker: 'locker', shelf: 'shelf' },
+  upstairs: { bed: 'drawer', locker: 'locker', shelf: 'shelf' },
+  cellar: { shelf: 'shelf', crate_stack: 'box', workbench: 'cabinet' },
   diner: { fridge: 'fridge' },
   garage: { locker: 'locker', workbench: 'cabinet', shelf: 'shelf', car_sedan_h: 'car', crate_stack: 'box' },
   warehouse: { workbench: 'cabinet', shelf: 'shelf', crate_stack: 'box' },
@@ -107,6 +111,7 @@ function survey(map: WorldMap): TownContainers {
       propIndex,
       building: room ? room.id : undefined,
       buildingKind: room ? room.kind : 'outdoors',
+      ...(room?.of === undefined ? {} : { upOrDown: true as const }),
       x: prop.x,
       y: prop.y,
       box: propBox(prop),

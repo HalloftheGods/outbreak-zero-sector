@@ -1,7 +1,9 @@
-import { BUILDING_DEFS, DOOR_WIDTH, WALL_THICKNESS } from '../../shared/protocol.ts';
+import { BUILDING_DEFS, DOOR_WIDTH, TILE_SIZE, WALL_THICKNESS } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt } from '../../shared/world-map.ts';
 import { BACK_DOORS, PARTITIONS } from '../../shared/building-plans.ts';
+import { flightsOf, isStoreyKind } from '../../shared/storeys.ts';
+import type { Flight } from '../../shared/storeys.ts';
 import type { EnvironmentArt, PixelSprite } from '../art/types.ts';
 import type { ScreenRect } from './light-field.ts';
 import { fadedCanvas, FADE_STEPS, spriteCanvas } from './sprite-cache.ts';
@@ -58,19 +60,61 @@ function paintInterior(kind: BuildingKind, art: EnvironmentArt['interior']): HTM
   northWall(ctx, kind, art);
   tileStrip(ctx, art.wallCap, 0, 0, wall, h);
   tileStrip(ctx, art.wallCap, w - wall, 0, wall, h);
-  tileStrip(ctx, art.wallCap, 0, h - wall, doorLeft, wall);
-  tileStrip(ctx, art.wallCap, doorRight, h - wall, w - doorRight, wall);
-  ctx.drawImage(
-    spriteCanvas(art.doorMat),
-    doorX - Math.round(art.doorMat.w / 2),
-    h - wall - art.doorMat.h,
-  );
+  const closed = isStoreyKind(kind);
+  if (closed) tileStrip(ctx, art.wallCap, 0, h - wall, w, wall);
+  else southWall(ctx, art, doorX, doorLeft, doorRight, w, h);
   for (const inner of PARTITIONS[kind] ?? []) {
     tileStrip(ctx, art.wallCap, inner.x0, inner.y0, inner.x1 - inner.x0, inner.y1 - inner.y0);
     // The end that faces south shows its face, like the north wall does.
     const freeEnd = inner.y1 < h - wall;
     if (freeEnd) tileStrip(ctx, art.wallFace, inner.x0, inner.y1, inner.x1 - inner.x0, art.wallFace.h);
   }
+  return canvas;
+}
+
+/** The front wall either side of the door, and the mat inside it. */
+function southWall(ctx: CanvasRenderingContext2D, art: EnvironmentArt['interior'], doorX: number, doorLeft: number, doorRight: number, w: number, h: number): void {
+  const wall = WALL_THICKNESS;
+  tileStrip(ctx, art.wallCap, 0, h - wall, doorLeft, wall);
+  tileStrip(ctx, art.wallCap, doorRight, h - wall, w - doorRight, wall);
+  ctx.drawImage(spriteCanvas(art.doorMat), doorX - Math.round(art.doorMat.w / 2), h - wall - art.doorMat.h);
+}
+
+const TREAD = ['#3a2a1e', '#5e4632', '#86684a', '#ad8a62'] as const;
+/** The lit front edge of each tread, so stairs read as stairs and not as more floorboards. */
+const NOSING = '#e0c08e';
+const RAIL = '#1a120c';
+const STAIRS_DARK = '#07080b';
+
+/**
+ * One tile of stairs, seen from above. Going up, four treads that catch more light the higher they
+ * climb; going down, the treads drop away into the dark of the floor below.
+ */
+function paintStairs(down: boolean): HTMLCanvasElement {
+  const size = TILE_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const treads = TREAD.length;
+  const depth = size / treads;
+  if (down) {
+    ctx.fillStyle = STAIRS_DARK;
+    ctx.fillRect(0, 0, size, size);
+  }
+  for (let step = 0; step < treads; step++) {
+    // Up: the far (top) tread is the brightest. Down: the near (bottom) one is, and the far ones go dark.
+    const shade = down ? step : treads - 1 - step;
+    const inset = down ? treads - 1 - step : 0;
+    ctx.fillStyle = TREAD[shade];
+    ctx.fillRect(2 + inset, step * depth, size - 4 - inset * 2, depth - 1);
+    const lit = shade >= treads - 2;
+    ctx.fillStyle = lit ? NOSING : TREAD[Math.min(treads - 1, shade + 1)];
+    ctx.fillRect(2 + inset, step * depth, size - 4 - inset * 2, 1);
+  }
+  ctx.fillStyle = RAIL;
+  ctx.fillRect(0, 0, 2, size);
+  ctx.fillRect(size - 2, 0, 2, size);
   return canvas;
 }
 
@@ -102,6 +146,9 @@ export class BuildingLayer {
   private readonly art: EnvironmentArt;
   private readonly interiors = new Map<BuildingKind, HTMLCanvasElement>();
   private readonly byId = new Map<string, PlacedBuilding>();
+  /** The stairs in each building, drawn over its floor once it is open. */
+  private readonly stairs = new Map<string, Flight[]>();
+  private readonly stairsArt = { up: null as HTMLCanvasElement | null, down: null as HTMLCanvasElement | null };
   private map: WorldMap | null = null;
 
   constructor(art: EnvironmentArt) {
@@ -111,6 +158,11 @@ export class BuildingLayer {
   setMap(map: WorldMap): void {
     this.map = map;
     this.byId.clear();
+    this.stairs.clear();
+    for (const flight of flightsOf(map).values()) {
+      const building = buildingAt(map, flight.from.x, flight.from.y);
+      if (building) this.stairs.set(building.id, [...(this.stairs.get(building.id) ?? []), flight]);
+    }
     this.placed = map.buildings.map((building) => {
       const variants = this.art.buildings[building.kind];
       const sprite = variants[building.variant % variants.length];
@@ -180,18 +232,43 @@ export class BuildingLayer {
   drawInteriors(ctx: CanvasRenderingContext2D, left: number, top: number): void {
     for (const placed of this.placed) {
       const showing = placed.reveal > 0;
-      if (showing) ctx.drawImage(this.interior(placed.building.kind), placed.building.x - left, placed.building.y - top);
+      if (!showing) continue;
+      ctx.drawImage(this.interior(placed.building.kind), placed.building.x - left, placed.building.y - top);
+      for (const flight of this.stairs.get(placed.building.id) ?? []) this.drawStairs(ctx, flight, left, top);
     }
+  }
+
+  private drawStairs(ctx: CanvasRenderingContext2D, flight: Flight, left: number, top: number): void {
+    const which = flight.down ? 'down' : 'up';
+    const art = this.stairsArt[which] ?? paintStairs(flight.down);
+    this.stairsArt[which] = art;
+    ctx.drawImage(art, Math.round(flight.from.x - TILE_SIZE / 2 - left), Math.round(flight.from.y - TILE_SIZE / 2 - top));
   }
 
   /** The fade punches pixels out through the dither matrix, so the art stays hard-edged. */
   drawShell(ctx: CanvasRenderingContext2D, placed: PlacedBuilding, left: number, top: number): void {
+    // A floor above or below has no outside to show: shut, it is as dark as the strip it lies in.
+    const storey = isStoreyKind(placed.building.kind);
+    if (storey) {
+      drawShut(ctx, placed, left, top);
+      return;
+    }
     const step = Math.round(placed.reveal * FADE_STEPS);
     const gone = step >= FADE_STEPS;
     if (gone) return;
     const canvas = step === 0 ? spriteCanvas(placed.sprite) : fadedCanvas(placed.sprite, step);
     ctx.drawImage(canvas, placed.x0 - left, placed.y0 - top);
   }
+}
+
+/** Hides a floor nobody is on, and whatever is on it, under the dark; it fades as someone climbs in. */
+function drawShut(ctx: CanvasRenderingContext2D, placed: PlacedBuilding, left: number, top: number): void {
+  const shut = 1 - placed.reveal;
+  if (shut <= 0) return;
+  ctx.globalAlpha = shut;
+  ctx.fillStyle = STAIRS_DARK;
+  ctx.fillRect(placed.building.x - left, placed.building.y - top, placed.width, placed.height);
+  ctx.globalAlpha = 1;
 }
 
 export function roomRect(placed: PlacedBuilding, left: number, top: number): ScreenRect {

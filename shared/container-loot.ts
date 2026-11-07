@@ -24,6 +24,8 @@ const HOME: ContainerLootRule = { odds: 0.24, table: { ...HOME_KEEPSAKES, pistol
 export const CONTAINER_LOOT: Record<BuildingKind | 'outdoors', ContainerLootRule> = {
   house: HOME,
   apartment: HOME,
+  upstairs: { odds: 0.3, table: HOME_KEEPSAKES },
+  cellar: { odds: 0.35, table: { bandage: 2, medkit: 1, knife: 0.6 } },
   diner: { odds: 0.4, table: { bandage: 3, pistol_ammo: 1, knife: 1.5 } },
   garage: { odds: 0.25, table: { pistol_ammo: 1.2, shells: 0.6, bandage: 2, knife: 1.5 } },
   warehouse: { odds: 0.18, table: { bandage: 2, pistol_ammo: 1, shells: 0.5 } },
@@ -42,20 +44,23 @@ function roundsPutAway(type: PickupType, difficulty: DifficultyId): number {
 }
 
 /** One thing of the sort this place holds. */
-export function rollFind(sim: SimState, kind: BuildingKind | 'outdoors'): ContainerLoot {
-  const type = pickWeighted(sim.rng, CONTAINER_LOOT[kind].table);
+export function rollFind(sim: SimState, kind: BuildingKind | 'outdoors', rng: Rng = sim.rng): ContainerLoot {
+  const type = pickWeighted(rng, CONTAINER_LOOT[kind].table);
   return { type, rounds: roundsPutAway(type, sim.difficulty) };
 }
 
-function fill(sim: SimState, kind: BuildingKind | 'outdoors'): ContainerState {
-  const empty = sim.rng() >= CONTAINER_LOOT[kind].odds;
-  return { opened: false, loot: empty ? null : rollFind(sim, kind) };
+function fill(sim: SimState, kind: BuildingKind | 'outdoors', rng: Rng): ContainerState {
+  const empty = rng() >= CONTAINER_LOOT[kind].odds;
+  return { opened: false, loot: empty ? null : rollFind(sim, kind, rng) };
 }
 
-/** Shuts and fills every container in the town. */
-export function stockContainers(sim: SimState): void {
-  sim.containers = townContainers(sim.map).map((container) => fill(sim, container.buildingKind));
+/** Shuts and fills every container in the town. Those upstairs and in cellars roll on `upOrDown`, so the town's own rolls stay put. */
+export function stockContainers(sim: SimState, upOrDown: Rng = sim.rng): void {
+  sim.containers = townContainers(sim.map).map((container) => fill(sim, container.buildingKind, container.upOrDown ? upOrDown : sim.rng));
 }
+
+/** The containers in the town itself, which its ammo budget and its homes' small finds are settled over. */
+const inTown = (sim: SimState) => townContainers(sim.map).filter((container) => !container.upOrDown);
 
 /**
  * Brings the ammo put away to what the town can spare, so a lucky roll never shows up as bare
@@ -63,8 +68,8 @@ export function stockContainers(sim: SimState): void {
  */
 export function settleContainerAmmo(sim: SimState, budget: number, worth: (loot: ContainerLoot) => number): void {
   const isAmmo = (loot: ContainerLoot | null): loot is ContainerLoot => loot !== null && isAmmoPickup(loot.type);
-  const spaces = shuffle(sim.rng, [...townContainers(sim.map)]);
-  let total = containerLoot(sim).filter(isAmmo).reduce((sum, loot) => sum + worth(loot), 0);
+  const spaces = shuffle(sim.rng, [...inTown(sim)]);
+  let total = spaces.map(({ id }) => sim.containers[id].loot).filter(isAmmo).reduce((sum, loot) => sum + worth(loot), 0);
   for (const { id } of spaces) {
     const state = sim.containers[id];
     const withinBudget = total <= budget;
@@ -87,7 +92,7 @@ export function settleContainerAmmo(sim: SimState, budget: number, worth: (loot:
 
 /** Nobody goes through a home for nothing: one that came up empty is left a small find. */
 export function stockEmptyHomes(sim: SimState): void {
-  const town = townContainers(sim.map);
+  const town = inTown(sim);
   const stocked = new Set(town.filter(({ id }) => sim.containers[id].loot).map((c) => c.building));
   const inHomes = town.filter((c) => CONTAINER_LOOT[c.buildingKind] === HOME);
   for (const { id, building } of shuffle(sim.rng, inHomes)) {
