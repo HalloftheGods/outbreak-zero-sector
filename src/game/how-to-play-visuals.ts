@@ -115,6 +115,10 @@ const SECTION_CARDS: Readonly<Record<string, CardList>> = {
   forge: (art) => [{ id: 'forge', title: 'Forge', sprite: art.ui.stations.forge, scale: 1.6 }],
   merchants,
   dying: (art) => [{ id: 'skull', title: 'Skull', sprite: art.ui.skull, scale: 3 }],
+  overrun: (art) => [
+    { id: 'blast_door', title: 'Blast door', sprite: art.environment.overrun.doorBuckling, scale: 1.4, caption: 'Rated for a while.' },
+    { id: 'chest', title: 'Reward chest', sprite: art.environment.props.chest, scale: 2, caption: 'For those who stayed.' },
+  ],
   controls: (art) => [{ id: 'crosshair', title: 'Crosshair', sprite: art.ui.crosshair, scale: 2 }],
   melee: (art) => [{ id: 'knife', title: 'Knife', sprite: art.ui.pickupIcons.knife, scale: 2 }],
   van: (art) => [{ id: 'van', title: 'Escape van', sprite: art.environment.escapeVan, scale: 1 }],

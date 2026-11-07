@@ -410,6 +410,19 @@ const dying: HintMaker = ({ photos }) => ({
   right: [stamp('Not final', -8), photo(photos.crowd, 'A trip, shortly before it was cut short.', 1.2, 'normal', [{ kind: 'circle', x: 150, y: 84, r: 30 }])],
 });
 
+const overrun: HintMaker = ({ art, photos }) => ({
+  layout: 'forecast',
+  color: 'violet',
+  kicker: 'Notice to residents',
+  deck: 'The door holds. For a while.',
+  coverline: 'How long can you stay home?',
+  left: [
+    head,
+    photo(photos.crowd, 'Fig. 14: Visitors, arriving without an appointment.', -1.5, 'hero', [{ kind: 'note', x: 96, y: 18, text: 'shop faster' }]),
+  ],
+  right: [article('numbered'), gallery('spotter', getSectionVisuals('overrun', art), 'Fixtures'), tip('Hold the bunker and the chest pays. Run and the stalls pay instead.'), stamp('Do not open', 6)],
+});
+
 const HINTS: Readonly<Record<string, HintMaker>> = {
   goal,
   styles,
@@ -419,6 +432,7 @@ const HINTS: Readonly<Record<string, HintMaker>> = {
   forge,
   merchants,
   dying,
+  overrun,
   controls,
   noise,
   supplies,

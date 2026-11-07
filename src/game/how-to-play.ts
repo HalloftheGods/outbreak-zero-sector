@@ -195,6 +195,22 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
     ],
   },
   {
+    id: 'overrun',
+    tab: 'Overrun',
+    title: 'Campaign: the overrun',
+    points: [
+      'The bunker is not safe for long. Once you have reached level 2, a clock starts every time you come home.',
+      'It lasts four minutes on Night Light On, three on Stay Close, two and a half on Lights Out and two on Undead Tired.',
+      'It runs at half speed while you are at a stall or station, and the pause menu stops it.',
+      'Warnings sound as it runs down. At the last one you can draw your guns in the bunker.',
+      'When it runs out the blast door bursts and a horde comes in, bigger the further you have got.',
+      'Kill it and everyone opens a reward chest of silver and ammo.',
+      'Run for the van and some merchants die, and the rest have thin stock for three trips. One stall always survives.',
+      'Go down and you lose what you were holding, but the merchants are spared.',
+      'Leave on a trip before the breach and the clock costs nothing.',
+    ],
+  },
+  {
     id: 'workbench',
     tab: 'Workbench',
     title: 'Workbench and gun upgrades',
