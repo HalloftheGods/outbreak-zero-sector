@@ -20,6 +20,15 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 ### Changed
 - The gun bar moves to the bottom centre to make room for the log.
 
+## [2026-11-07] - Upstairs and cellars
+
+### Added
+- Floors above and below (`shared/storeys.ts`). About 30% of houses get an upstairs and 20% a cellar, drawn from the town seed on a generator of its own. Each floor is a building of its own (`upstairs` or `cellar`, with `of` naming its house), laid out in a strip of rows below the town (`WorldMap.townRows`), walled in and surrounded by solid dark (`void` tiles and boxes).
+- Stairs in the house's kitchen corner and at the same spot on the floor. Pressing the search key on them takes them (`stairs_taken` event). The flow fields link the two stairs tiles, so a hunting or investigating zombie walks onto the stairs and comes out on the other floor when that is its way to you.
+- Distances that ignore walls (hearing, dozing off, picking whom to chase, the town map's markers, where a horde or boss spawns) are measured from the same spot in the house (`groundOf`), so someone upstairs counts as being in their house.
+- Upstairs is two bedrooms and a landing; a cellar is one room of shelves, crates and a workbench. Their containers and floor loot roll on their own generators, after the town's, and hold no ammo, so the town's rolls and its ammo budget are as they were. Bedrooms hide candy more often than any other room.
+- The stairs are drawn going up or down, with an "E: UPSTAIRS / DOWNSTAIRS / CELLAR" prompt. A floor nobody is on is drawn dark.
+
 ## [2026-11-07] - Back doors and rooms
 
 ### Added

@@ -126,7 +126,8 @@ export function flightsOf(map: Pick<WorldMap, 'buildings' | 'cols'>): ReadonlyMa
     const house = storey.of === undefined ? undefined : byId.get(storey.of);
     const up = stairsPoint(storey);
     const down = house ? stairsPoint(house) : null;
-    if (!up || !down) continue;
+    const linked = up !== null && down !== null;
+    if (!linked) continue;
     const words = FLIGHT_LABEL[storey.kind as StoreyKind];
     const upIndex = tileIndex(map, up);
     const downIndex = tileIndex(map, down);

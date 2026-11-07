@@ -20,6 +20,19 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'floors',
+    date: '2026-11-07',
+    kind: 'new',
+    title: 'Upstairs and cellars',
+    deck: 'Some houses go up a floor, and some go down one.',
+    points: [
+      'About half the houses have stairs in the kitchen: up to two bedrooms, or down to a cellar.',
+      'Stand on the stairs and press E (or tap Search) to take them.',
+      'Zombies on your heels follow you up and down. A shot upstairs is heard around the house below.',
+      'Bedrooms hide the most candy. Cellars keep first aid, and the odd knife.',
+    ],
+  },
+  {
     id: 'merchants',
     date: '2026-11-07',
     kind: 'better',

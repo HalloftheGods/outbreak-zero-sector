@@ -110,7 +110,8 @@ export class FlowField {
         queue[tail++] = index + cols;
       }
       const upOrDown = stairs[index];
-      if (upOrDown >= 0 && distance[upOrDown] > next) {
+      const nearerByStairs = upOrDown >= 0 && distance[upOrDown] > next;
+      if (nearerByStairs) {
         distance[upOrDown] = next;
         queue[tail++] = upOrDown;
       }

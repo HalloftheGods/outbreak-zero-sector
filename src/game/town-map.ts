@@ -247,7 +247,8 @@ export class TownMapView {
     this.paintStations(ctx);
     const placed: LabelBox[] = [];
     for (const building of this.map.buildings) {
-      if (!isLandmark(building.kind) || isStorey(building)) continue;
+      const named = isLandmark(building.kind) && !isStorey(building);
+      if (!named) continue;
       const box = footprint(building);
       placeLabel(ctx, BUILDING_DEFS[building.kind].label, Math.round((box.x0 + box.x1) / 2), box.y1 + 3, LABEL_COLOR, placed);
     }
