@@ -1,0 +1,321 @@
+/* The record book: the magazine's paper, ruled like a ledger, with numbers written in by hand and days stamped. */
+
+.rb-open {
+  animation: rb-settle 160ms steps(4);
+}
+
+@keyframes rb-settle {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* Ledger paper: faint blue rules and a red margin down the left of every leaf. */
+.rb-leaf {
+  --rule: rgba(47, 143, 224, 0.28);
+  --hand-ink: #1f3b8a;
+}
+
+.rb-leaf::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--m) * 14);
+  z-index: 1;
+  width: calc(var(--m) * 1.5);
+  background: rgba(220, 34, 55, 0.35);
+  pointer-events: none;
+}
+
+.rb-leaf .mag-flow {
+  gap: calc(var(--k) * 14);
+}
+
+.rb-leaf p,
+.rb-leaf h3,
+.rb-leaf dl,
+.rb-leaf dd,
+.rb-leaf ol {
+  margin: 0;
+  padding: 0;
+}
+
+.rb-tab {
+  display: inline-block;
+  align-self: flex-start;
+  padding: calc(var(--k) * 2) calc(var(--k) * 10);
+  background: var(--band);
+  color: var(--on-band);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 13);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* A number written in by hand, big, with what it is in small print after it. */
+.rb-big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: calc(var(--k) * 10);
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 48);
+  line-height: 1;
+  color: var(--hand-ink);
+}
+
+.rb-big-tag {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 11);
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+/* Personal bests: one card for each style. */
+.rb-bests {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 16);
+}
+
+.rb-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 6);
+}
+
+.rb-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The tag, then the value written in at the far end of the rule. */
+.rb-line {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--k) * 6);
+  padding: calc(var(--k) * 3) 0;
+  border-bottom: calc(var(--m) * 1.5) solid var(--rule);
+}
+
+.rb-line dt {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12);
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+.rb-line dd {
+  flex: 1;
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 24);
+  line-height: 1;
+  text-align: right;
+  color: var(--hand-ink);
+}
+
+/* A rubber stamp: ink in a box, a little crooked. */
+.rb-stamp {
+  position: absolute;
+  top: calc(var(--k) * 30);
+  right: calc(var(--k) * 6);
+  padding: calc(var(--k) * 3) calc(var(--k) * 10);
+  border: calc(var(--k) * 3) solid currentColor;
+  color: var(--marker);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 16);
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.82;
+  transform: rotate(-8deg);
+  mix-blend-mode: multiply;
+}
+
+.rb-stamp.is-grey,
+.rb-stamp.is-missed {
+  color: var(--print-soft);
+  opacity: 0.55;
+}
+
+.rb-stamp.is-open {
+  color: var(--band-deep);
+}
+
+.rb-stamp.is-small {
+  position: static;
+  justify-self: end;
+  padding: calc(var(--k) * 1) calc(var(--k) * 6);
+  border-width: calc(var(--k) * 2);
+  font-size: calc(var(--k) * 11);
+  transform: rotate(-4deg);
+}
+
+/* The ledger: ruled rows, the score written in on the right. */
+.rb-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(var(--k) * 15);
+}
+
+.rb-ledger th {
+  padding: 0 calc(var(--k) * 4) calc(var(--k) * 4);
+  border-bottom: calc(var(--m) * 2.5) solid var(--band);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 11);
+  font-weight: 400;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+.rb-ledger td {
+  height: calc(var(--k) * 46);
+  padding: 0 calc(var(--k) * 4);
+  border-bottom: calc(var(--m) * 1.5) solid var(--rule);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.rb-ledger .is-name {
+  text-align: left;
+  font-weight: 700;
+  white-space: normal;
+}
+
+.rb-ledger .is-rank {
+  font-family: var(--chunky);
+  color: var(--band-deep);
+}
+
+.rb-ledger td.is-score {
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 26);
+  text-align: right;
+  color: var(--hand-ink);
+}
+
+.rb-ledger th.is-score {
+  text-align: right;
+}
+
+.rb-ledger .is-blank .is-name {
+  font-family: var(--hand);
+  font-weight: 400;
+  color: var(--print-soft);
+}
+
+.rb-kind {
+  display: block;
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 10);
+  font-weight: 400;
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+/* Daily Night: tonight's ticket stub, then the three numbers that matter. */
+.rb-daily {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 16);
+}
+
+.rb-ticket {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 6);
+  padding: calc(var(--k) * 12);
+  background: var(--paper-deep);
+  border: calc(var(--k) * 2) dashed var(--print-soft);
+}
+
+.rb-ticket .rb-stamp {
+  top: calc(var(--k) * 14);
+}
+
+.rb-ticket-title {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 24);
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.rb-ticket-line {
+  font-style: italic;
+  color: var(--print-soft);
+}
+
+.rb-daily-stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-daily-stat {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 150) 1fr;
+  align-items: baseline;
+  gap: calc(var(--k) * 10);
+  padding: calc(var(--k) * 6) 0;
+  border-bottom: calc(var(--m) * 1.5) solid var(--rule);
+}
+
+.rb-daily-stat dt {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12);
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+.rb-daily-stat .rb-big {
+  font-size: calc(var(--k) * 38);
+}
+
+/* The last seven nights, a line each. */
+.rb-week {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+.rb-week-line {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 110) 1fr auto calc(var(--k) * 96);
+  align-items: center;
+  gap: calc(var(--k) * 10);
+  min-height: calc(var(--k) * 52);
+  border-bottom: calc(var(--m) * 1.5) solid var(--rule);
+}
+
+.rb-week-day {
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 12);
+  text-transform: uppercase;
+  color: var(--print-soft);
+}
+
+.rb-week-day strong {
+  display: block;
+  font-size: calc(var(--k) * 15);
+  color: var(--print);
+}
+
+.rb-week-detail {
+  font-style: italic;
+  color: var(--print-soft);
+}
+
+.rb-week-score {
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 28);
+  line-height: 1;
+  color: var(--hand-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-open {
+    animation: none;
+  }
+}
