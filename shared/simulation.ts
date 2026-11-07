@@ -28,6 +28,7 @@ import { updateWaves } from './waves.ts';
 import { updateZombieStatuses } from './zombie-burn.ts';
 import { updateFires } from './throwables.ts';
 import { updateSupplyDrop } from './supply-drop.ts';
+import { updateBosses } from './bosses.ts';
 import { benchCommand, updateBench } from './workbench.ts';
 import type { BenchAction } from './workbench.ts';
 import { ageFootprints } from './snow-tracks.ts';
@@ -212,6 +213,7 @@ export class GameSimulation {
       updateWaves(sim);
       updatePopulation(sim);
       updateSupplyDrop(sim);
+      updateBosses(sim);
     } else {
       updateOverrun(sim);
     }

@@ -5,6 +5,7 @@
     <span class="level-card-goal">{{ card.goal }}</span>
     <span v-if="card.rule" class="level-card-rule">{{ card.rule }}</span>
     <span v-if="card.event" class="level-card-event">Tonight: {{ card.event }}</span>
+    <span v-if="card.boss" class="level-card-event">Boss night: {{ card.boss }}</span>
   </div>
 </template>
 

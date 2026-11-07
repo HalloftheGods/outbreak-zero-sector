@@ -29,10 +29,10 @@ describe('night events', () => {
     expect(SEEDS.some((seed) => nightEventFor(seed, blackout)?.id === 'power_cut')).toBe(false);
   });
 
-  it('make a blood moon horde half as big again', () => {
+  it('make a blood moon horde twice the size', () => {
     const plain = waveRoster(4, () => 0.5, LEVELS[2]);
-    const bloody = waveRoster(4, () => 0.5, LEVELS[2], undefined, 1.5);
-    expect(bloody.length).toBeGreaterThanOrEqual(Math.round(plain.length * 1.4));
+    const bloody = waveRoster(4, () => 0.5, LEVELS[2], undefined, 2);
+    expect(bloody.length).toBeGreaterThanOrEqual(Math.round(plain.length * 1.9));
   });
 
   it('are named on the level card and change the look', () => {

@@ -20,6 +20,8 @@
       </div>
     </header>
 
+    <BossBar v-if="hud.boss" :boss="hud.boss" />
+
     <ul v-if="hud.teammates.length" class="hud-team">
       <li v-for="mate in hud.teammates" :key="mate.id" class="hud-chip">
         <span :class="{ 'is-threat': mate.status !== 'alive' }">{{ mate.name }}</span>
@@ -102,6 +104,7 @@ import { levelGoal, levelLine } from '../game/level-hud.ts';
 import type { TransportKind } from '../network/transport.ts';
 import { effectOf } from '../../shared/gun-upgrades.ts';
 import { GUN_EFFECTS } from '../../shared/round-effect-data.ts';
+import BossBar from './BossBar.vue';
 import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
 import QuestTracker from './QuestTracker.vue';

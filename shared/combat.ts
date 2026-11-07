@@ -8,6 +8,7 @@ import {
 } from './constants.ts';
 import { chainKill, chainMultiplier } from './kill-chain.ts';
 import { eventOf } from './night-events.ts';
+import { bossDown } from './bosses.ts';
 import { headOnBulletPlane, headshotMultiplier } from './headshots.ts';
 import type { EntityId } from './protocol.ts';
 import { maybeDropOnKill } from './pickups.ts';
@@ -68,6 +69,7 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
   const bunkerHorde = z.horde && sim.overrun !== null;
   if (!bunkerHorde) maybeDropOnKill(sim, z.x, z.y, killer);
   if (z.type === 'bloater') burst(sim, z, killerId);
+  bossDown(sim, z);
 }
 
 /** Dead zombies stay in the list with health 0 until the end of the tick. */

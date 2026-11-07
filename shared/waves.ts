@@ -22,6 +22,7 @@ import { emit, entityId, hiddenFromEveryone, standingPlayers } from './sim-state
 import { buildingAt, circleHitsSolid, isBlockedAt } from './world-query.ts';
 import { SIGHT_CHECK_TICKS, backToRoaming } from './zombie-senses.ts';
 import { eventOf } from './night-events.ts';
+import { liveBoss, maybeSummonBoss } from './bosses.ts';
 
 const SPAWN_TRIES_PER_TICK = 12;
 
@@ -141,7 +142,10 @@ function startHorde(sim: SimState): void {
   sim.spawnQueue = waveRoster(sim.wave, sim.rng, levelDef(sim.level), sim.difficulty, eventOf(sim)?.horde ?? 1).slice(0, room).reverse();
   sim.spawnTimer = 0;
   returnDeadPlayers(sim);
-  emit(sim, { type: 'wave_start', wave: sim.wave, hostiles: sim.spawnQueue.length });
+  const boss = maybeSummonBoss(sim);
+  emit(sim, { type: 'wave_start', wave: sim.wave, hostiles: hordeHostiles(sim) });
+  // After the horde's own banner, so the boss's is the one left up.
+  if (boss?.boss) emit(sim, { type: 'boss_arrive', boss: boss.boss, x: boss.x, y: boss.y });
 }
 
 /**
@@ -200,6 +204,8 @@ export function updateWaves(sim: SimState): void {
   if (sim.phase !== 'wave') return;
   sim.hordeLeft -= TICK_DT;
   trickleSpawns(sim);
-  const hordeOver = hordeHostiles(sim) === 0 || sim.hordeLeft <= 0;
+  // A boss keeps its horde going until it falls: the clock alone does not send it home.
+  const timedOut = sim.hordeLeft <= 0 && liveBoss(sim) === null;
+  const hordeOver = hordeHostiles(sim) === 0 || timedOut;
   if (hordeOver) endHorde(sim);
 }

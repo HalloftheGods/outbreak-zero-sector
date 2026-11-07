@@ -1,3 +1,4 @@
+import { BOSSES } from '../../shared/bosses.ts';
 import type { CalloutTone } from './kill-juice.ts';
 import { displayName } from '../../shared/callsign.ts';
 import { characterOf } from '../../shared/characters.ts';
@@ -76,6 +77,8 @@ export interface HudState {
   readonly gear: PlayerGear | null;
   /** Set while the run is held at the workbench. */
   readonly bench: BenchHud | null;
+  /** The town's boss while it stands: its name and the share of health it has left. */
+  readonly boss: { readonly name: string; readonly share: number } | null;
 }
 
 export interface Banner {
@@ -105,6 +108,8 @@ export interface LevelCard {
   readonly rule?: string;
   /** A night event, for towns that drew one (`shared/night-events.ts`). */
   readonly event?: string;
+  /** A boss night's warning (`shared/bosses.ts`). */
+  readonly boss?: string;
 }
 
 /** A small label for the place the player just walked into. */
@@ -197,6 +202,7 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     spectating,
     gear: local.gear ?? null,
     bench: benchHud(snapshot, local),
+    boss: snapshot.boss ? { name: BOSSES[snapshot.boss.id].name, share: snapshot.boss.health / Math.max(1, snapshot.boss.maxHealth) } : null,
   };
 }
 
