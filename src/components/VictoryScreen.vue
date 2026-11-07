@@ -3,6 +3,7 @@
     <SpriteImg v-if="art" :sprite="art.ui.skull" :scale="3" />
     <h2 class="px-heading">The night is over</h2>
     <p v-if="result.isNewBest" class="victory-best px-blink">New best</p>
+    <p v-if="result.daily" class="victory-best">{{ result.daily.label }}: {{ result.daily.counted ? 'this one counts' : 'practice' }}</p>
 
     <dl class="victory-stats">
       <div><dt>Towns cleared</dt><dd>{{ result.stats.level }}</dd></div>

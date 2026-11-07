@@ -47,7 +47,8 @@ export class SnapshotHandler {
     const onATrip = after?.home !== undefined;
     // Reaching a town on a trip opens nothing: only the van home does, and that comes on a receipt.
     const inArcade = snapshot.home === undefined;
-    const newLevel = inArcade && snapshot.level > state.levelNoted;
+    // A Daily Night starts deep in the game: it unlocks nothing on the Levels page.
+    const newLevel = inArcade && state.daily === null && snapshot.level > state.levelNoted;
     if (newLevel) {
       state.levelNoted = snapshot.level;
       recordLevelReached(snapshot.level);
@@ -107,9 +108,9 @@ export class SnapshotHandler {
 
   enterGameOver(stats: GameOverStats, localId: string, now: number): void {
     const { state, input, audio } = this.host;
-    state.runResult = finishRun(stats, localId);
+    state.runResult = finishRun(stats, localId, state.daily);
     const won = stats.outcome === 'victory';
-    if (won) recordGameFinished();
+    if (won && state.daily === null) recordGameFinished();
     state.gameOverAtMs = now;
     input.setEnabled(false);
     audio.setScene(won ? 'victory' : 'gameover');

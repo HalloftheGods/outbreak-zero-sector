@@ -17,6 +17,7 @@
   </section>
 
   <PlaySetup v-else-if="nav.page === 'play'" :ui :join="nav.invited" :level="nav.startLevel" @close="nav = closePlay(nav)" />
+  <DailyPage v-else-if="nav.page === 'daily'" :ui @close="close" />
   <LevelsPage v-else-if="nav.page === 'levels'" :art="ui.art" @start="nav = pickLevel(nav, $event)" @close="close" />
   <HowToPlay v-else-if="nav.page === 'howto'" @close="close" />
   <RecordsPage v-else-if="nav.page === 'records'" :ui @close="close" />
@@ -34,6 +35,7 @@ import { onlineRoomsLive } from '../network/play-api.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
 import { TITLE_MENU } from '../game/title-menu.ts';
 import { closePage, closePlay, INVITE_LANDING, openPage, pickLevel, TITLE_HOME } from '../game/title-nav.ts';
+import DailyPage from './DailyPage.vue';
 import HowToPlay from './HowToPlay.vue';
 import InstallCartridge from './InstallCartridge.vue';
 import LevelsPage from './LevelsPage.vue';

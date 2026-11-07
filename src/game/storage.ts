@@ -28,10 +28,10 @@ export interface Prefs {
 
 export const DEFAULT_PREFS: Prefs = { callsign: '', serverAddress: '' };
 
-type Store = Pick<Storage, 'getItem' | 'setItem'>;
+export type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
 /** localStorage can throw on access alone in a private window or a locked-down frame. */
-function browserStore(): Store | null {
+export function browserStore(): Store | null {
   try {
     return globalThis.localStorage ?? null;
   } catch {
@@ -39,7 +39,7 @@ function browserStore(): Store | null {
   }
 }
 
-function readJson(store: Store | null, key: string): unknown {
+export function readJson(store: Store | null, key: string): unknown {
   try {
     const raw = store?.getItem(key);
     return raw ? JSON.parse(raw) : null;
@@ -48,7 +48,7 @@ function readJson(store: Store | null, key: string): unknown {
   }
 }
 
-function writeJson(store: Store | null, key: string, value: unknown): void {
+export function writeJson(store: Store | null, key: string, value: unknown): void {
   try {
     store?.setItem(key, JSON.stringify(value));
   } catch {

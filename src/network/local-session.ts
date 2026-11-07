@@ -52,7 +52,9 @@ export class LocalSession implements GameTransport {
    */
   requestRestart(fromLevel?: number): void {
     if (this.playsHome) return;
-    this.options = { ...this.options, startLevel: fromLevel };
+    // A Daily Night plays again from its own level; anything else from where it is told, or level 1.
+    const daily = this.options.seed !== undefined;
+    this.options = { ...this.options, startLevel: fromLevel ?? (daily ? this.options.startLevel : undefined) };
     this.clock.stop();
     this.beginRun();
   }
@@ -88,7 +90,7 @@ export class LocalSession implements GameTransport {
 
   private beginRun(): void {
     const { name, difficulty, character, startLevel, home } = this.options;
-    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const seed = this.options.seed ?? Math.floor(Math.random() * 0x7fffffff);
     const overrun = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
     const sim = new GameSimulation({ seed, difficulty, workbench: 'hold', startLevel, home: this.playsHome, overrun });
     sim.addPlayer(LOCAL_PLAYER_ID, name, null, character, home);

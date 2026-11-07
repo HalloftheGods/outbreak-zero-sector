@@ -5,7 +5,7 @@ import type { SoundUnlock } from './sound-unlock.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 /** The title's menu, what each item opens, and the words its pages show. The components only lay these out. */
-export type TitlePage = 'play' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
+export type TitlePage = 'play' | 'daily' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
 
 export interface TitleMenuItem {
   readonly page: TitlePage;
@@ -22,6 +22,7 @@ export function menuLabel(item: TitleMenuItem, unlock: SoundUnlock): string {
 
 export const TITLE_MENU: readonly TitleMenuItem[] = [
   { page: 'play', label: 'Play' },
+  { page: 'daily', label: 'Daily Night' },
   { page: 'levels', label: 'Levels' },
   { page: 'howto', label: 'How to Play' },
   { page: 'records', label: 'Records' },
