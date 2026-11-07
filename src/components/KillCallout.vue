@@ -37,6 +37,18 @@ defineProps<{ callout: Callout }>();
   color: var(--blood-bright);
 }
 
+.is-stamp {
+  top: 22%;
+}
+
+.is-stamp .callout-text {
+  font-size: calc(var(--u) * 8);
+  color: var(--bone, #e8dcc0);
+  padding: calc(var(--u) * 2) calc(var(--u) * 4);
+  border: calc(var(--u) * 1) solid currentColor;
+  transform: rotate(-4deg);
+}
+
 @keyframes callout-life {
   0% { opacity: 0; transform: scale(1.6); }
   12% { opacity: 1; transform: scale(1); }

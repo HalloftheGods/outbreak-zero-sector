@@ -18,7 +18,7 @@ export const FREEZE_MS = {
 /** The words a chain earns, by its length. Past the last row the count is printed. */
 const CHAIN_WORDS: Readonly<Record<number, string>> = { 2: 'DOUBLE', 3: 'TRIPLE', 4: 'QUAD' };
 
-export type CalloutTone = 'chain' | 'close';
+export type CalloutTone = 'chain' | 'close' | 'stamp';
 
 export interface CalloutWords {
   readonly text: string;

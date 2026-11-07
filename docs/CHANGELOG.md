@@ -2,6 +2,13 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Stamps
+
+### Added
+- Achievements as rubber stamps (`src/game/stamps.ts`): 17 of them, from First Blood and Headhunter (50 headshots across runs) to the three boss stamps, Blood Moon, Into the Fog, Last Stop (all ten towns) and Three Nights (a Daily Night streak of three). They are read off the events every client already gets, so play is the same with them or without them, and kept on the device under `outbreak.stamps` with the day each was earned.
+- A stamp earned in play shows as a "STAMP:" callout once no kill callout has the screen.
+- Two new leaves at the back of the Record Book: each stamp is a ring, inked and dated once earned, and dashed with how to earn it while empty.
+
 ## [2026-11-07] - Boss nights
 
 ### Added

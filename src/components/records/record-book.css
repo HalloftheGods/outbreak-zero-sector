@@ -319,3 +319,71 @@
     animation: none;
   }
 }
+
+/* The stamps: a grid of rubber-stamp rings, inked when earned and dashed while empty. */
+.rb-stamps {
+  display: grid;
+  gap: calc(var(--k) * 8);
+}
+
+.rb-stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--k) * 10) calc(var(--k) * 8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rb-stamp-card {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--k) * 4);
+  text-align: center;
+}
+
+.rb-ring {
+  display: grid;
+  place-content: center;
+  gap: calc(var(--k) * 2);
+  width: calc(var(--k) * 100);
+  aspect-ratio: 1;
+  padding: calc(var(--k) * 3);
+  border: calc(var(--k) * 2) dashed var(--print-soft);
+  border-radius: 50%;
+  color: var(--print-soft);
+  opacity: 0.6;
+}
+
+.is-earned .rb-ring {
+  border: calc(var(--k) * 4) double var(--band-deep);
+  color: var(--band-deep);
+  opacity: 0.88;
+  transform: rotate(var(--tilt));
+  mix-blend-mode: multiply;
+}
+
+.rb-ring-name {
+  font-family: var(--chunky);
+  max-width: 100%;
+  font-size: calc(var(--k) * 11);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.rb-ring-date {
+  font-size: calc(var(--k) * 10);
+  letter-spacing: 0.04em;
+}
+
+.rb-ring-how {
+  font-size: calc(var(--k) * 11);
+  line-height: 1.2;
+  color: var(--print-soft);
+}
+
+.is-earned .rb-ring-how {
+  color: var(--print);
+}

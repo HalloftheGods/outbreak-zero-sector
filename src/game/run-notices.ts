@@ -167,6 +167,11 @@ export class RunNotices {
     return { ...words, key: this.calloutKey };
   }
 
+  /** Whether a callout still has the screen. */
+  calloutShowing(now: number): boolean {
+    return now <= this.calloutUntilMs;
+  }
+
   place(label: string, now: number): PlaceBanner {
     this.placeKey += 1;
     this.placeUntilMs = now + PLACE_BANNER_MS;

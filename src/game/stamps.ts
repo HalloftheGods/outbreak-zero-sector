@@ -27,12 +27,12 @@ export const STAMPS: readonly StampDef[] = [
   { id: 'flare_up', name: 'Flare Up', how: 'Light a flare.' },
   { id: 'special_delivery', name: 'Special Delivery', how: 'Grab something from a supply drop.' },
   { id: 'close_shave', name: 'Close Shave', how: 'Make a kill with almost no health left.' },
+  { id: 'halfway', name: 'Halfway Home', how: 'Reach level 5.' },
   { id: 'howler_down', name: 'Howler Down', how: 'Kill the Howler.' },
   { id: 'mother_down', name: 'Mother Down', how: 'Kill Mother.' },
   { id: 'butcher_down', name: 'Butcher Down', how: 'Kill the Butcher.' },
   { id: 'blood_moon', name: 'Blood Moon', how: 'See off a horde under a blood moon.' },
   { id: 'into_the_fog', name: 'Into the Fog', how: 'Get out of a town in the fog.' },
-  { id: 'halfway', name: 'Halfway Home', how: 'Reach level 5.' },
   { id: 'last_stop', name: 'Last Stop', how: 'Survive all ten towns.' },
   { id: 'daily_bread', name: 'Daily Bread', how: 'Finish a Daily Night that counts.' },
   { id: 'three_nights', name: 'Three Nights', how: 'Play the Daily Night three days in a row.' },
@@ -60,7 +60,8 @@ const EMPTY: StampBook = { earned: {}, headshots: 0, molotovs: 0 };
 
 export function loadStamps(store: Store | null = browserStore()): StampBook {
   const raw = readJson(store, STAMPS_KEY);
-  if (typeof raw !== 'object' || raw === null) return EMPTY;
+  const unreadable = typeof raw !== 'object' || raw === null;
+  if (unreadable) return EMPTY;
   const r = raw as Record<string, unknown>;
   const known = new Set<string>(STAMPS.map((stamp) => stamp.id));
   const earned: Partial<Record<StampId, string>> = {};
@@ -96,29 +97,48 @@ export function readStamps(book: StampBook, events: readonly GameEvent[], ctx: S
   let { headshots, molotovs } = book;
   const mine = (id: EntityId | null): boolean => id !== null && id === ctx.localId;
   const event = nightEventFor(ctx.mapSeed, ctx.level)?.id ?? null;
+  const bloodMoon = event === 'blood_moon';
+  const foggy = event === 'fog';
   for (const e of events) {
-    if (e.type === 'zombie_die' && mine(e.killerId)) {
-      earn('first_blood');
-      if ((e.chain ?? 1) >= CHAIN_FOR_STAMP) earn('massacre');
-    } else if (e.type === 'headshot' && mine(e.playerId)) {
-      headshots += 1;
-    } else if (e.type === 'molotov_burst' && mine(e.playerId)) {
-      molotovs += 1;
-    } else if (e.type === 'flare_lit' && mine(e.playerId)) {
-      earn('flare_up');
-    } else if (e.type === 'pickup' && mine(e.playerId)) {
-      const fromDrop = ctx.drop !== null && Math.hypot(e.x - ctx.drop.x, e.y - ctx.drop.y) <= DROP_REACH;
-      if (fromDrop) earn('special_delivery');
-    } else if (e.type === 'boss_down') {
-      earn(BOSS_STAMPS[e.boss]);
-    } else if (e.type === 'wave_clear' && event === 'blood_moon') {
-      earn('blood_moon');
-    } else if (e.type === 'level_complete' && event === 'fog') {
-      earn('into_the_fog');
-    } else if (e.type === 'level_start' && e.level >= HALFWAY_LEVEL) {
-      earn('halfway');
-    } else if (e.type === 'game_over' && e.stats.outcome === 'victory') {
-      earn('last_stop');
+    switch (e.type) {
+      case 'zombie_die': {
+        const myKill = mine(e.killerId);
+        const myChain = myKill && (e.chain ?? 1) >= CHAIN_FOR_STAMP;
+        if (myKill) earn('first_blood');
+        if (myChain) earn('massacre');
+        break;
+      }
+      case 'headshot':
+        if (mine(e.playerId)) headshots += 1;
+        break;
+      case 'molotov_burst':
+        if (mine(e.playerId)) molotovs += 1;
+        break;
+      case 'flare_lit':
+        if (mine(e.playerId)) earn('flare_up');
+        break;
+      case 'pickup': {
+        const fromDrop = mine(e.playerId) && ctx.drop !== null && Math.hypot(e.x - ctx.drop.x, e.y - ctx.drop.y) <= DROP_REACH;
+        if (fromDrop) earn('special_delivery');
+        break;
+      }
+      case 'boss_down':
+        earn(BOSS_STAMPS[e.boss]);
+        break;
+      case 'wave_clear':
+        if (bloodMoon) earn('blood_moon');
+        break;
+      case 'level_complete':
+        if (foggy) earn('into_the_fog');
+        break;
+      case 'level_start':
+        if (e.level >= HALFWAY_LEVEL) earn('halfway');
+        break;
+      case 'game_over':
+        if (e.stats.outcome === 'victory') earn('last_stop');
+        break;
+      default:
+        break;
     }
   }
   if (headshots >= HEADSHOTS_FOR_STAMP) earn('headhunter');
@@ -128,22 +148,45 @@ export function readStamps(book: StampBook, events: readonly GameEvent[], ctx: S
   return { book: { earned: { ...book.earned, ...stamped }, headshots, molotovs }, earned };
 }
 
-/** Stamps earned off the run's events, saved. Returns the new ones, for the callout. */
-export function stampSnapshot(events: readonly GameEvent[], ctx: StampContext, today: string, store: Store | null = browserStore()): StampId[] {
-  const before = loadStamps(store);
-  const { book, earned } = readStamps(before, events, ctx, today);
-  const changed = earned.length > 0 || book.headshots !== before.headshots || book.molotovs !== before.molotovs;
-  if (changed) writeJson(store, STAMPS_KEY, book);
-  return earned;
+/** Stamps given outright, off a moment rather than an event: a close call, a Daily Night counted, a streak. */
+export function giveStamps(book: StampBook, ids: readonly StampId[], today: string): { book: StampBook; earned: StampId[] } {
+  const earned = ids.filter((id, i) => book.earned[id] === undefined && ids.indexOf(id) === i);
+  const stamped = Object.fromEntries(earned.map((id) => [id, today]));
+  return { book: { ...book, earned: { ...book.earned, ...stamped } }, earned };
 }
 
-/** Stamps given outright, off a moment rather than an event: a close call, a Daily Night counted, a streak. */
-export function giveStamps(ids: readonly StampId[], today: string, store: Store | null = browserStore()): StampId[] {
-  const book = loadStamps(store);
-  const fresh = ids.filter((id) => book.earned[id] === undefined);
-  if (fresh.length === 0) return [];
-  writeJson(store, STAMPS_KEY, { ...book, earned: { ...book.earned, ...Object.fromEntries(fresh.map((id) => [id, today])) } });
-  return fresh;
+/**
+ * Keeps the book in memory through a run, so a snapshot costs no storage read, and saves it when it
+ * changes. Every stamp goes through one keeper, so nothing written elsewhere is overwritten.
+ */
+export class StampKeeper {
+  private book: StampBook;
+
+  constructor(private readonly store: Store | null = browserStore()) {
+    this.book = loadStamps(store);
+  }
+
+  /** Picks up the book again, as a run starts. */
+  reload(): void {
+    this.book = loadStamps(this.store);
+  }
+
+  /** Folds a snapshot's events in. Returns the stamps it newly earned, for the callout. */
+  read(events: readonly GameEvent[], ctx: StampContext, today: string): StampId[] {
+    return this.keep(readStamps(this.book, events, ctx, today));
+  }
+
+  give(ids: readonly StampId[], today: string): StampId[] {
+    return this.keep(giveStamps(this.book, ids, today));
+  }
+
+  private keep(next: { book: StampBook; earned: StampId[] }): StampId[] {
+    const before = this.book;
+    this.book = next.book;
+    const changed = next.earned.length > 0 || next.book.headshots !== before.headshots || next.book.molotovs !== before.molotovs;
+    if (changed) writeJson(this.store, STAMPS_KEY, next.book);
+    return next.earned;
+  }
 }
 
 export const stampName = (id: StampId): string => STAMPS.find((stamp) => stamp.id === id)?.name ?? id;

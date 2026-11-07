@@ -23,13 +23,14 @@
 </template>
 
 <script setup lang="ts">
-/** Records as a printed record book: personal bests, the ledger, the Daily Night and the last seven nights. */
+/** Records as a printed record book: personal bests, the ledger, the Daily Night, the last seven nights and the stamps. */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { trackTitlePage } from '../game/analytics/index.ts';
 import { loadDailyLog } from '../game/daily-night.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { swipeStep, turnKeyStep } from '../game/magazine-controller.ts';
-import { dailySummary, leafLabel, openLeaves, RECORD_LEAVES, turnLeaves, weekLines } from '../game/record-book.ts';
+import { dailySummary, leafLabel, openLeaves, RECORD_LEAVES, stampCards, stampTally, turnLeaves, weekLines } from '../game/record-book.ts';
+import { loadStamps } from '../game/stamps.ts';
 import type { BookMode } from '../game/record-book.ts';
 import { recordRows, recordSections } from '../game/title-menu.ts';
 import MenuLink from './MenuLink.vue';
@@ -45,11 +46,14 @@ const emit = defineEmits<{ close: [] }>();
 const game = useGame();
 
 const log = loadDailyLog();
+const stampBook = loadStamps();
 const book = computed<RecordBookData>(() => ({
   sections: recordSections(ui.best, ui.bestTrip),
   rows: recordRows(ui.leaderboard),
   daily: dailySummary(log),
   week: weekLines(log),
+  stamps: { stamps: stampCards(stampBook, 'stamps'), more_stamps: stampCards(stampBook, 'more_stamps') },
+  tally: stampTally(stampBook),
 }));
 
 /** The same test as How to Play: a window taller than it is wide reads one page at a time. */
