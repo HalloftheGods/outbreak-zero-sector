@@ -11,6 +11,13 @@
   --amber: #e8a33d;
 }
 
+/* Colorblind-safe palette: magenta for harm, sky blue for help, both well clear of amber. */
+:root[data-palette='clear'] {
+  --blood: #b8246f;
+  --blood-bright: #ff4fa8;
+  --sick: #5aaef0;
+}
+
 html,
 body {
   background: var(--ink);
