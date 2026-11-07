@@ -2,7 +2,7 @@ import type { GameStyle } from '../../shared/game-style.ts';
 import type { GameEvent, PickupType, PlayerEntity, WeaponId, WorldMap, ZombieType } from '../../shared/protocol.ts';
 import type { GunEffect } from '../../shared/round-effect-data.ts';
 import { FootstepTracker, type StepPlayer } from './footsteps.ts';
-import { HEARING_RANGE, Mixer } from './mixer.ts';
+import { HEARING_RANGE, Mixer, type BusLevels } from './mixer.ts';
 import { Music, type Scene } from './music.ts';
 import { Soundtrack } from './soundtrack.ts';
 import { SFX } from './sfx-registry.ts';
@@ -38,15 +38,26 @@ const SUPPRESSED_GAIN = 0.35;
 /** A pack waking at once shares this: at most one alert snarl per window. */
 const ALERT_WINDOW = 0.15;
 
-interface Prefs { volume: number; muted: boolean }
+interface Prefs { volume: number; muted: boolean; music: number; sfx: number }
+
+const DEFAULT_PREFS: Prefs = { volume: 0.7, muted: false, music: 1, sfx: 1 };
+
+/** A saved level in 0..1, or the fallback when it is missing or not a number. */
+function level(raw: unknown, fallback: number): number {
+  return typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : fallback;
+}
 
 function loadPrefs(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as Partial<Prefs> | null;
-    const volume = typeof raw?.volume === 'number' ? Math.max(0, Math.min(1, raw.volume)) : 0.7;
-    return { volume, muted: raw?.muted === true };
+    return {
+      volume: level(raw?.volume, DEFAULT_PREFS.volume),
+      muted: raw?.muted === true,
+      music: level(raw?.music, DEFAULT_PREFS.music),
+      sfx: level(raw?.sfx, DEFAULT_PREFS.sfx),
+    };
   } catch {
-    return { volume: 0.7, muted: false };
+    return { ...DEFAULT_PREFS };
   }
 }
 
@@ -80,7 +91,7 @@ export class AudioEngine {
     if (!hasWebAudio()) return;
     if (!this.mixer) {
       try {
-        this.mixer = new Mixer(new AudioContext({ latencyHint: 'interactive' }), this.level);
+        this.mixer = new Mixer(new AudioContext({ latencyHint: 'interactive' }), this.level, this.buses);
         this.music = new Music(this.mixer.ctx, this.mixer.music, (n) => this.ambient(n));
         this.music.setScene(this.scene);
         this.music.setIntensity(this.intensity);
@@ -199,6 +210,26 @@ export class AudioEngine {
 
   set volume(v: number) {
     this.prefs.volume = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
+    this.persist();
+  }
+
+  /** Music, the bed and the soundtrack, as a share of the master volume. */
+  get musicVolume(): number {
+    return this.prefs.music;
+  }
+
+  set musicVolume(v: number) {
+    this.prefs.music = level(v, 0);
+    this.persist();
+  }
+
+  /** Every sound effect, as a share of the master volume. */
+  get sfxVolume(): number {
+    return this.prefs.sfx;
+  }
+
+  set sfxVolume(v: number) {
+    this.prefs.sfx = level(v, 0);
     this.persist();
   }
 
@@ -327,8 +358,13 @@ export class AudioEngine {
     return this.prefs.muted ? 0 : this.prefs.volume;
   }
 
+  private get buses(): BusLevels {
+    return { music: this.prefs.music, sfx: this.prefs.sfx };
+  }
+
   private applyLevel(): void {
     this.mixer?.setLevel(this.level);
+    this.mixer?.setBuses(this.buses);
   }
 
   private persist(): void {

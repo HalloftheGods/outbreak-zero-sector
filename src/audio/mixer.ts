@@ -7,6 +7,12 @@ export const HEARING_RANGE = 420;
 const PAN_SPAN = 260;
 const MAX_VOICES = 44;
 const TRACK_LEVEL = 0.35;
+/** The generated bed sits far under everything else. */
+const BED_LEVEL = 0.12;
+
+/** The player's two sub-levels, 0..1, under the master volume. */
+export interface BusLevels { readonly music: number; readonly sfx: number }
+export const FULL_BUSES: BusLevels = { music: 1, sfx: 1 };
 
 export interface Spatial { readonly gain: number; readonly pan: number }
 
@@ -47,12 +53,13 @@ export class Mixer {
   private timers = new Set<ReturnType<typeof setTimeout>>();
 
   /** Starts at the player's level: a ramp from the node's default would leak a burst past a mute. */
-  constructor(readonly ctx: AudioContext, level: number) {
+  constructor(readonly ctx: AudioContext, level: number, buses: BusLevels = FULL_BUSES) {
     this.sfx = ctx.createGain();
+    this.sfx.gain.value = buses.sfx;
     this.music = ctx.createGain();
-    this.music.gain.value = 0.12;
+    this.music.gain.value = BED_LEVEL * buses.music;
     this.tracks = ctx.createGain();
-    this.tracks.gain.value = TRACK_LEVEL;
+    this.tracks.gain.value = TRACK_LEVEL * buses.music;
     const bus = ctx.createGain();
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16;
@@ -91,6 +98,14 @@ export class Mixer {
 
   setLevel(level: number): void {
     this.master.gain.setTargetAtTime(level, this.ctx.currentTime, 0.02);
+  }
+
+  /** Music (the bed and the soundtrack together) and effects, each under the master level. */
+  setBuses(buses: BusLevels): void {
+    const now = this.ctx.currentTime;
+    this.sfx.gain.setTargetAtTime(buses.sfx, now, 0.02);
+    this.music.gain.setTargetAtTime(BED_LEVEL * buses.music, now, 0.02);
+    this.tracks.gain.setTargetAtTime(TRACK_LEVEL * buses.music, now, 0.02);
   }
 
   play(name: SfxName, o: PlayOpts = {}): void {
