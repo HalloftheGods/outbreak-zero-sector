@@ -7,6 +7,7 @@ import { BuildingLayer, roomRect } from './building-layer.ts';
 import { Camera } from './camera.ts';
 import { EmoteOverlay } from './emote-overlay.ts';
 import { EntityRenderer } from './entity-renderer.ts';
+import { FrameBudget } from './frame-budget.ts';
 import { FxDirector } from './fx-director.ts';
 import { GroundMotion } from './ground-motion.ts';
 import type { FxContext } from './fx-director.ts';
@@ -40,6 +41,10 @@ const VAN_GLOW_COLOR = '#ffc878';
 const VAN_GLOW_RADIUS = 84;
 const VAN_GLOW_STRENGTH = 0.7;
 const VAN_GLOW_HEIGHT = 12;
+/** Flashes of light (shots, burns, blasts) one frame lights at full detail; a slow machine gets a share of it. */
+const MAX_PULSES = 24;
+/** From this load-shedding level on, the light is worked out every other frame and moved with the camera between. */
+const HALF_RATE_LIGHT_LEVEL = 2;
 
 /** Draws the whole game into a low-res buffer that CSS scales up by a whole number. */
 export class WorldRenderer {
@@ -47,6 +52,10 @@ export class WorldRenderer {
   readonly effects: ScreenEffects;
   /** Rolling average of render() in ms, for the dev handle. */
   frameMs = 0;
+  /** Sheds particles and small lights while frames run long. */
+  readonly budget = new FrameBudget();
+  /** Flips each frame, for the light that is only worked out every other frame under load. */
+  private oddFrame = false;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -180,6 +189,10 @@ export class WorldRenderer {
 
   private composeLight(scene: SceneView, left: number, top: number): void {
     const lighting = this.lighting;
+    this.oddFrame = !this.oddFrame;
+    const halfRate = this.budget.level >= HALF_RATE_LIGHT_LEVEL && this.oddFrame;
+    const keptLastLight = halfRate && lighting.reuse(left, top);
+    if (keptLastLight) return;
     lighting.begin(left, top);
     const look = this.atmosphere.look;
     const lights = this.map?.lights ?? [];
@@ -197,7 +210,11 @@ export class WorldRenderer {
     const room = open ? roomRect(open, left, top) : null;
     const inRoom = open !== null && room !== null;
     if (inRoom) lighting.enclose(room, open.reveal);
-    for (const pulse of this.fx.pulses) {
+    const pulses = this.fx.pulses;
+    // The newest flashes are the ones being looked at; older ones are nearly out anyway.
+    const firstPulse = Math.max(0, pulses.length - Math.round(MAX_PULSES * this.budget.share));
+    for (let i = firstPulse; i < pulses.length; i += 1) {
+      const pulse = pulses[i];
       const x = pulse.x - left;
       const y = pulse.y - top;
       const underRoof = this.buildings.isHidden(pulse.x, pulse.y);
@@ -261,6 +278,8 @@ export class WorldRenderer {
 
     this.time += dt;
     const time = this.time;
+    this.budget.update(dt);
+    this.fx.particles.setShare(this.budget.share);
     this.fx.update(dt);
     this.effects.update(dt);
     const viewer = fullScene.players.find((player) => player.id === fullScene.viewerId);

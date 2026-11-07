@@ -91,6 +91,8 @@ export class ParticleSystem {
   private readonly clips: ClipEffect[] = [];
   private readonly texts = new FloatingTexts();
   private readonly stamp: (sprite: PixelSprite, x: number, y: number) => void;
+  /** Share of each cap in force: under 1 while a slow machine is shedding load (`frame-budget.ts`). */
+  private share = 1;
 
   constructor(stamp: (sprite: PixelSprite, x: number, y: number) => void) {
     this.stamp = stamp;
@@ -103,19 +105,31 @@ export class ParticleSystem {
     this.texts.clear();
   }
 
+  /** Scales every cap. What is already flying stays; only new debris is refused past the lower cap. */
+  setShare(share: number): void {
+    this.share = share;
+  }
+
+  private cap(max: number): number {
+    return Math.max(1, Math.round(max * this.share));
+  }
+
+  private isCasingsFull(): boolean {
+    return this.casings.length >= this.cap(MAX_CASINGS);
+  }
+
   addDot(dot: Dot): void {
-    const hasRoomForDot = this.dots.length < MAX_DOTS;
+    const hasRoomForDot = this.dots.length < this.cap(MAX_DOTS);
     if (hasRoomForDot) this.dots.push(dot);
   }
 
   addCasing(casing: Casing): void {
-    const isCasingsFull = this.casings.length >= MAX_CASINGS;
-    if (isCasingsFull) this.casings.shift();
+    while (this.isCasingsFull()) this.casings.shift();
     this.casings.push(casing);
   }
 
   addClip(clip: Clip, x: number, y: number, emissive: boolean): void {
-    const hasRoomForClip = this.clips.length < MAX_CLIPS;
+    const hasRoomForClip = this.clips.length < this.cap(MAX_CLIPS);
     if (hasRoomForClip) this.clips.push({ clip, x, y, age: 0, emissive });
   }
 

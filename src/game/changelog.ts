@@ -20,6 +20,18 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'smooth-hordes',
+    date: '2026-11-07',
+    kind: 'better',
+    title: 'Smoother big hordes',
+    deck: 'A full horde runs faster on slower computers and phones.',
+    points: [
+      'Score pop-ups and bloodstains cost far less to draw.',
+      'When frames start to drop, the game trims spare sparks and small flashes of light first.',
+      'If that is not enough, the lighting updates every other frame until the fight thins out.',
+    ],
+  },
+  {
     id: 'motion-setting',
     date: '2026-11-07',
     kind: 'new',
