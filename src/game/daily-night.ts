@@ -3,7 +3,8 @@
 
 import { difficultyDef } from '../../shared/difficulty.ts';
 import type { DifficultyId } from '../../shared/difficulty.ts';
-import { levelDef } from '../../shared/levels.ts';
+import { levelDef, levelSeed } from '../../shared/levels.ts';
+import { nightEventFor } from '../../shared/night-events.ts';
 import { townRule } from '../../shared/town-rules.ts';
 import { browserStore, readJson, writeJson } from './storage.ts';
 import type { Store } from './storage.ts';
@@ -89,13 +90,15 @@ export function countdownText(ms: number): string {
 }
 
 /** What the day's page says about the town before anyone goes in. */
-export function nightFacts(night: DailyNight): { title: string; level: string; difficulty: string; rule: string | null } {
+export function nightFacts(night: DailyNight): { title: string; level: string; difficulty: string; rule: string | null; event: string | null } {
   const rule = townRule(night.level);
+  const event = nightEventFor(levelSeed(night.seed, night.level), night.level);
   return {
     title: levelDef(night.level).title,
     level: `Level ${night.level}`,
     difficulty: difficultyDef(night.difficulty).label,
     rule: rule ? `${rule.name}: ${rule.blurb}` : null,
+    event: event ? event.name : null,
   };
 }
 

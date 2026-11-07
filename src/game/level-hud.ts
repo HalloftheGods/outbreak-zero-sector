@@ -1,5 +1,6 @@
 import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, levelDef } from '../../shared/levels.ts';
+import { nightEventFor } from '../../shared/night-events.ts';
 import { townRule } from '../../shared/town-rules.ts';
 import type { HudState, LevelCard } from './hud-state.ts';
 
@@ -24,15 +25,17 @@ export function levelGoal(hud: Pick<HudState, 'level' | 'phase' | 'wave' | 'exit
   return `${hordesSurvived(hud)} of ${levelDef(hud.level).hordes} hordes survived`;
 }
 
-/** The words for a level's title card. */
-export function levelTitle(level: number): Omit<LevelCard, 'key'> {
+/** The words for a level's title card. With the town's map seed it also names the night's event, if any. */
+export function levelTitle(level: number, mapSeed: number | null = null): Omit<LevelCard, 'key'> {
   const { number, title, hordes } = levelDef(level);
   const isLast = number === FINAL_LEVEL;
   const rule = townRule(level);
+  const event = mapSeed === null ? null : nightEventFor(mapSeed, level);
   return {
     heading: isLast ? 'Final level' : `Level ${number} of ${FINAL_LEVEL}`,
     title,
     goal: `Survive ${hordes} hordes, then reach the van`,
     ...(rule ? { rule: `${rule.name}: ${rule.blurb}` } : {}),
+    ...(event ? { event: `${event.name}. ${event.blurb}` } : {}),
   };
 }

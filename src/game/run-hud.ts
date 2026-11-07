@@ -165,9 +165,9 @@ export class RunHud {
   }
 
   /** The level's title card. Nothing said in the last town is worth keeping up beside it. */
-  showLevel(level: number, now: number): void {
+  showLevel(level: number, now: number, mapSeed: number | null = null): void {
     this.level = level;
-    this.publish({ levelCard: this.notices.levelCard(level, now), banner: null, place: null });
+    this.publish({ levelCard: this.notices.levelCard(level, now, mapSeed), banner: null, place: null });
   }
 
   /** Who walked in where, and what the floor would not give up. */
