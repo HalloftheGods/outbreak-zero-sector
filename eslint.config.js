@@ -25,6 +25,11 @@ export default tseslint.config(
     },
   },
   {
+    // Specs poke at private engine internals through loose casts.
+    files: ['tests/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
     files: ['public/sw.js'],
     languageOptions: { globals: { ...globals.serviceworker } },
   },

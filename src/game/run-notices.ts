@@ -2,7 +2,7 @@ import { ammoCapOf } from '../../shared/keepsakes.ts';
 import { CANDIES } from '../../shared/candy.ts';
 import type { CandyId } from '../../shared/protocol.ts';
 import { BOSSES } from '../../shared/bosses.ts';
-import { MEDKIT_MAX, PICKUP_RADIUS, WEAPONS } from '../../shared/constants.ts';
+import { MEDKIT_MAX, PICKUP_RADIUS } from '../../shared/constants.ts';
 import { PART_CARRY_CAP } from '../../shared/gun-upgrade-data.ts';
 import { isPartPickup } from '../../shared/gun-upgrades.ts';
 import type { OverrunEnd } from '../../shared/home-protocol.ts';

@@ -372,6 +372,8 @@ export class GameController {
 
   /** The parts of this controller a run reaches into. */
   private runHost(): RunHost {
+    // Getters read the live renderer and map, so they need the controller itself, not a snapshot.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const controller = this;
     return {
       state: this.run,

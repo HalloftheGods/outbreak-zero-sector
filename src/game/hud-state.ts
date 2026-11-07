@@ -8,7 +8,6 @@ import { characterOf } from '../../shared/characters.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { PlayerGear } from '../../shared/gun-upgrades.ts';
 import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
-import { levelDef } from '../../shared/levels.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type {
   EntityId,

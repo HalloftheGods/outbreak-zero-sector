@@ -121,10 +121,11 @@ export function parseHostSignal(text: unknown): HostSignal | null {
       const report = parseReport(m.report);
       return report ? { type: 'report', report } : null;
     }
-    case 'end':
+    case 'end': {
       const hasNoReason = m.reason === undefined;
       if (hasNoReason) return { type: 'end' };
       return isText(m.reason, END_REASON_MAX) ? { type: 'end', reason: m.reason } : null;
+    }
     default:
       return null;
   }

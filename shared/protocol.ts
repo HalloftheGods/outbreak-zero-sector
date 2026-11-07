@@ -6,10 +6,9 @@ import type { DifficultyId } from './difficulty.ts';
 import type { EmoteId } from './emotes.ts';
 import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from './events.ts';
 import type { GameStyle } from './game-style.ts';
-import type { PartId } from './gun-upgrade-data.ts';
 import type { PlayerGear } from './gun-upgrades.ts';
 import type { HomeAction, HomeView, JoinHome, OverrunEnd, RoomHomeView } from './home-protocol.ts';
-import type { GunEffect, RoundKitId } from './round-effect-data.ts';
+import type { GunEffect } from './round-effect-data.ts';
 import type { BenchAction, BenchView } from './workbench.ts';
 
 export { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES };
