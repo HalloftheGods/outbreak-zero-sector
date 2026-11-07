@@ -28,9 +28,15 @@ export function dropPort53(servers: readonly IceServer[]): IceServer[] {
 
 export const turnConfigured = (env: TurnEnv): boolean => env.TURN_ENABLED === '1' && !!env.TURN_KEY_ID && !!env.TURN_KEY_API_TOKEN;
 
+/** The API answers `iceServers` as one server or a list; absent means none. */
+function asServerList(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  return raw ? [raw] : [];
+}
+
 function readServers(data: unknown): IceServer[] {
   const raw = (data as { iceServers?: unknown } | null)?.iceServers;
-  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const list = asServerList(raw);
   return list.filter((each): each is IceServer => typeof each === 'object' && each !== null && 'urls' in each);
 }
 
