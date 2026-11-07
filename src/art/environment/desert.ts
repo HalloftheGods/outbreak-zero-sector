@@ -13,8 +13,9 @@ const { ink, wood, olive, rot, ash, bone } = RAMPS;
 const FLESH: Legend = { H: olive[2], g: rot[2], m: olive[1], d: rot[1], D: rot[0], s: bone[2], b: bone[1], k: ink[1] };
 
 export function buildCactus(): PixelSprite {
-  const c = new PixelCanvas(24, 52);
-  const ground = 48;
+  // The trunk's root row sits on y 41, so the ground line (and its shadow) is right under it.
+  const c = new PixelCanvas(24, 46);
+  const ground = 42;
   c.ellipse(12, ground - 1, 9, 2, ink[1]);
 
   // Arms first, so the trunk overlaps their roots. Left arm: out, then up.
