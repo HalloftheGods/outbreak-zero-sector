@@ -59,6 +59,7 @@ A Hall of the Gods, Inc. game. A top-down pixel art zombie survival game set in 
 | Mouse wheel | Cycle through the weapons you own, wrapping round (one step per notch, 110 ms apart; `cycleWeapon` in `src/game/input-manager.ts`) |
 | Tab or N | Map: the town, or the bunker with its stations |
 | Esc | Pause |
+| L | Run log: everything the screen has said this run |
 | M | Mute |
 
 ## Architecture

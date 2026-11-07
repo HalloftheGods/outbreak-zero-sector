@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Run log
+
+### Added
+- A run log (`src/game/event-log.ts`): every callout, banner, title card, landmark, pickup and teammate going down or getting back up is written down with the run's clock, so it can still be read after the toast is gone. The same words again within a few seconds count up on one line ("CLOSE CALL ×3").
+- The newest five lines sit in the bottom-right corner, older ones dimmer (two lines on touch). Press L, or tap or click the corner, to open the whole log over the run, with tabs for Fights, Loot, Night and Team. The run keeps going underneath.
+
+### Changed
+- The gun bar moves to the bottom centre to make room for the log.
+
 ## [2026-11-07] - Back doors and rooms
 
 ### Added

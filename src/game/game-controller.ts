@@ -119,6 +119,7 @@ export class GameController {
       onConfirm: () => this.confirm(),
       onMap: () => this.toggleMap(),
       mapUsable: () => this.canUseMap(),
+      onLog: () => this.toggleLog(),
       onTouchSeen: () => { this.publish({ touch: true }); this.onResize(); },
     });
     this.inputs = new InputSender(this.input);
@@ -304,6 +305,10 @@ export class GameController {
 
   private flipPause(): void {
     if (!this.isPlaying()) return;
+    if (this.ui.value.logOpen) {
+      this.publish({ logOpen: false });
+      return;
+    }
     if (this.ui.value.mapOpen) {
       this.toggleMap();
       return;
@@ -329,6 +334,12 @@ export class GameController {
     this.holdRun(mapOpen);
     this.publish({ mapOpen });
     return true;
+  }
+
+  /** The run's full log, over the run, which keeps going. Not behind a menu or the map. */
+  toggleLog(): boolean {
+    const free = this.isPlaying() && !this.ui.value.paused && !this.ui.value.mapOpen;
+    return free && this.runHud.toggleLog();
   }
 
   playAgain(fromLevel?: number): void {

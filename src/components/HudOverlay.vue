@@ -100,6 +100,8 @@
         <span v-else-if="swapKey !== null" class="hud-sub is-threat keys-only">Press {{ swapKey }}</span>
         <span v-else-if="hud.ammo === 0" class="hud-sub is-threat keys-only">Press R</span>
       </div>
+
+      <EventFeed v-if="log.length" class="hud-feed" :log />
     </footer>
   </section>
 </template>
@@ -118,6 +120,8 @@ import { effectOf } from '../../shared/gun-upgrades.ts';
 import { GUN_EFFECTS } from '../../shared/round-effect-data.ts';
 import BossBar from './BossBar.vue';
 import KeepsakeOffer from './KeepsakeOffer.vue';
+import EventFeed from './log/EventFeed.vue';
+import type { LogEntry } from '../game/event-log.ts';
 import GunFitPips from './GunFitPips.vue';
 import SpriteImg from './SpriteImg.vue';
 import QuestTracker from './QuestTracker.vue';
@@ -132,6 +136,7 @@ const { hud } = defineProps<{
   signalWeak: boolean;
   place: PlaceBanner | null;
   home: HomeUi | null;
+  log: readonly LogEntry[];
 }>();
 
 const isLow = computed(() => hud.health / hud.maxHealth < LOW_HEALTH);
@@ -173,6 +178,35 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 
 .hud-top {
   align-items: flex-start;
+}
+
+/* Vitals on the left, the guns in the middle, the run's log in the right corner. */
+.hud-bottom {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: 'vitals weapon feed';
+}
+
+.hud-vitals {
+  grid-area: vitals;
+}
+
+.hud-weapon {
+  grid-area: weapon;
+}
+
+.hud-feed {
+  grid-area: feed;
+  justify-self: end;
+}
+
+/* Too narrow for three across: the log sits over the guns on the right. */
+@media (max-width: 720px) {
+  .hud-bottom {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: '. feed' 'vitals weapon';
+    row-gap: calc(var(--u) * 3);
+  }
 }
 
 .hud-home {
@@ -329,7 +363,7 @@ function slotClass(weapon: WeaponId): Record<string, boolean> {
 }
 
 .hud-weapon {
-  align-items: flex-end;
+  align-items: center;
 }
 
 .hud-slots {

@@ -9,6 +9,8 @@ import type { HomeFacts } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
 import type { CalloutWords } from './kill-juice.ts';
+import { bannerLine, calloutLine, eventLine, EventLog, levelLines } from './event-log.ts';
+import type { LogContext, LogLine } from './event-log.ts';
 import { hordeBanner, isLandmark, overrunBanner, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
 import { lockedTracksOf } from '../audio/playlists.ts';
@@ -40,6 +42,8 @@ export const NO_RUN_UI = {
   home: null,
   result: null,
   restarting: false,
+  log: [],
+  logOpen: false,
 } as const satisfies Partial<UiState>;
 
 /** 0..1 for the low-health effects. Anyone not on their feet has no use for them. */
@@ -86,6 +90,7 @@ export interface HudFrame {
 /** Keeps the Vue-facing state and the town map in step with the run, a few times a second. */
 export class RunHud {
   private readonly notices = new RunNotices();
+  private readonly log = new EventLog();
   private readonly ui: () => UiState;
   private readonly publish: (patch: Partial<UiState>) => void;
   /** What the home screens need that no snapshot carries. */
@@ -113,6 +118,7 @@ export class RunHud {
   /** A new run, on this map or the next. */
   reset(): void {
     this.notices.reset();
+    this.log.reset();
     this.town?.clearVisited();
     this.town?.clearOpened();
   }
@@ -151,11 +157,26 @@ export class RunHud {
     this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers, scene.drop, clock);
   }
 
-  onEvent(event: GameEvent, now: number): void {
+  onEvent(event: GameEvent, now: number, ctx?: LogContext): void {
     tapGameEvent(event);
     const track = isRadioFound(event) ? this.giveUpTrack() : null;
     const banner = hordeBanner(event) ?? overrunBanner(event) ?? radioBanner(event, track === null ? null : trackName(track));
-    if (banner) this.publish({ banner: this.notices.banner(banner, now) });
+    if (banner) this.say(banner, now);
+    const line = ctx ? eventLine(event, ctx) : null;
+    if (line) this.note(line, now);
+  }
+
+  /** Writes a line in the run's log, which outlasts every toast. */
+  private note(line: LogLine, now: number): void {
+    this.publish({ log: this.log.add(line, now) });
+  }
+
+  /** The full log opens over the run, which keeps going underneath. */
+  toggleLog(): boolean {
+    const onRun = this.ui().screen === 'game' && this.ui().hud !== null;
+    if (!onRun) return false;
+    this.publish({ logOpen: !this.ui().logOpen });
+    return true;
   }
 
   /** Notes the Radio, and hands out the next track of this level that has not been found, if any is left. */
@@ -172,7 +193,7 @@ export class RunHud {
 
   /** A kill worth a word over the action. */
   callout(words: CalloutWords, now: number): void {
-    this.publish({ callout: this.notices.callout(words, now) });
+    this.publish({ callout: this.notices.callout(words, now), log: this.log.add(calloutLine(words), now) });
   }
 
   calloutShowing(now: number): boolean {
@@ -181,7 +202,7 @@ export class RunHud {
 
   /** A banner of the game's own, outside any event: a hint, or a question put to the player. */
   say(banner: Omit<Banner, 'key'>, now: number): void {
-    this.publish({ banner: this.notices.banner(banner, now) });
+    this.publish({ banner: this.notices.banner(banner, now), log: this.log.add(bannerLine(banner), now) });
   }
 
   /** The home screens read the save, which moves between the hud's beats. */
@@ -196,7 +217,9 @@ export class RunHud {
   /** The level's title card. Nothing said in the last town is worth keeping up beside it. */
   showLevel(level: number, now: number, mapSeed: number | null = null): void {
     this.level = level;
-    this.publish({ levelCard: this.notices.levelCard(level, now, mapSeed), banner: null, place: null });
+    const levelCard = this.notices.levelCard(level, now, mapSeed);
+    for (const line of levelLines(levelCard)) this.log.add(line, now);
+    this.publish({ levelCard, banner: null, place: null, log: this.log.entries });
   }
 
   /** Who walked in where, and what the floor would not give up. */
@@ -207,7 +230,10 @@ export class RunHud {
     const building = enteredId === null ? null : this.town?.building(enteredId) ?? null;
     if (building) {
       this.town?.markVisited(building.id);
-      if (isLandmark(building.kind)) this.publish({ place: this.notices.place(BUILDING_DEFS[building.kind].label, ms) });
+      if (isLandmark(building.kind)) {
+        const label = BUILDING_DEFS[building.kind].label;
+        this.publish({ place: this.notices.place(label, ms), log: this.log.add({ text: label.toUpperCase(), tone: 'plain', kind: 'night' }, ms) });
+      }
     }
     const refused = this.notices.refusal(local, world.latest?.pickups ?? [], ms);
     if (refused) renderer.note(refused, world.predictor.x, world.predictor.y);
