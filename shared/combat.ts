@@ -1,3 +1,4 @@
+import { BRITTLE_HEAL, sugarById, sugarOf } from './candy.ts';
 import {
   BLOATER_BURST_PLAYER_DAMAGE,
   BLOATER_BURST_RADIUS,
@@ -53,6 +54,9 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
   if (killer) {
     killer.score += points;
     killer.kills += 1;
+    const brittle = BRITTLE_HEAL * sugarOf(killer, 'witchs_brittle');
+    const standing = killer.status === 'alive';
+    if (standing) killer.health = Math.min(killer.maxHealth, killer.health + brittle);
   }
   emit(sim, {
     type: 'zombie_die',
@@ -171,7 +175,8 @@ function strike(sim: SimState, b: BulletState, z: ZombieState, angle: number): b
   const damage = b.damage * headshotMultiplier(sim, b, z, angle);
   damageZombie(sim, z, damage, angle, b.shooterId, b.effect === 'acid');
   if (b.effect) applyRoundEffect(sim, b.effect, z, b.shooterId, b.volley);
-  const carriesOn = b.effect === 'piercing' && !b.passed;
+  const pierces = b.effect === 'piercing' || sugarById(sim, b.shooterId, 'bat_bites') > 0;
+  const carriesOn = pierces && !b.passed;
   if (carriesOn) passThrough(sim, b, z);
   return carriesOn;
 }

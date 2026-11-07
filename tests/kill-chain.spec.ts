@@ -3,7 +3,7 @@ import { CHAIN_WINDOW_SEC, chainKill, chainMultiplier } from '../shared/kill-cha
 import { TICK_DT } from '../shared/constants.ts';
 import type { SimState } from '../shared/sim-state.ts';
 
-const simAt = (tick: number) => ({ tick, killChains: new Map() }) as unknown as SimState;
+const simAt = (tick: number) => ({ tick, killChains: new Map(), players: [] }) as unknown as SimState;
 
 describe('kill chains', () => {
   it('pays a quarter more for each kill in a chain, up to double', () => {

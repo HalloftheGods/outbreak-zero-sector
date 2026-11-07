@@ -2,6 +2,7 @@
 // when the town is. A molotov is a bottle with fuel in it, so it spends one of each.
 
 import { landingSpot } from './bottles.ts';
+import { sugarOf } from './candy.ts';
 import { TICK_DT } from './constants.ts';
 import type { Container } from './containers.ts';
 import { hurtPlayer } from './player-health.ts';
@@ -93,14 +94,17 @@ export function updateThrowables(sim: SimState, p: PlayerState): void {
   p.molotovQueued = false;
   p.flareQueued = false;
   if (p.throwCooldown > 0) return;
-  const canMolotov = wantsMolotov && p.fuel > 0 && p.bottles > 0;
+  const fuelled = p.fuel > 0 || sugarOf(p, 'popping_eyeballs') > 0;
+  const canMolotov = wantsMolotov && fuelled && p.bottles > 0;
   const canFlare = !canMolotov && wantsFlare && p.flares > 0;
   if (canMolotov) throwMolotov(sim, p);
   if (canFlare) throwFlare(sim, p);
 }
 
 function throwMolotov(sim: SimState, p: PlayerState): void {
-  p.fuel -= 1;
+  // Popping Eyeballs light the bottle without spending fuel.
+  const free = sugarOf(p, 'popping_eyeballs') > 0;
+  if (!free) p.fuel -= 1;
   p.bottles -= 1;
   p.throwCooldown = THROW_COOLDOWN_SEC;
   const spot = landingSpot(sim, p, MOLOTOV_RANGE);

@@ -1,3 +1,5 @@
+import { CANDIES } from '../../shared/candy.ts';
+import type { CandyId } from '../../shared/protocol.ts';
 import { BOSSES } from '../../shared/bosses.ts';
 import { MEDKIT_MAX, PICKUP_RADIUS, WEAPONS } from '../../shared/constants.ts';
 import { PART_CARRY_CAP } from '../../shared/gun-upgrade-data.ts';
@@ -84,6 +86,13 @@ const SET_BANNERS: Partial<Record<GameEvent['type'], Omit<Banner, 'key'>>> = {
 /** The loud banner for a horde or the van, or null for anything else. */
 /** Said instead of the horde moving on, when the last of it fell. */
 export const HORDE_WIPED_BANNER: Omit<Banner, 'key'> = { title: 'HORDE WIPED OUT', subtitle: 'FOR NOW', tone: 'quiet' };
+
+/** Said to whoever ate it: what the candy does. */
+export function candyBanner(candy: CandyId, saved: boolean): Omit<Banner, 'key'> {
+  const def = CANDIES[candy];
+  if (saved) return { title: 'CARAMEL APPLE', subtitle: 'BACK ON YOUR FEET', tone: 'hope' };
+  return { title: def.name.toUpperCase(), subtitle: def.blurb.replace(/\.$/, '').toUpperCase(), tone: 'hope' };
+}
 
 export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   const hordeCame = event.type === 'wave_start';

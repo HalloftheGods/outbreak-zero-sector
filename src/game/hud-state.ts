@@ -1,3 +1,4 @@
+import { CANDIES } from '../../shared/candy.ts';
 import { BOSSES } from '../../shared/bosses.ts';
 import type { CalloutTone } from './kill-juice.ts';
 import { displayName } from '../../shared/callsign.ts';
@@ -58,6 +59,10 @@ export interface HudState {
   /** Fuel for molotovs (each also takes a bottle), and flares. */
   readonly fuel: number;
   readonly flares: number;
+  /** Candy carried, by name, oldest first: the next eaten is the first not already working. */
+  readonly candy: readonly string[];
+  /** Candy working now, with whole seconds left. */
+  readonly sugar: readonly { readonly name: string; readonly left: number }[];
   readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
@@ -184,6 +189,8 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     bottles: local.bottles ?? 0,
     fuel: local.fuel ?? 0,
     flares: local.flares ?? 0,
+    candy: (local.candy ?? []).map((id) => CANDIES[id].name),
+    sugar: (local.sugar ?? []).map((sugar) => ({ name: CANDIES[sugar.id].name, left: Math.ceil(sugar.left) })),
     knife: local.knife,
     reload: local.reload,
     score: local.score,

@@ -4,7 +4,7 @@ import type { ClientWorld } from './client-world.ts';
 import { recordGameFinished, recordLevelReached } from './level-progress.ts';
 import type { CalloutWords } from './kill-juice.ts';
 import { KillJuice } from './kill-juice.ts';
-import { HORDE_WIPED_BANNER, pickupNote } from './run-notices.ts';
+import { candyBanner, HORDE_WIPED_BANNER, pickupNote } from './run-notices.ts';
 import { finishRun, healthFraction } from './run-hud.ts';
 import type { RunHost } from './run-session.ts';
 import { dateKeyOf, loadDailyLog, streakOf } from './daily-night.ts';
@@ -137,6 +137,8 @@ export class SnapshotHandler {
     const music = EVENT_MUSIC[event.type];
     if (music) audio.setScene(music);
     runHud.onEvent(event, now);
+    const ateIt = event.type === 'candy_eaten' && event.playerId === world.localId;
+    if (ateIt) runHud.say(candyBanner(event.candy, event.saved === true), now);
   }
 
   enterGameOver(stats: GameOverStats, localId: string, now: number): void {

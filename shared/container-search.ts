@@ -11,6 +11,7 @@ import { emit } from './sim-state.ts';
 import { makeNoise } from './zombie-senses.ts';
 import { maybeCarAlarm, scroungeBottle } from './bottles.ts';
 import { stashIn, takeStash } from './throwables.ts';
+import { candyIn, takeCandy } from './candy.ts';
 
 /** Odds that a search knocks something over. */
 export const CLATTER_CHANCE = 0.1;
@@ -61,9 +62,11 @@ function finishSearch(sim: SimState, p: PlayerState, id: number): void {
   if (ordinary) spawnPickup(sim, ordinary.type, p.x, p.y, ordinary.rounds);
   const bottle = ordinary === null && scroungeBottle(sim, p);
   const container = townContainers(sim.map)[id];
-  const stash = takeStash(p, stashIn(sim.map.seed, container));
+  const thrown = takeStash(p, stashIn(sim.map.seed, container));
+  const candy = thrown ? null : takeCandy(p, candyIn(sim.map.seed, container));
+  const stash = thrown ?? (candy ? 'candy' : null);
   maybeCarAlarm(sim, container);
-  emit(sim, { type: 'container_opened', playerId: p.id, container: id, x: p.x, y: p.y, found: found || stash !== null, noisy, ...(bottle ? { bottle } : {}), ...(stash ? { stash } : {}) });
+  emit(sim, { type: 'container_opened', playerId: p.id, container: id, x: p.x, y: p.y, found: found || stash !== null, noisy, ...(bottle ? { bottle } : {}), ...(stash ? { stash } : {}), ...(candy ? { candy } : {}) });
   stopSearch(p);
   p.searchSpent = true;
 }

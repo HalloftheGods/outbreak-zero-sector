@@ -1,3 +1,4 @@
+import { CANDIES } from '../../shared/candy.ts';
 import { MUZZLE_OFFSET } from '../../shared/constants.ts';
 import { chainMultiplier } from '../../shared/kill-chain.ts';
 import { FLARE_SEC } from '../../shared/throwables.ts';
@@ -19,6 +20,12 @@ const BOTTLE_GLASS = ['#8c8c56', '#c4f048', '#e4f0c0'];
 const FLAMES = ['#ffd27a', '#ff9a2e', '#ff5a1c', '#c4300f'];
 const DUST = ['#8a7a5c', '#b3a27a', '#5e523e'];
 const FLARE_SPARKS = ['#ffd0d0', '#ff4a3c', '#ff7a5c'];
+/** What a searcher is told they found besides the loot. */
+function stashLabel(event: Extract<GameEvent, { type: 'container_opened' }>): string {
+  if (event.candy) return CANDIES[event.candy].name.toUpperCase();
+  return event.stash === 'fuel' ? 'FUEL' : 'FLARE';
+}
+
 /** Flames and sparks a second for a pool of fire and for a flare. */
 const FIRE_DOTS_PER_SEC = 70;
 const FLARE_DOTS_PER_SEC = 24;
@@ -158,6 +165,7 @@ export class FxDirector {
       case 'player_hurt': this.onPlayerHurt(event.playerId, event.x, event.y, event.damage, ctx); break;
       case 'player_downed': this.stampBlood(event.x, event.y); break;
       case 'player_revived': this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR); break;
+      case 'candy_eaten': this.particles.addText(event.saved ? 'SAVED BY CARAMEL' : CANDIES[event.candy].name.toUpperCase(), event.x, event.y - 14, PICKUP_COLOR); break;
       case 'pickup': this.onPickup(event, ctx); break;
       case 'container_opened': this.onContainerOpened(event, ctx); break;
       case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
@@ -307,7 +315,7 @@ export class FxDirector {
     const gotBottle = event.bottle === true && event.playerId === ctx.localId;
     if (event.noisy) this.particles.addText('CLATTER', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR);
     else if (gotBottle) this.note('BOTTLE', event.x, event.y);
-    else if (event.stash && event.playerId === ctx.localId) this.particles.addText(event.stash === 'fuel' ? 'FUEL' : 'FLARE', event.x, event.y - NOTE_HEIGHT, PICKUP_COLOR);
+    else if (event.stash && event.playerId === ctx.localId) this.particles.addText(stashLabel(event), event.x, event.y - NOTE_HEIGHT, PICKUP_COLOR);
     else if (emptyHanded) this.note('NOTHING', event.x, event.y);
   }
 

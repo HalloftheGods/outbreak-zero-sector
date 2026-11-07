@@ -15,6 +15,7 @@ import { stepMovement } from './movement.ts';
 import { useMedkit } from './player-health.ts';
 import { updateThrow } from './bottles.ts';
 import { updateThrowables } from './throwables.ts';
+import { candySpeed, sugarOf, updateCandy } from './candy.ts';
 import { isBunkerMap } from './home-protocol.ts';
 import { gunsFree } from './overrun.ts';
 import type { ClientInputPacket, Stance } from './protocol.ts';
@@ -55,7 +56,8 @@ function footsteps(sim: SimState, p: PlayerState): void {
   const stepDue = p.stepNoiseLeft <= 0;
   if (!stepDue) return;
   p.stepNoiseLeft = SPRINT_NOISE_INTERVAL_SEC;
-  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS * characterOf(p.skin).noise * groundEffect(sim.map, p.x, p.y).noise);
+  const hush = 1 - sugarOf(p, 'ghost_gum');
+  makeNoise(sim, p.x, p.y, SPRINT_NOISE_RADIUS * characterOf(p.skin).noise * groundEffect(sim.map, p.x, p.y).noise * hush);
 }
 
 /** Stores the newest input. One-shot requests latch until a tick consumes them. */
@@ -82,6 +84,7 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   p.throwQueued ||= input.throw === true;
   p.molotovQueued ||= input.molotov === true;
   p.flareQueued ||= input.flare === true;
+  p.eatQueued ||= input.eat === true;
   p.searchHeld = input.search === true;
   p.stanceWanted = stanceOf(input);
   if (input.weapon) p.weaponQueued = input.weapon;
@@ -128,7 +131,7 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   p.moving = dirX !== 0 || dirY !== 0;
   p.stance = effectiveStance(p.stanceWanted, p.winded);
   if (p.moving) {
-    const speed = playerSpeed(p.skin, p.stance) * groundSpeedScale(sim.level, sim.map, p.x, p.y);
+    const speed = playerSpeed(p.skin, p.stance) * candySpeed(p) * groundSpeedScale(sim.level, sim.map, p.x, p.y);
     const moved = stepMovement(sim.map, p.x, p.y, dirX, dirY, speed, TICK_DT, PLAYER_RADIUS);
     p.x = moved.x;
     p.y = moved.y;
@@ -144,6 +147,7 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   useMedkit(sim, p);
   updateThrow(sim, p);
   updateThrowables(sim, p);
+  updateCandy(sim, p);
   updateSearch(sim, p);
   updateStations(sim, p);
 }
