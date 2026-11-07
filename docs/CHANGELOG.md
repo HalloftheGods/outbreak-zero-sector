@@ -2,6 +2,20 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Back doors and rooms
+
+### Added
+- Back doors (`shared/building-plans.ts`): houses, apartments, the clinic, the police station, the garage, the warehouse and the grocery have a second door in the north wall, so a crowd at the front is no longer a trap. One tile of sidewalk outside each back door is paved and kept clear of props.
+- Rooms: houses have a bedroom wall on the left, and apartments are split into two flats and a shared hall. The furniture is rearranged around them, and every room is still reachable by the widest body.
+- The north wall draws with its gap, a dark doorway and a mat, and inner walls draw their cap and face.
+
+### Fixed
+- The van could park with a street lamp right where a survivor stands beside it to wait. Its spot now needs that room free.
+
+### Changed
+- The diner keeps its single door. The grocery's north row has four shelves to leave its back door clear.
+- Tests: the floor-loot cap allows the one top-up box a short town adds per building.
+
 ## [2026-11-07] - Keepsakes
 
 ### Added

@@ -19,17 +19,17 @@ import { buildingBox, circleHitsSolid, doorBox } from '../shared/world-map.ts';
 import { addRoamer, addZombie, eventsOf, findBuilding, findProp, input, pointsAcross, quietSim, stateOf, stepUntil, steps } from './helpers/sim-harness.ts';
 
 describe('pathing', () => {
-  it.each<ZombieType>(['walker', 'runner', 'bloater', 'brute'])('a %s walks around a building to reach the player', (type) => {
+  it.each<ZombieType>(['walker', 'runner', 'bloater', 'brute'])('a %s walks around a building with no back door to reach the player', (type) => {
     const { sim, state } = quietSim();
     const [p] = state.players;
-    const warehouse = findBuilding(sim, 'warehouse');
-    const { north, south } = pointsAcross(warehouse);
+    const diner = findBuilding(sim, 'diner');
+    const { north, south } = pointsAcross(diner);
     p.x = south.x;
     p.y = south.y;
     const zombie = addZombie(state, type, north.x, north.y);
     zombie.health = zombie.maxHealth = 1e6;
 
-    const box = buildingBox(warehouse);
+    const box = buildingBox(diner);
     let insideBuilding = false;
     const ticks = stepUntil(
       sim,

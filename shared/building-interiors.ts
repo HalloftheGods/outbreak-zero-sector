@@ -41,7 +41,7 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['shelf', 96, 96],
   ],
   grocery: [
-    ['shelf', 16, NORTH_WALL], ['shelf', 48, NORTH_WALL], ['shelf', 80, NORTH_WALL], ['shelf', 112, NORTH_WALL], ['shelf', 144, NORTH_WALL],
+    ['shelf', 16, NORTH_WALL], ['shelf', 48, NORTH_WALL], ['shelf', 80, NORTH_WALL], ['shelf', 112, NORTH_WALL],
     ['shelf', 96, 52], ['shelf', 128, 52], ['shelf', 160, 52],
     ['shelf', 96, 96], ['shelf', 128, 96], ['shelf', 160, 96],
     ['counter', 16, 60],
@@ -72,19 +72,21 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['workbench', 194, NORTH_DEEP],
     ['shelf', 156, 64], ['shelf', 202, 100, 0.6],
   ],
+  // Bedroom west of the inside wall at 54, kitchen east of it with the back door, living room along the front.
   house: [
-    ['bed', 16, NORTH_BED],
-    ['fridge', 44, NORTH_WALL],
-    ['sofa', 64, 20],
-    ['table', 72, 64],
-    ['locker', 16, 90, 0.5],
+    ['bed', 6, NORTH_BED],
+    ['locker', 38, 14, 0.5],
+    ['fridge', 90, 40],
+    ['sofa', 70, 90],
+    ['table', 6, 80],
   ],
+  // Two rooms either side of the hall that runs from the front door to the back, and a lobby along the front.
   apartment: [
-    ['bed', 16, NORTH_BED], ['bed', 124, NORTH_BED],
-    ['sofa', 64, 20],
-    ['fridge', 104, NORTH_WALL], ['fridge', 136, 116],
-    ['table', 16, 80], ['table', 120, 80],
-    ['locker', 48, NORTH_WALL], ['shelf', 16, 116, 0.5],
+    ['bed', 6, NORTH_BED], ['locker', 38, 14],
+    ['table', 6, 80],
+    ['fridge', 106, 14], ['bed', 130, NORTH_BED],
+    ['table', 130, 80],
+    ['sofa', 6, 122], ['shelf', 122, 122, 0.5],
   ],
 };
 
@@ -146,7 +148,8 @@ function closeUp(run: Piece[], inside: number): void {
     spreadOut(run, inside - WALL_THICKNESS - (right - left));
     return;
   }
-  const shift = nearLeft ? WALL_THICKNESS - left : nearRight ? inside - right : 0;
+  const towardLeft = nearLeft ? WALL_THICKNESS - left : 0;
+  const shift = nearRight && !nearLeft ? inside - right : towardLeft;
   for (const piece of run) piece.left += shift;
 }
 

@@ -1,3 +1,4 @@
+import { backDoorBox, partitionBoxes } from './building-plans.ts';
 import { settleVan } from './exit-van.ts';
 import { BUILDING_DEFS, DOOR_WIDTH, PROP_DEFS, TILE_SIZE, WALL_THICKNESS } from './protocol.ts';
 import type { BuildingInstance, PropInstance, WorldMap } from './protocol.ts';
@@ -43,15 +44,24 @@ export function doorBox(building: BuildingInstance): Box {
   return { x0: left, y0: building.y + h - WALL_THICKNESS, x1: left + DOOR_WIDTH, y1: building.y + h };
 }
 
+/** The north wall, in one piece or either side of a back door. */
+function northWall(building: BuildingInstance, x0: number, y0: number, x1: number): Box[] {
+  const back = backDoorBox(building);
+  const y1 = y0 + WALL_THICKNESS;
+  if (!back) return [{ x0, y0, x1, y1 }];
+  return [{ x0, y0, x1: back.x0, y1 }, { x0: back.x1, y0, x1, y1 }];
+}
+
 function wallsOf(building: BuildingInstance): Box[] {
   const { x0, y0, x1, y1 } = buildingBox(building);
   const door = doorBox(building);
   return [
-    { x0, y0, x1, y1: y0 + WALL_THICKNESS },
+    ...northWall(building, x0, y0, x1),
     { x0, y0, x1: x0 + WALL_THICKNESS, y1 },
     { x0: x1 - WALL_THICKNESS, y0, x1, y1 },
     { x0, y0: door.y0, x1: door.x0, y1 },
     { x0: door.x1, y0: door.y0, x1, y1 },
+    ...partitionBoxes(building),
   ];
 }
 

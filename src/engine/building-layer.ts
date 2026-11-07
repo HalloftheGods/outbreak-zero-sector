@@ -1,11 +1,14 @@
 import { BUILDING_DEFS, DOOR_WIDTH, WALL_THICKNESS } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, WorldMap } from '../../shared/protocol.ts';
 import { buildingAt } from '../../shared/world-map.ts';
+import { BACK_DOORS, PARTITIONS } from '../../shared/building-plans.ts';
 import type { EnvironmentArt, PixelSprite } from '../art/types.ts';
 import type { ScreenRect } from './light-field.ts';
 import { fadedCanvas, FADE_STEPS, spriteCanvas } from './sprite-cache.ts';
 
 const REVEAL_SEC = 0.22;
+/** The night through an open back door. */
+const BACK_DOOR_DARK = '#0b0c10';
 
 export interface PlacedBuilding {
   readonly building: BuildingInstance;
@@ -52,8 +55,7 @@ function paintInterior(kind: BuildingKind, art: EnvironmentArt['interior']): HTM
   const doorLeft = doorX - DOOR_WIDTH / 2;
   const doorRight = doorX + DOOR_WIDTH / 2;
 
-  tileStrip(ctx, art.wallFace, wall, wall, w - wall * 2, art.wallFace.h);
-  tileStrip(ctx, art.wallCap, 0, 0, w, wall);
+  northWall(ctx, kind, art);
   tileStrip(ctx, art.wallCap, 0, 0, wall, h);
   tileStrip(ctx, art.wallCap, w - wall, 0, wall, h);
   tileStrip(ctx, art.wallCap, 0, h - wall, doorLeft, wall);
@@ -63,7 +65,35 @@ function paintInterior(kind: BuildingKind, art: EnvironmentArt['interior']): HTM
     doorX - Math.round(art.doorMat.w / 2),
     h - wall - art.doorMat.h,
   );
+  for (const inner of PARTITIONS[kind] ?? []) {
+    tileStrip(ctx, art.wallCap, inner.x0, inner.y0, inner.x1 - inner.x0, inner.y1 - inner.y0);
+    // The end that faces south shows its face, like the north wall does.
+    const freeEnd = inner.y1 < h - wall;
+    if (freeEnd) tileStrip(ctx, art.wallFace, inner.x0, inner.y1, inner.x1 - inner.x0, art.wallFace.h);
+  }
   return canvas;
+}
+
+/** The north wall's top and face, with the back door left open where there is one: dark night beyond, a mat inside. */
+function northWall(ctx: CanvasRenderingContext2D, kind: BuildingKind, art: EnvironmentArt['interior']): void {
+  const { w } = BUILDING_DEFS[kind];
+  const wall = WALL_THICKNESS;
+  const middle = BACK_DOORS[kind];
+  const faceH = art.wallFace.h;
+  if (middle === undefined) {
+    tileStrip(ctx, art.wallFace, wall, wall, w - wall * 2, faceH);
+    tileStrip(ctx, art.wallCap, 0, 0, w, wall);
+    return;
+  }
+  const left = middle - DOOR_WIDTH / 2;
+  const right = middle + DOOR_WIDTH / 2;
+  tileStrip(ctx, art.wallFace, wall, wall, left - wall, faceH);
+  tileStrip(ctx, art.wallFace, right, wall, w - wall - right, faceH);
+  tileStrip(ctx, art.wallCap, 0, 0, left, wall);
+  tileStrip(ctx, art.wallCap, right, 0, w - right, wall);
+  ctx.fillStyle = BACK_DOOR_DARK;
+  ctx.fillRect(left, 0, DOOR_WIDTH, wall + faceH);
+  ctx.drawImage(spriteCanvas(art.doorMat), middle - Math.round(art.doorMat.w / 2), wall + faceH);
 }
 
 /** The town's buildings: closed shells from outside, opened rooms from within. */

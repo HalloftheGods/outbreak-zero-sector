@@ -1,3 +1,4 @@
+import { backDoorBox, partitionBoxes } from '../shared/building-plans.ts';
 import { describe, expect, it } from 'vitest';
 import { ZOMBIES } from '../shared/constants.ts';
 import { FlowField } from '../shared/flow-field.ts';
@@ -254,7 +255,8 @@ describe('buildings', () => {
   it('wallBoxes leave exactly the door gap', () => {
     const map = generateWorldMap(2);
     const boxes = wallBoxes(map);
-    expect(boxes.length).toBe(map.buildings.length * 5);
+    const expected = map.buildings.reduce((sum, building) => sum + 5 + (backDoorBox(building) ? 1 : 0) + partitionBoxes(building).length, 0);
+    expect(boxes.length).toBe(expected);
     for (const building of map.buildings) {
       const door = doorBox(building);
       expect(door.x1 - door.x0).toBe(DOOR_WIDTH);
@@ -267,13 +269,20 @@ describe('buildings', () => {
     }
   });
 
-  it('wallBoxes cover the other three sides whole', () => {
+  it('wallBoxes cover the other three sides whole, but for a back door', () => {
     const map = generateWorldMap(2);
     for (const building of map.buildings) {
       const { x0, y0, x1, y1 } = buildingBox(building);
-      const midX = (x0 + x1) / 2;
+      const back = backDoorBox(building);
+      // Across the north wall clear of any back door: its west end, which no back door reaches.
+      const northX = x0 + WALL_THICKNESS + 2;
       const midY = (y0 + y1) / 2;
-      expect(segmentHitsSolid(map, midX, y0 - 1, midX, y0 + WALL_THICKNESS + 1)).not.toBeNull();
+      expect(segmentHitsSolid(map, northX, y0 - 1, northX, y0 + WALL_THICKNESS + 1)).not.toBeNull();
+      if (back) {
+        const middle = (back.x0 + back.x1) / 2;
+        expect(segmentHitsSolid(map, middle, back.y0 - 1, middle, back.y1 + 1)).toBeNull();
+        expect(circleHitsSolid(map, middle, (back.y0 + back.y1) / 2, ZOMBIES.brute.radius)).toBe(false);
+      }
       expect(segmentHitsSolid(map, x0 - 1, midY, x0 + WALL_THICKNESS + 1, midY)).not.toBeNull();
       expect(segmentHitsSolid(map, x1 + 1, midY, x1 - WALL_THICKNESS - 1, midY)).not.toBeNull();
     }
