@@ -60,6 +60,8 @@ export interface RunHost {
   readonly titleMap: WorldMap | null;
   publish(patch: Partial<UiState>): void;
   onResize(): void;
+  /** Holds the picture (and, solo, the sim) still for a beat. */
+  hitStop(ms: number): void;
 }
 
 /** WebRTC needs a signal round trip and ICE before the room can answer. */

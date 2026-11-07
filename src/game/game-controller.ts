@@ -79,6 +79,8 @@ export class GameController {
   private lastSnapshotMs = 0;
   private aim = 0;
   private titleTime = 0;
+  /** A hit-stop holds the picture until this frame time. */
+  private heldUntilMs = 0;
   /** Read once, as the solo session reads it: the blast door is drawn only with the overrun on. */
   private readonly overrunOn = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
 
@@ -364,6 +366,7 @@ export class GameController {
       get titleMap() { return controller.titleMap; },
       publish: (patch) => this.publish(patch),
       onResize: () => this.onResize(),
+      hitStop: (ms) => this.hitStop(ms),
     };
   }
 
@@ -385,6 +388,14 @@ export class GameController {
         this.publish({ screen: 'game', result: null });
       },
     };
+  }
+
+  /** Solo only: the sim and the picture stop together, so nothing drifts. In co-op the town carries on, so the picture does too. */
+  private hitStop(ms: number): void {
+    const transport = this.run.transport;
+    if (transport?.kind !== 'solo' || this.isMenuUp()) return;
+    transport.hold?.(ms);
+    this.heldUntilMs = Math.max(this.heldUntilMs, performance.now() + ms);
   }
 
   // --- Frame loop ----------------------------------------------------------
@@ -416,6 +427,10 @@ export class GameController {
     const frozen = menuUp && transport?.kind === 'solo';
     if (frozen) {
       renderer.render({ ...this.lastScene, showCrosshair: false }, 0);
+      return;
+    }
+    if (ms < this.heldUntilMs) {
+      renderer.render(this.lastScene, 0);
       return;
     }
     const dirX = this.input.dirX;

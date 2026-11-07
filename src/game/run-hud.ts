@@ -8,6 +8,7 @@ import { homeUi } from './home-hud.ts';
 import type { HomeFacts } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
+import type { CalloutWords } from './kill-juice.ts';
 import { hordeBanner, isLandmark, overrunBanner, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
 import { lockedTracksOf } from '../audio/playlists.ts';
@@ -25,6 +26,7 @@ export const NO_RUN_UI = {
   mapOpen: false,
   hud: null,
   banner: null,
+  callout: null,
   place: null,
   levelCard: null,
   home: null,
@@ -135,6 +137,11 @@ export class RunHud {
   /** Home has no title card, and nothing said in the last town is worth keeping up in it. */
   clearNotices(): void {
     this.publish({ levelCard: null, banner: null, place: null });
+  }
+
+  /** A kill worth a word over the action. */
+  callout(words: CalloutWords, now: number): void {
+    this.publish({ callout: this.notices.callout(words, now) });
   }
 
   /** A banner of the game's own, outside any event: a hint, or a question put to the player. */
