@@ -1,7 +1,11 @@
 name: Deploy to GitHub Pages
 
+# Runs after Auto Version has bumped package.json and pushed the bump commit, so the build carries the new version.
+# A push whose message holds [skip ci] skips Auto Version and so is not deployed; run this workflow by hand for those.
 on:
-  push:
+  workflow_run:
+    workflows: ["Auto Version"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -16,12 +20,16 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # The tip of main, which is the bump commit when there is one.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: pnpm/action-setup@v4
         with:
           version: 12.3.4

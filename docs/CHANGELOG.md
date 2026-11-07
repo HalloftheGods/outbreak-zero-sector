@@ -2,6 +2,18 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Biomes, terrain, ground effects and footsteps
+
+### Added
+- Per-level biomes (`shared/biomes.ts`): plants, ground, density, litter, park layout, a park landmark and town pieces differ by level. New props `pine`, `cactus`, `dead_tree`, `scrub`, `reeds`, `fungus`. The welcome packet gained an optional `level`.
+- Ground tiles `water`, `snow`, `ash`, `sludge`, laid in patches by a biome; they slow players and zombies and scale sprint-step noise (`shared/ground.ts`).
+- Six footstep sounds, one per ground, spaced by distance walked.
+- Town pieces: fenced and junk-barricaded side streets with a gate, and burning, sunk, overgrown or snowed-in houses.
+
+### Changed
+- Street lamps stand on street corners and at an even pitch along each kerb instead of at random.
+- Solids keep clear of the fence so the map repair cannot take a fence piece down.
+
 ## [2026-11-06] - Towns hold jewels only
 
 ### Changed
