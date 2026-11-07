@@ -7,6 +7,11 @@ import type { SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/proto
 import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
+import { normalizeRoomCode } from '../../shared/lobby/room-code.ts';
+import { HostSession } from '../network/host-session.ts';
+import { onlineRoomsLive, PLAY_API } from '../network/play-api.ts';
+import { RemoteSession, type RoomSession } from '../network/remote-session.ts';
+import { RtcGuestPipe } from '../network/rtc-pipe.ts';
 import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
 import type { GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
@@ -57,6 +62,9 @@ export interface RunHost {
   onResize(): void;
 }
 
+/** WebRTC needs a signal round trip and ICE before the room can answer. */
+const ONLINE_CONNECT_TIMEOUT_MS = 20_000;
+
 export function newRunState(): RunState {
   return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null };
 }
@@ -90,17 +98,39 @@ export class RunSession {
   startCoop(style: GameStyle): void {
     if (!this.canStart()) return;
     this.host.audio.unlock();
-    const url = resolveServerUrl(this.host.ui.value.serverAddress, window.location);
-    const badAddress = url === null;
-    if (badAddress) {
+    const session = this.coopSession(this.host.ui.value.serverAddress, style);
+    if (!session) {
       this.host.publish({ error: 'That server address does not look right.' });
       return;
     }
     this.host.audio.playUi('start');
-    this.host.publish({ mode: 'coop', error: null, connecting: true });
-    const session = new SocketSession(url);
+    this.host.publish({ mode: 'coop', error: null, connecting: true, onlineRoom: null });
     session.onRoom = (room) => this.answerRoom(session, room ?? style);
     this.beginSession(session, style);
+  }
+
+  /**
+   * In a build with online rooms, a blank field hosts one from this tab and a room code joins one over WebRTC.
+   * Anything else, and every address in a build without them, is a LAN server.
+   */
+  private coopSession(address: string, style: GameStyle): RoomSession | null {
+    const text = address.trim();
+    if (onlineRoomsLive()) {
+      if (!text) {
+        const hosting = new HostSession(style);
+        hosting.onHosted = (code) => this.host.publish({ onlineRoom: code });
+        // The game goes on, but nobody new can join, so the invite stops being offered.
+        hosting.onUnlisted = () => this.host.publish({ onlineRoom: null });
+        return hosting;
+      }
+      const code = normalizeRoomCode(text);
+      if (code.ok) {
+        const words = { badAddress: 'That room code does not look right.', noAnswer: 'Could not reach that game. Ask the host to check it is still open.', unreachable: 'Could not reach that game.' };
+        return new RemoteSession(new RtcGuestPipe(PLAY_API, code.code), words, ONLINE_CONNECT_TIMEOUT_MS);
+      }
+    }
+    const url = resolveServerUrl(text, window.location);
+    return url === null ? null : new SocketSession(url);
   }
 
   playAgain(fromLevel?: number): void {
@@ -134,7 +164,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, runStyle: null, ...loadBests(), leaderboard: loadLeaderboard() });
+    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, runStyle: null, onlineRoom: null, ...loadBests(), leaderboard: loadLeaderboard() });
   }
 
   onWelcome(packet: WelcomePacket): void {
@@ -161,7 +191,7 @@ export class RunSession {
     this.host.home.close();
     state.transport = null;
     if (!state.welcomed) {
-      this.host.publish({ connecting: false, runStyle: null, error: reason });
+      this.host.publish({ connecting: false, runStyle: null, onlineRoom: null, error: reason });
       return;
     }
     state.world = null;
@@ -171,7 +201,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'lost', runStyle: null, lostReason: reason });
+    this.host.publish({ ...NO_RUN_UI, screen: 'lost', runStyle: null, onlineRoom: null, lostReason: reason });
   }
 
   private canStart(): boolean {
@@ -201,7 +231,7 @@ export class RunSession {
   }
 
   /** The room has said what it plays, and the screens, the music and the save follow it. */
-  private answerRoom(session: SocketSession, style: GameStyle): void {
+  private answerRoom(session: RoomSession, style: GameStyle): void {
     this.followStyle(style);
     if (playsFromHome(style)) {
       this.readHome(session, (home) => session.join(style, home));
@@ -230,7 +260,7 @@ export class RunSession {
       transport.disconnect();
       // Left open, the next run would write through a save that never finished opening.
       home.close();
-      this.host.publish({ connecting: false, runStyle: null, error: HOME_UNREADABLE });
+      this.host.publish({ connecting: false, runStyle: null, onlineRoom: null, error: HOME_UNREADABLE });
     };
     void home.open(transport.kind).then(answer, giveUp);
   }

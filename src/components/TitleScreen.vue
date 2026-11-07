@@ -30,6 +30,7 @@ import { openPrivacy, privacyOpen } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { parseInvite, withoutJoinParam } from '../game/invite-link.ts';
 import { setPendingRoomCode } from '../game/pending-room.ts';
+import { onlineRoomsLive } from '../network/play-api.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
 import { TITLE_MENU } from '../game/title-menu.ts';
 import { closePage, closePlay, INVITE_LANDING, openPage, pickLevel, TITLE_HOME } from '../game/title-nav.ts';
@@ -59,8 +60,11 @@ const nav = ref(TITLE_HOME);
  */
 const invite = parseInvite(window.location.search);
 if (invite) {
-  if (invite.kind === 'room') setPendingRoomCode(invite.code);
-  else game.setServerAddress(invite.address);
+  if (invite.kind === 'room') {
+    setPendingRoomCode(invite.code);
+    // An online build joins a code from the same field a LAN address goes in.
+    if (onlineRoomsLive()) game.setServerAddress(invite.code);
+  } else game.setServerAddress(invite.address);
   nav.value = INVITE_LANDING;
   window.history.replaceState(null, '', withoutJoinParam(window.location.href));
 }
