@@ -20,6 +20,19 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'combat-feel',
+    date: '2026-11-07',
+    kind: 'better',
+    title: 'Fights hit harder',
+    deck: 'You can hear a brute coming, and a boss going down feels like it.',
+    points: [
+      'Brutes and bosses stomp as they walk, so you hear a big one before you see it.',
+      'Every gun reloads its own way: the pistol slide snaps, the carbine racks, the shotgun loads shell by shell.',
+      'When you are badly hurt the red at the edge of the screen beats with your heart, and the world goes muffled.',
+      'A boss kill freezes the moment with a flash and the biggest shake in the game. Reduced motion keeps it calm.',
+    ],
+  },
+  {
     id: 'faster-first-load',
     date: '2026-11-07',
     kind: 'better',

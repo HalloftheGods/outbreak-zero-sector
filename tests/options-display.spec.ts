@@ -62,6 +62,7 @@ describe('Mixer buses', () => {
       },
       createDynamicsCompressor: () => ({ ...node(), threshold: {}, knee: {}, ratio: {}, attack: {}, release: {} }),
       createWaveShaper: node,
+      createBiquadFilter: () => ({ ...node(), frequency: {} }),
     };
     new Mixer(ctx as unknown as AudioContext, 1, buses);
     return made.slice(0, 3).map((g) => g.gain.value);
