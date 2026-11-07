@@ -4,7 +4,7 @@ A Hall of the Gods, Inc. game. A top-down pixel art zombie survival game across 
 
 **Play solo in your browser:** https://undeadofnight.forthexp.com/
 
-Every level is its own kind of town: oak and pine suburbs, scrapland, a flooded marsh, blighted fungus fields, a pine forest, a fenced cordon, snowbound tundra, a hive and a burning ashland. Each has its own plants, ground, park, landmark and footsteps. The full rules are in [docs/README.md](docs/README.md).
+Every level is its own kind of town: oak and pine suburbs, scrapland, a flooded marsh, blighted fungus fields, a pine forest, a fenced cordon, snowbound tundra, a hive and a burning ashland. Each has its own plants, ground, park, landmark and footsteps. The full rules are in [docs/README.md](docs/README.md). The plan for getting players, Steam and consoles is in [docs/launch-plan.md](docs/launch-plan.md).
 
 Multiplayer needs the game server, which GitHub Pages cannot host. Run it yourself to play together; see [docs/README.md](docs/README.md).
 
