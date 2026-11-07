@@ -25,6 +25,7 @@ export const CONTAINER_LOOT: Record<BuildingKind | 'outdoors', ContainerLootRule
   house: HOME,
   apartment: HOME,
   upstairs: { odds: 0.3, table: HOME_KEEPSAKES },
+  apartment_upstairs: { odds: 0.3, table: HOME_KEEPSAKES },
   cellar: { odds: 0.35, table: { bandage: 2, medkit: 1, knife: 0.6 } },
   diner: { odds: 0.4, table: { bandage: 3, pistol_ammo: 1, knife: 1.5 } },
   garage: { odds: 0.25, table: { pistol_ammo: 1.2, shells: 0.6, bandage: 2, knife: 1.5 } },

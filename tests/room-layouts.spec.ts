@@ -5,7 +5,7 @@ import type { MapBuilder } from '../shared/map-builder.ts';
 import { BUILDING_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, PropInstance, WorldMap } from '../shared/protocol.ts';
 import { backDoorBox } from '../shared/building-plans.ts';
-import { stairsPoint } from '../shared/storeys.ts';
+import { isStoreyKind, stairsPoint } from '../shared/storeys.ts';
 import { blockedTiles, buildingBox, circleHitsSolid, doorBox, propBox, wallBoxes } from '../shared/world-query.ts';
 import type { Box } from '../shared/world-query.ts';
 
@@ -28,7 +28,7 @@ interface Room {
 
 /** One room on an empty map, with each optional piece in or out according to the bits of `skipped`. */
 function furnished(kind: BuildingKind, skipped: number): Room {
-  const storey = kind === 'upstairs' || kind === 'cellar';
+  const storey = isStoreyKind(kind);
   const building: BuildingInstance = { id: 'b1', kind, x: ORIGIN_TILE * TILE_SIZE, y: ORIGIN_TILE * TILE_SIZE, variant: 0, ...(storey ? { of: 'b0' } : {}) };
   const props: PropInstance[] = [];
   let optional = 0;

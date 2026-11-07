@@ -96,6 +96,14 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['locker', 90, 14],
     ['shelf', 6, 90], ['table', 82, 90, 0.6],
   ],
+  // Two more flats off the same hall, furnished the same, with the stairs coming up in the lobby's east end.
+  apartment_upstairs: [
+    ['bed', 6, NORTH_BED], ['locker', 38, 14],
+    ['table', 6, 80],
+    ['fridge', 106, 14], ['bed', 130, NORTH_BED],
+    ['table', 130, 80],
+    ['sofa', 6, 122], ['shelf', 122, 122, 0.5],
+  ],
   // One room under the whole house, stores along the walls and the stairs coming down in the same corner.
   cellar: [
     ['shelf', 6, NORTH_WALL], ['workbench', 66, NORTH_DEEP],

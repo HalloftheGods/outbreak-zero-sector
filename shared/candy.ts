@@ -61,6 +61,7 @@ const CANDY_ODDS: Partial<Record<Container['buildingKind'], number>> = {
   house: 0.3,
   // Bedrooms are where a night's haul gets hidden.
   upstairs: 0.45,
+  apartment_upstairs: 0.35,
   cellar: 0.15,
   apartment: 0.25,
   grocery: 0.18,

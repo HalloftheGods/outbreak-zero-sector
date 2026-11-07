@@ -72,6 +72,7 @@ const BUILDING_COLOR: Record<BuildingKind, string> = {
   apartment: HOMES,
   upstairs: HOMES,
   cellar: HOMES,
+  apartment_upstairs: HOMES,
 };
 
 /** What the colours mean, for the key beside the map. */

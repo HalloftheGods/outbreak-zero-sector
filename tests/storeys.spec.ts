@@ -21,9 +21,20 @@ describe('floors above and below', () => {
     expect(map.buildings.filter((b) => b.kind === 'cellar').length).toBeGreaterThan(0);
     expect(townBuildings(map).length + storeys.length).toBe(map.buildings.length);
     for (const storey of storeys) {
-      expect(houseOf(map, storey).kind).toBe('house');
+      expect(['house', 'apartment']).toContain(houseOf(map, storey).kind);
       expect(storey.y).toBeGreaterThanOrEqual(townHeight(map));
       expect(buildingAt(map, storey.x + 40, storey.y + 40)).toBe(storey);
+    }
+  });
+
+  it.each(SEEDS)('seed %i: every apartment block has a second floor', (seed) => {
+    const map = generateWorldMap(seed);
+    const blocks = map.buildings.filter((b) => b.kind === 'apartment');
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      const upstairs = map.buildings.find((b) => b.of === block.id);
+      expect(upstairs?.kind).toBe('apartment_upstairs');
+      expect(flightAt(map, stairsPoint(block)!.x, stairsPoint(block)!.y)?.label).toBe('UPSTAIRS');
     }
   });
 
