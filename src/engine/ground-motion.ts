@@ -74,9 +74,14 @@ const MOTION: Partial<Record<LevelTheme, Motion>> = { flooded: 'water', snow: 's
 export class GroundMotion {
   private map: WorldMap | null = null;
   private motion: Motion = null;
-  private readonly reducedMotion: boolean;
+  private reducedMotion: boolean;
 
   constructor(reducedMotion: boolean) {
+    this.reducedMotion = reducedMotion;
+  }
+
+  /** The Motion setting changed while the game was running. */
+  setReducedMotion(reducedMotion: boolean): void {
     this.reducedMotion = reducedMotion;
   }
 
