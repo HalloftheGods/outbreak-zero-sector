@@ -119,6 +119,9 @@ function spread(amount: number): number {
 }
 
 /** Turns sim events into everything visual that follows from them. */
+type FxHandler<K extends GameEvent['type']> = (event: Extract<GameEvent, { type: K }>, ctx: FxContext) => void;
+type FxHandlers = { readonly [K in GameEvent['type']]?: FxHandler<K> };
+
 export class FxDirector {
   readonly particles: ParticleSystem;
   readonly pulses: PulseLight[] = [];
@@ -146,38 +149,42 @@ export class FxDirector {
     this.particles.update(dt);
     for (let i = this.pulses.length - 1; i >= 0; i -= 1) {
       this.pulses[i].life -= dt;
-      if (this.pulses[i].life <= 0) this.pulses.splice(i, 1);
+      const isPulseSpent = this.pulses[i].life <= 0;
+      if (isPulseSpent) this.pulses.splice(i, 1);
     }
     // After the pulses age, so this frame's glow is drawn at full strength and gone by the next.
     this.burnOn(dt);
   }
 
+  /** What each event draws; an event with no entry draws nothing. */
+  private readonly handlers: FxHandlers = {
+    shot: (event, ctx) => this.onShot(event, ctx),
+    melee: (event, ctx) => this.onMelee(event, ctx),
+    heal: (event, ctx) => this.onHeal(event, ctx),
+    bullet_impact: (event) => this.onImpact(event.x, event.y, event.angle),
+    zombie_hit: (event, ctx) => this.onZombieHit(event.zombieId, event.x, event.y, event.angle, ctx.time),
+    headshot: (event, ctx) => this.onHeadshot(event, ctx),
+    zombie_die: (event, ctx) => this.onZombieDie(event, ctx),
+    bloater_burst: (event) => this.onBurst(event.x, event.y, event.radius),
+    player_hurt: (event, ctx) => this.onPlayerHurt(event.playerId, event.x, event.y, event.damage, ctx),
+    player_downed: (event) => this.stampBlood(event.x, event.y),
+    player_revived: (event) => this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR),
+    candy_eaten: (event) => this.particles.addText(event.saved ? 'SAVED BY CARAMEL' : CANDIES[event.candy].name.toUpperCase(), event.x, event.y - 14, PICKUP_COLOR),
+    pickup: (event, ctx) => this.onPickup(event, ctx),
+    container_opened: (event, ctx) => this.onContainerOpened(event, ctx),
+    bottle_smash: (event) => this.onBottleSmash(event.x, event.y),
+    molotov_burst: (event) => this.onMolotov(event.x, event.y, event.radius, event.sec),
+    flare_lit: (event) => this.onFlare(event.x, event.y, event.sec),
+    drop_called: (event) => this.onFlare(event.x, event.y, FLARE_SEC),
+    drop_landed: (event) => this.onDropLanded(event.x, event.y),
+    car_alarm: (event) => this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR),
+    zombie_status: (event) => this.onZombieStatus(event),
+    overrun_breach: () => this.effects.addShake(OVERRUN_BURST_SHAKE),
+  };
+
   handle(event: GameEvent, ctx: FxContext): void {
-    switch (event.type) {
-      case 'shot': this.onShot(event, ctx); break;
-      case 'melee': this.onMelee(event, ctx); break;
-      case 'heal': this.onHeal(event, ctx); break;
-      case 'bullet_impact': this.onImpact(event.x, event.y, event.angle); break;
-      case 'zombie_hit': this.onZombieHit(event.zombieId, event.x, event.y, event.angle, ctx.time); break;
-      case 'headshot': this.onHeadshot(event, ctx); break;
-      case 'zombie_die': this.onZombieDie(event, ctx); break;
-      case 'bloater_burst': this.onBurst(event.x, event.y, event.radius); break;
-      case 'player_hurt': this.onPlayerHurt(event.playerId, event.x, event.y, event.damage, ctx); break;
-      case 'player_downed': this.stampBlood(event.x, event.y); break;
-      case 'player_revived': this.particles.addText('REVIVED', event.x, event.y - 14, PICKUP_COLOR); break;
-      case 'candy_eaten': this.particles.addText(event.saved ? 'SAVED BY CARAMEL' : CANDIES[event.candy].name.toUpperCase(), event.x, event.y - 14, PICKUP_COLOR); break;
-      case 'pickup': this.onPickup(event, ctx); break;
-      case 'container_opened': this.onContainerOpened(event, ctx); break;
-      case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
-      case 'molotov_burst': this.onMolotov(event.x, event.y, event.radius, event.sec); break;
-      case 'flare_lit': this.onFlare(event.x, event.y, event.sec); break;
-      case 'drop_called': this.onFlare(event.x, event.y, FLARE_SEC); break;
-      case 'drop_landed': this.onDropLanded(event.x, event.y); break;
-      case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
-      case 'zombie_status': this.onZombieStatus(event); break;
-      case 'overrun_breach': this.effects.addShake(OVERRUN_BURST_SHAKE); break;
-      default: break;
-    }
+    const handler = this.handlers[event.type] as FxHandler<GameEvent['type']> | undefined;
+    handler?.(event, ctx);
   }
 
   private onShot(event: Extract<GameEvent, { type: 'shot' }>, ctx: FxContext): void {
@@ -198,7 +205,8 @@ export class FxDirector {
     const light = MUZZLE_LIGHT[event.weapon];
     this.pulses.push({ x: tipX, y: bodyY, radius: light.radius, color: '#ffd28a', life: light.life, maxLife: light.life });
     this.ejectCasing(event.weapon, bodyX + dirX * 4, bodyY + dirY * 4, dirX, dirY);
-    if (event.weapon === 'shotgun') this.particles.addClip(this.art.fx.smokePuff, tipX, tipY, false);
+    const isShotgun = event.weapon === 'shotgun';
+    if (isShotgun) this.particles.addClip(this.art.fx.smokePuff, tipX, tipY, false);
     if (isLocal) this.effects.addShake(SHOT_KICK[event.weapon]);
   }
 
@@ -239,14 +247,16 @@ export class FxDirector {
   private onZombieStatus(event: Extract<GameEvent, { type: 'zombie_status' }>): void {
     const burst = burstFor(event);
     this.burstDots(event.x, event.y, -Math.PI / 2, burst.colors, burst.count, burst.speed, burst.emissive, Math.PI);
-    if (event.effect === 'incendiary') this.pulses.push({ x: event.x, y: event.y, radius: STATUS_LIGHT_RADIUS, color: '#ff8a1c', life: STATUS_LIGHT_LIFE, maxLife: STATUS_LIGHT_LIFE });
+    const isIncendiary = event.effect === 'incendiary';
+    if (isIncendiary) this.pulses.push({ x: event.x, y: event.y, radius: STATUS_LIGHT_RADIUS, color: '#ff8a1c', life: STATUS_LIGHT_LIFE, maxLife: STATUS_LIGHT_LIFE });
   }
 
   private onZombieHit(id: EntityId, x: number, y: number, angle: number, time: number): void {
     this.visuals.get(id).flashUntil = time + HIT_FLASH_SEC;
     this.particles.addClip(this.art.fx.bloodBurst, x, y - CHEST_HEIGHT, false);
     this.burstDots(x, y, angle, BLOOD, 6, 60, false);
-    if (Math.random() < 0.35) this.stampBlood(x + spread(6), y + spread(6));
+    const shouldSplatter = Math.random() < 0.35;
+    if (shouldSplatter) this.stampBlood(x + spread(6), y + spread(6));
   }
 
   /** The event is at the head as drawn, and dots start CHEST_HEIGHT over the spot they are given. */
@@ -268,7 +278,8 @@ export class FxDirector {
     this.burstDots(x, y, angle, BLOOD, 14, 80, false);
     this.stampBlood(x, y);
     this.stampBlood(x + Math.cos(angle) * 9, y + Math.sin(angle) * 9);
-    if (event.killerId === ctx.localId && event.points > 0) {
+    const isLocalScore = event.killerId === ctx.localId && event.points > 0;
+    if (isLocalScore) {
       // A chained kill shows what the chain paid it, so the callout's words come with a number.
       const chained = (event.chain ?? 1) > 1;
       const bonus = chained ? ` x${chainMultiplier(event.chain ?? 1)}` : '';
@@ -294,7 +305,8 @@ export class FxDirector {
   private onPlayerHurt(id: EntityId, x: number, y: number, damage: number, ctx: FxContext): void {
     this.visuals.get(id).flashUntil = ctx.time + HIT_FLASH_SEC;
     this.burstDots(x, y, -Math.PI / 2, BLOOD, 7, 50, false, Math.PI);
-    if (id === ctx.localId) {
+    const isLocalPlayer = id === ctx.localId;
+    if (isLocalPlayer) {
       this.effects.addHurt(0.35 + damage / 40);
       this.effects.addShake(0.32);
     }
@@ -352,7 +364,8 @@ export class FxDirector {
     for (let i = this.burning.length - 1; i >= 0; i -= 1) {
       const burn = this.burning[i];
       burn.left -= dt;
-      if (burn.left <= 0) {
+      const isBurnOver = burn.left <= 0;
+      if (isBurnOver) {
         this.burning.splice(i, 1);
         continue;
       }

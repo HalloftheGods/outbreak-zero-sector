@@ -42,7 +42,8 @@ function readServers(data: unknown): IceServer[] {
 
 /** STUN plus Cloudflare TURN when it is on and minting works; STUN alone otherwise. */
 export async function iceServersFor(env: TurnEnv, fetcher: typeof fetch = fetch): Promise<IceServer[]> {
-  if (!turnConfigured(env)) return [STUN_SERVER];
+  const isTurnOff = !turnConfigured(env);
+  if (isTurnOff) return [STUN_SERVER];
   try {
     const response = await fetcher(turnUrl(env.TURN_KEY_ID as string), {
       method: 'POST',
