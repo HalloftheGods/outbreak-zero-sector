@@ -6,7 +6,7 @@
 
     <template v-else-if="ui.screen === 'game'">
       <template v-if="ui.hud && ui.art">
-        <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" :home="ui.home" />
+        <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" :home="ui.home" :log="ui.log" />
         <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
         <TouchControls v-if="ui.touch" />
         <EmoteWheel :art="ui.art" :enabled="emotesOn" />
@@ -14,6 +14,7 @@
       <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
       <KillCallout v-if="ui.callout" :key="ui.callout.key" :callout="ui.callout" />
+      <LogPanel v-if="ui.logOpen && ui.hud" :log="ui.log" />
       <WorkbenchScreen v-if="ui.hud?.bench && ui.art" :hud="ui.hud" :bench="ui.hud.bench" :art="ui.art" />
       <template v-if="ui.home">
         <LockerScreen v-if="ui.home.station === 'locker'" :home="ui.home" :art="ui.art" />
@@ -60,6 +61,7 @@ import GarageMap from './components/GarageMap.vue';
 import HudOverlay from './components/HudOverlay.vue';
 import JukeboxScreen from './components/JukeboxScreen.vue';
 import LevelCard from './components/LevelCard.vue';
+import LogPanel from './components/log/LogPanel.vue';
 import LockerScreen from './components/LockerScreen.vue';
 import MerchantScreen from './components/MerchantScreen.vue';
 import OverrunChest from './components/OverrunChest.vue';

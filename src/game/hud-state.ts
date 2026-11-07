@@ -23,6 +23,7 @@ import type { ArtBook } from '../art/types.ts';
 import type { TransportKind } from '../network/transport.ts';
 import { benchHud } from './bench-view.ts';
 import type { BenchHud } from './bench-view.ts';
+import type { LogEntry } from './event-log.ts';
 import type { HomeUi } from './home-hud.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
@@ -162,6 +163,10 @@ export interface UiState {
   readonly callout: Callout | null;
   readonly place: PlaceBanner | null;
   readonly levelCard: LevelCard | null;
+  /** Everything the screen said this run, oldest first (`event-log.ts`). */
+  readonly log: readonly LogEntry[];
+  /** The full log is open over the run. */
+  readonly logOpen: boolean;
   /** The bunker and the trip, on a Campaign run. */
   readonly home: HomeUi | null;
   /** The style the player last chose: what the Play page offers, and what an empty room is given. */

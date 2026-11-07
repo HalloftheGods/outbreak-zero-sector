@@ -27,6 +27,7 @@ const EAT_CODE = 'KeyX';
 const SNEAK_CODES = ['KeyC'];
 const SPRINT_CODES = ['ShiftLeft', 'ShiftRight'];
 const MAP_CODES: ReadonlySet<string> = new Set(['Tab', 'KeyN']);
+const LOG_CODE = 'KeyL';
 const LEFT_BUTTON = 0;
 const RIGHT_BUTTON = 2;
 const LEFT_BUTTON_BIT = 1;
@@ -62,6 +63,8 @@ export interface InputCallbacks {
   mapUsable(): boolean;
   /** The first touch of the page. */
   onTouchSeen?(): void;
+  /** L: the run's full log. True if the game took the key. */
+  onLog?(): boolean;
 }
 
 interface OwnedWeapons {
@@ -270,6 +273,11 @@ export class InputManager {
     this.callbacks.onGesture();
     if (event.code === 'KeyM') {
       if (!event.repeat) this.callbacks.onMute();
+      return;
+    }
+    if (event.code === LOG_CODE) {
+      const taken = !event.repeat && (this.callbacks.onLog?.() ?? false);
+      if (taken) event.preventDefault();
       return;
     }
     if (MAP_CODES.has(event.code)) {
