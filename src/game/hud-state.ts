@@ -103,6 +103,8 @@ export interface LevelCard {
   readonly goal: string;
   /** What this town's weather does to play, for towns where it does something. */
   readonly rule?: string;
+  /** A night event, for towns that drew one (`shared/night-events.ts`). */
+  readonly event?: string;
 }
 
 /** A small label for the place the player just walked into. */

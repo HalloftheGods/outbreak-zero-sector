@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Night events
+
+### Added
+- About three towns in ten, from level 2, get a night event, drawn from the town's seed on a generator of its own (`shared/night-events.ts`):
+  - **Fog**: zombies spot you from 55% of the usual range, and the town is washed grey.
+  - **Blood moon**: hordes half as big again, every kill worth double, and a red sky that pulses.
+  - **Power cut**: zombies see 70% as far and hear 30% further, and most lamps are dead. A blackout town gets fog instead.
+- The level card names the event ("Tonight: Fog. ..."), and the Daily Night page shows it next to the difficulty. The client works it out from the snapshot's map seed, so nothing new goes over the wire.
+
 ## [2026-11-07] - Chains that pay, and a Daily result to share
 
 ### Added

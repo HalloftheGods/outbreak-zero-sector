@@ -1,4 +1,5 @@
 import type { LevelTheme } from '../../shared/levels.ts';
+import type { NightEventId } from '../../shared/night-events.ts';
 import type { Rgb } from './light-field.ts';
 import { NIGHT_AMBIENT } from './lighting.ts';
 
@@ -103,6 +104,22 @@ export const LEVEL_LOOKS: Record<LevelTheme, LevelLook> = {
     weather: 'embers',
   },
 };
+
+/**
+ * A night event laid over a town's look: fog greys the world and pales the ambient, a blood moon reddens
+ * the sky with a slow pulse, and a power cut kills most of the lamps and the ambient with them.
+ */
+export function withEvent(look: LevelLook, event: NightEventId | null): LevelLook {
+  if (event === 'fog') return { ...look, wash: { color: '#a9b2bc', alpha: 0.26 }, washPulse: 0.03, ambient: mix(look.ambient, [120, 126, 134], 0.4) };
+  if (event === 'blood_moon') return { ...look, wash: { color: '#b3121c', alpha: 0.1 }, washPulse: 0.04, ambient: mix(look.ambient, [120, 24, 28], 0.5) };
+  if (event === 'power_cut') return { ...look, ambient: [10, 11, 20], lampEvery: Math.max(look.lampEvery, 6), lampStrength: Math.min(look.lampStrength, 0.7) };
+  return look;
+}
+
+function mix(a: Rgb, b: Rgb, share: number): Rgb {
+  const blend = (i: 0 | 1 | 2) => Math.round(a[i] * (1 - share) + b[i] * share);
+  return [blend(0), blend(1), blend(2)];
+}
 
 /** Whether this street lamp, by its place in the map's list, still has power. */
 export function lampWorks(look: LevelLook, index: number): boolean {

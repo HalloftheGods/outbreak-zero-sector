@@ -1,6 +1,7 @@
 import type { LevelTheme } from '../../shared/levels.ts';
+import type { NightEventId } from '../../shared/night-events.ts';
 import { windTravel } from './ground-motion.ts';
-import { LEVEL_LOOKS } from './level-look.ts';
+import { LEVEL_LOOKS, withEvent } from './level-look.ts';
 import type { LevelLook, WeatherKind } from './level-look.ts';
 
 const WASH_PULSE_RATE = 2.2;
@@ -83,8 +84,8 @@ export class Atmosphere {
     this.reducedMotion = reducedMotion;
   }
 
-  setTheme(theme: LevelTheme): void {
-    this.look = LEVEL_LOOKS[theme];
+  setTheme(theme: LevelTheme, event: NightEventId | null = null): void {
+    this.look = withEvent(LEVEL_LOOKS[theme], event);
   }
 
   /** The wash's alpha right now. */

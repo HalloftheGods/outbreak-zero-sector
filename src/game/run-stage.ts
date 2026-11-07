@@ -1,5 +1,6 @@
 import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import { levelDef } from '../../shared/levels.ts';
+import { nightEventFor } from '../../shared/night-events.ts';
 import type { SnapshotPacket, WorldMap } from '../../shared/protocol.ts';
 import { generateWorldMap } from '../../shared/world-map.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
@@ -48,7 +49,7 @@ export class RunStage {
       this.hud.clearNotices();
       return;
     }
-    this.renderer()?.setTheme(levelDef(snapshot.level).theme);
-    this.hud.showLevel(snapshot.level, nowMs);
+    this.renderer()?.setTheme(levelDef(snapshot.level).theme, nightEventFor(snapshot.mapSeed, snapshot.level)?.id ?? null);
+    this.hud.showLevel(snapshot.level, nowMs, snapshot.mapSeed);
   }
 }

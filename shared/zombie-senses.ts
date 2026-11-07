@@ -4,6 +4,7 @@ import type { PlayerState, SimState, ZombieMode, ZombieState } from './sim-state
 import { emit } from './sim-state.ts';
 import { buildingAt, segmentHitsSolid } from './world-query.ts';
 import { printUnder } from './snow-tracks.ts';
+import { eventOf } from './night-events.ts';
 import { hearingScale, sightScale, TRACK_REST_SEC, TRACK_SEARCH_SEC } from './town-rules.ts';
 import type { Footprint } from './town-rules.ts';
 
@@ -54,7 +55,7 @@ export function backToRoaming(sim: SimState, z: ZombieState): void {
 /** Sound goes through walls: everything in the radius comes to look. Horde zombies already know. */
 export function makeNoise(sim: SimState, x: number, y: number, radius: number): void {
   sim.noises.push({ x, y });
-  const heardFrom = radius * hearingScale(sim.level);
+  const heardFrom = radius * hearingScale(sim.level) * (eventOf(sim)?.hearing ?? 1);
   const radiusSquared = heardFrom * heardFrom;
   for (const z of sim.zombies) {
     const heard = !z.horde && z.health > 0 && (z.x - x) ** 2 + (z.y - y) ** 2 <= radiusSquared;
@@ -73,7 +74,7 @@ export function spottedFrom(p: PlayerState): number {
 }
 
 function seesAnyone(sim: SimState, z: ZombieState, prey: readonly PlayerState[]): boolean {
-  const dark = sightScale(sim.level);
+  const dark = sightScale(sim.level) * (eventOf(sim)?.sight ?? 1);
   return prey.some((p) => {
     const inRange = (p.x - z.x) ** 2 + (p.y - z.y) ** 2 <= (spottedFrom(p) * dark) ** 2;
     return inRange && !segmentHitsSolid(sim.map, z.x, z.y, p.x, p.y);

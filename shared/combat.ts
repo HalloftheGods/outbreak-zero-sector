@@ -7,6 +7,7 @@ import {
   TICK_DT,
 } from './constants.ts';
 import { chainKill, chainMultiplier } from './kill-chain.ts';
+import { eventOf } from './night-events.ts';
 import { headOnBulletPlane, headshotMultiplier } from './headshots.ts';
 import type { EntityId } from './protocol.ts';
 import { maybeDropOnKill } from './pickups.ts';
@@ -47,7 +48,7 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
   const killer = present ?? away;
   // A kill in a chain pays more, the bonus rounded down so a single kill pays exactly its worth.
   const chain = killer ? chainKill(sim, killer.id) : 1;
-  const points = Math.floor(z.points * chainMultiplier(chain));
+  const points = Math.floor(z.points * chainMultiplier(chain) * (eventOf(sim)?.points ?? 1));
   if (killer) {
     killer.score += points;
     killer.kills += 1;

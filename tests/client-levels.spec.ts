@@ -247,7 +247,7 @@ describe('levels in a run', () => {
     moveToNextTown(sim);
     pump(300);
     expect(setMap.mock.lastCall?.[0].seed).toBe(sim.map.seed);
-    expect(setTheme).toHaveBeenLastCalledWith(levelDef(3).theme);
+    expect(setTheme.mock.lastCall?.[0]).toBe(levelDef(3).theme);
     expect(game.ui.value.levelCard?.title).toBe(levelDef(3).title);
     expect(game.ui.value.hud?.level).toBe(3);
   });
@@ -255,7 +255,7 @@ describe('levels in a run', () => {
   it('shows a joiner the level they walked into, in its own look', () => {
     const setTheme = vi.spyOn(WorldRenderer.prototype, 'setTheme');
     joinRoom().receive(frame(1, { level: 6 }));
-    expect(setTheme).toHaveBeenLastCalledWith('blackout');
+    expect(setTheme.mock.lastCall?.[0]).toBe('blackout');
     expect(game.ui.value.levelCard?.title).toBe(levelDef(6).title);
   });
 
@@ -283,7 +283,7 @@ describe('levels in a run', () => {
     socket.receive(frame(2, { level: 3, mapSeed: TOWN_B, phase: 'gameover', gameOver: stats }));
     socket.receive(frame(3));
     expect(setMap.mock.lastCall?.[0].seed).toBe(TOWN_A);
-    expect(setTheme).toHaveBeenLastCalledWith('night');
+    expect(setTheme.mock.lastCall?.[0]).toBe('night');
     expect(game.ui.value.levelCard?.title).toBe(levelDef(1).title);
   });
 

@@ -3,7 +3,7 @@
     <header class="daily-ticket px-frame">
       <span class="daily-scene"><SpriteImg v-if="scene" :sprite="scene" /></span>
       <div class="daily-title">
-        <p class="px-label daily-kicker">{{ dayLabel(night.key) }} - {{ facts.level }} - {{ facts.difficulty }}</p>
+        <p class="px-label daily-kicker">{{ dayLabel(night.key) }} - {{ facts.level }} - {{ facts.difficulty }}<template v-if="facts.event"> - {{ facts.event }}</template></p>
         <p class="daily-name">{{ facts.title }}</p>
         <p v-if="facts.rule" class="daily-rule">{{ facts.rule }}</p>
       </div>
