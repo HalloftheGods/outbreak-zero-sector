@@ -20,6 +20,18 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'readable-pickup-text',
+    date: '2026-11-07',
+    kind: 'better',
+    title: 'Pickup words you can read',
+    deck: 'The little words over your head no longer pile on top of each other.',
+    points: [
+      'Grab several things at once and each word gets its own line, newest at the bottom.',
+      'Grab the same thing twice and the numbers add up: two boxes of shells read +8 SHELLS.',
+      'Words hold still for a moment once they rise, then fade out instead of blinking away.',
+    ],
+  },
+  {
     id: 'combat-feel',
     date: '2026-11-07',
     kind: 'better',
