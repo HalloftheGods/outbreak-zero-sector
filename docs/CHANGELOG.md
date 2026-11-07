@@ -2,6 +2,12 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - The Overrun goes live
+
+### Changed
+- `OVERRUN_LIVE` is now true: every Campaign player gets the bunker clock, the breach and the reward chest once someone in the room has reached level 2. Solo and the co-op server both follow it.
+- How to Play has a Campaign chapter on the overrun (the clock by difficulty, the half-speed menus, the warnings, and holding, running or going down), with the blast door and the chest as its pictures.
+
 ## [2026-11-07] - Biomes, terrain, ground effects and footsteps
 
 ### Added
