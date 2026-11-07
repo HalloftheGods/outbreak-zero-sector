@@ -2,6 +2,7 @@ import { cleanCallsign } from '../callsign.ts';
 import { isCharacterIndex } from '../characters.ts';
 import { JOIN_TOKEN_MAX_LENGTH } from '../constants.ts';
 import { isDifficultyId } from '../difficulty.ts';
+import { isEmoteId } from '../emotes.ts';
 import { isGameStyle } from '../game-style.ts';
 import { WEAPON_ORDER } from '../protocol.ts';
 import type { ClientInputPacket, ClientPacket, WeaponId } from '../protocol.ts';
@@ -92,6 +93,8 @@ export function parseClientPacket(raw: string): ClientPacket | null {
     return input ? { type: 'input', input } : null;
   }
   if (value.type === 'bench') return isBenchAction(value.action) ? { type: 'bench', action: value.action } : null;
+  const emote = value.type === 'emote' && isEmoteId(value.emote) ? value.emote : null;
+  if (emote) return { type: 'emote', emote };
   const homeAction = value.type === 'home' ? parseHome(value.action) : null;
   if (homeAction) return { type: 'home', action: homeAction };
   return value.type === 'restart' ? { type: 'restart' } : null;

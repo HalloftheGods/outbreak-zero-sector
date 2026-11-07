@@ -20,5 +20,5 @@ export const GAME_EVENT_TYPES = [
   'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
   'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
   'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over', 'trip_start',
-  'overrun_warning', 'overrun_breach', 'overrun_end',
+  'overrun_warning', 'overrun_breach', 'overrun_end', 'emote',
 ] as const;

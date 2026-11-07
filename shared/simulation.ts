@@ -1,6 +1,7 @@
 import { freeCharacter } from './characters.ts';
 import { updateBullets } from './combat.ts';
-import { PLAYER_RADIUS, SPAWN_SCATTER } from './constants.ts';
+import { PLAYER_RADIUS, SPAWN_SCATTER, TICK_DT } from './constants.ts';
+import { isEmoteId, takeEmote } from './emotes.ts';
 import type { DifficultyId } from './difficulty.ts';
 import { moveToNextTown } from './level-change.ts';
 import { isBunkerMap } from './home-protocol.ts';
@@ -18,7 +19,7 @@ import { checkGameOver, leaveTown, restartRun } from './run-end.ts';
 import { createSimState } from './sim-factory.ts';
 import type { SimulationOptions } from './sim-factory.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
-import { openGroundNear } from './sim-state.ts';
+import { emit, openGroundNear } from './sim-state.ts';
 import { buildSnapshot, playerSnapshot } from './snapshot-build.ts';
 import { updatePopulation } from './town-population.ts';
 import { enterHome, homeCommand } from './trip.ts';
@@ -167,6 +168,13 @@ export class GameSimulation {
   benchCommand(id: string, action: BenchAction): void {
     const player = this.sim.players.find((p) => p.id === id);
     if (player) benchCommand(this.sim, player, action);
+  }
+
+  /** An icon from a player, passed on to every client as an event. Over the pace, or not an emote, it is dropped. */
+  emote(id: string, emote: unknown): void {
+    const player = this.sim.players.find((p) => p.id === id);
+    const allowed = player !== undefined && isEmoteId(emote) && takeEmote(player, this.sim.tick * TICK_DT);
+    if (allowed) emit(this.sim, { type: 'emote', playerId: id, emote });
   }
 
   homeCommand(id: string, action: HomeAction): void {

@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
 import { capCallsign } from '../../shared/callsign.ts';
+import type { EmoteId } from '../../shared/emotes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { WorldMap } from '../../shared/protocol.ts';
@@ -301,6 +302,11 @@ export class GameController {
     const paused = !this.ui.value.paused;
     this.holdRun(paused);
     this.publish({ paused });
+  }
+
+  /** An icon over this survivor for the team; the wheel is only offered in co-op. */
+  sendEmote(emote: EmoteId): void {
+    this.run.transport?.sendEmote(emote);
   }
 
   private canUseMap(): boolean {

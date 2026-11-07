@@ -298,7 +298,7 @@ The three passes proposed different codes:
 
   - Each is 16×16 pixel art. It shows over the survivor for 2 s, with an edge arrow when the player is off screen.
   - The host limits each player to 1 emote per 1.5 s, with a burst of 3.
-  - The key binding waits on open question 15.
+  - Binding (open question 15, decided): hold **V** to open the six-way wheel and let go over an icon to send it, or click one. Nothing else uses V. On touch an HUD button on the left edge opens the same wheel. The wheel only shows in co-op. Sending bumped `PROTOCOL_VERSION` to 2.
 - **Public rooms send no callsign.** The join carries `name: ''` and everyone is labelled by survivor name, which is unique in a room. (The architecture pass proposed generated names from word lists. Survivor names need no new list, so this spec uses them.)
 - **Private rooms show the callsign after a shared filter**, `shared/callsign.ts`:
   1. normalise with NFKC;

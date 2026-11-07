@@ -1,4 +1,5 @@
 import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { EmoteId } from '../../shared/emotes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
 import type { ClientInputPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
@@ -31,6 +32,8 @@ export interface GameTransport {
   sendInput(input: ClientInputPacket): void;
   sendBench(action: BenchAction): void;
   sendHome(action: HomeAction): void;
+  /** An icon over this survivor for everyone, paced by the room. */
+  sendEmote(emote: EmoteId): void;
   /** Solo can begin again from a later level; co-op restarts at level 1 and ignores it. */
   requestRestart(fromLevel?: number): void;
   setPaused(paused: boolean): void;

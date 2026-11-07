@@ -4,6 +4,7 @@ import type { ArtBook, PixelSprite } from '../art/types.ts';
 import { Atmosphere } from './atmosphere.ts';
 import { BuildingLayer, roomRect } from './building-layer.ts';
 import { Camera } from './camera.ts';
+import { EmoteOverlay } from './emote-overlay.ts';
 import { EntityRenderer } from './entity-renderer.ts';
 import { FxDirector } from './fx-director.ts';
 import { GroundMotion } from './ground-motion.ts';
@@ -51,6 +52,7 @@ export class WorldRenderer {
   private readonly visuals = new VisualStore();
   private readonly entities: EntityRenderer;
   private readonly overlay: OverlayRenderer;
+  private readonly emotes: EmoteOverlay;
   private readonly buildings: BuildingLayer;
   private readonly lighting = new Lighting();
   private readonly atmosphere: Atmosphere;
@@ -77,6 +79,7 @@ export class WorldRenderer {
     this.buildings = new BuildingLayer(art.environment);
     this.entities = new EntityRenderer(art, this.visuals, this.buildings, reducedMotion);
     this.overlay = new OverlayRenderer(art, this.visuals);
+    this.emotes = new EmoteOverlay(art, this.visuals);
     this.fx = new FxDirector(art, this.visuals, this.effects, {
       stamp: (sprite, x, y, alpha) => this.stamp(sprite, x, y, alpha),
       addCorpse: (id, type, x, y) => this.addCorpse(id, type, x, y),
@@ -155,10 +158,12 @@ export class WorldRenderer {
     this.entities.reset();
     this.visuals.clear();
     this.fx.clear();
+    this.emotes.clear();
     this.effects.reset();
   }
 
   handleEvent(event: GameEvent, ctx: Omit<FxContext, 'time'>): void {
+    this.emotes.handle(event, this.time);
     this.fx.handle(event, { ...ctx, time: this.time });
   }
 
@@ -279,6 +284,7 @@ export class WorldRenderer {
     this.atmosphere.drawWeather(ctx, left, top, viewW, viewH, time, outdoors);
     this.effects.draw(ctx, viewW, viewH);
     this.overlay.draw(ctx, scene, left, top, viewW, viewH, time, lightAt, isKilled);
+    this.emotes.draw(ctx, scene, left, top, viewW, viewH, time);
     this.fx.particles.drawTexts(ctx, left, top);
     if (scene.showCrosshair) this.overlay.drawCrosshair(ctx, scene, left, top, lightAt, isKilled);
 

@@ -1,4 +1,5 @@
 import { closeText } from '../../shared/close-codes.ts';
+import type { EmoteId } from '../../shared/emotes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
 import { PROTOCOL_VERSION } from '../../shared/protocol.ts';
@@ -65,6 +66,10 @@ export class RemoteSession implements GameTransport {
 
   sendHome(action: HomeAction): void {
     if (this.welcomed) this.send({ type: 'home', action });
+  }
+
+  sendEmote(emote: EmoteId): void {
+    if (this.welcomed) this.send({ type: 'emote', emote });
   }
 
   requestRestart(): void {

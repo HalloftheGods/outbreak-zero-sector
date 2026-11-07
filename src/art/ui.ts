@@ -2,6 +2,7 @@
 
 import type { UiArt } from './types.ts';
 import { buildBottle, buildCrosshair, buildCrosshairHead, buildHeart, buildPickupIcons, buildSilverIcon, buildSkull, buildWeaponIcons } from './fx/icons.ts';
+import { buildEmoteIcons } from './fx/emotes.ts';
 import { buildDifficultyCards } from './difficulty-cards.ts';
 import { buildLevelCards } from './level-cards.ts';
 import { buildModeCards } from './mode-cards.ts';
@@ -20,6 +21,7 @@ export function buildUi(): UiArt {
     heart: buildHeart(),
     bottle: buildBottle(),
     skull: buildSkull(),
+    emotes: buildEmoteIcons(),
     logo: buildLogo(),
     difficulty: buildDifficultyCards(),
     mode: buildModeCards(),

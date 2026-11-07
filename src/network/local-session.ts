@@ -1,4 +1,5 @@
 import { TICK_DT, TICK_RATE } from '../../shared/constants.ts';
+import type { EmoteId } from '../../shared/emotes.ts';
 import { playsFromHome } from '../../shared/game-style.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction } from '../../shared/home-protocol.ts';
@@ -43,6 +44,10 @@ export class LocalSession implements GameTransport {
 
   sendHome(action: HomeAction): void {
     this.sim?.homeCommand(LOCAL_PLAYER_ID, action);
+  }
+
+  sendEmote(emote: EmoteId): void {
+    this.sim?.emote(LOCAL_PLAYER_ID, emote);
   }
 
   /**

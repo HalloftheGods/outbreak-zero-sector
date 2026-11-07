@@ -9,6 +9,7 @@
         <HudOverlay :hud="ui.hud" :art="ui.art" :mode="ui.mode" :signal-weak="ui.signalWeak" :place="ui.place" :home="ui.home" />
         <DownedOverlay v-if="ui.hud.status !== 'alive'" :hud="ui.hud" :mode="ui.mode" />
         <TouchControls v-if="ui.touch" />
+        <EmoteWheel :art="ui.art" :enabled="emotesOn" />
       </template>
       <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
@@ -50,6 +51,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, useTemplateRef } fr
 import ConnectionLost from './components/ConnectionLost.vue';
 import DeathSummary from './components/DeathSummary.vue';
 import DownedOverlay from './components/DownedOverlay.vue';
+import EmoteWheel from './components/EmoteWheel.vue';
 import EndingFlow from './components/EndingFlow.vue';
 import ForgeScreen from './components/ForgeScreen.vue';
 import GameOverScreen from './components/GameOverScreen.vue';
@@ -83,6 +85,8 @@ const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
 const aiming = computed(() =>
   aimsCursor({ screen: ui.value.screen, paused: ui.value.paused, mapOpen: ui.value.mapOpen, bench: !!ui.value.hud?.bench, home: ui.value.home })
 );
+/** The wheel is for a team, and only while the keys are the game's. */
+const emotesOn = computed(() => aiming.value && ui.value.mode === 'coop');
 
 provide(GAME_KEY, game);
 

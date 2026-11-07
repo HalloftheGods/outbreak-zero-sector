@@ -64,6 +64,9 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottl
   kits: KitCounts;
   /** Said so at the current workbench. */
   benchReady: boolean;
+  /** The pace of this player's emotes (shared/emotes.ts). */
+  emoteTokens: number;
+  emoteAt: number;
   /** Reconnect token, or null when nobody can come back as this player. Never sent to clients. */
   readonly token: string | null;
   up: boolean;

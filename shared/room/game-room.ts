@@ -144,6 +144,7 @@ export function createGameRoom({ sim, clock, newId, restartVoteMs }: GameRoomOpt
     else if (packet.type === 'input') sim.setInput(client.playerId, packet.input);
     else if (packet.type === 'bench') sim.benchCommand(client.playerId, packet.action);
     else if (packet.type === 'home') sim.homeCommand(client.playerId, packet.action);
+    else if (packet.type === 'emote') sim.emote(client.playerId, packet.emote);
     else vote.ask(client);
   }
 

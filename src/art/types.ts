@@ -1,4 +1,5 @@
 import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { EmoteId } from '../../shared/emotes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { MerchantId } from '../../shared/home-protocol.ts';
 import type { BuildingKind, PickupType, PropKind, TileKind, WeaponId, ZombieType } from '../../shared/protocol.ts';
@@ -148,6 +149,8 @@ export interface UiArt {
   /** The HUD's count of bottles to throw. */
   readonly bottle: PixelSprite;
   readonly skull: PixelSprite;
+  /** The six emote icons, 16x16 (shared/emotes.ts). */
+  readonly emotes: Record<EmoteId, PixelSprite>;
   /** Title lockup for the menu and game over screens. */
   readonly logo: PixelSprite;
   /** The difficulty page's card picture for each difficulty (difficulty-card.ts). */

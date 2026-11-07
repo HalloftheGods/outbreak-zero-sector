@@ -3,6 +3,7 @@
 
 import { CHARACTERS } from './characters.ts';
 import type { DifficultyId } from './difficulty.ts';
+import type { EmoteId } from './emotes.ts';
 import { GAME_EVENT_TYPES, GAME_PHASES, PICKUP_TYPES } from './events.ts';
 import type { Point } from './flow-field.ts';
 import type { GameStyle } from './game-style.ts';
@@ -201,6 +202,8 @@ export type GameEvent =
   | { readonly type: 'overrun_warning'; readonly step: number; readonly left: number }
   | { readonly type: 'overrun_breach'; readonly hostiles: number }
   | { readonly type: 'overrun_end'; readonly outcome: OverrunEnd }
+  /** A survivor sent an icon. Only the id travels; the client finds the body by playerId. */
+  | { readonly type: 'emote'; readonly playerId: EntityId; readonly emote: EmoteId }
   | { readonly type: 'game_over'; readonly stats: GameOverStats };
 
 /** Compiles only while GAME_EVENT_TYPES lists exactly the names GameEvent declares. */
@@ -296,7 +299,7 @@ export interface RoomPacket {
 }
 
 /** Bumped by any change to a packet. A host closes a join from another version with 4014. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /**
  * Sent just before a link is closed on purpose, because a data channel has no close code.
@@ -321,6 +324,7 @@ export type ClientPacket =
   | { readonly type: 'input'; readonly input: ClientInputPacket }
   | { readonly type: 'bench'; readonly action: BenchAction }
   | { readonly type: 'home'; readonly action: HomeAction }
+  | { readonly type: 'emote'; readonly emote: EmoteId }
   | { readonly type: 'restart' };
 
 // --- World map -------------------------------------------------------------
@@ -425,6 +429,7 @@ export const BUILDING_DEFS = {
   police: { label: 'Police Station', w: 224, h: 144, doorX: 112, floor: 'floor_concrete' },
   gun_shop: { label: 'Gun Shop', w: 144, h: 112, doorX: 48, floor: 'floor_wood' },
   grocery: { label: 'Grocery', w: 208, h: 128, doorX: 64, floor: 'floor_tile' },
+  discount: { label: 'S.O.S. Discount', w: 176, h: 112, doorX: 64, floor: 'floor_tile' },
   diner: { label: 'Diner', w: 160, h: 96, doorX: 112, floor: 'floor_tile' },
   garage: { label: 'Auto Garage', w: 176, h: 112, doorX: 48, floor: 'floor_concrete' },
   warehouse: { label: 'Warehouse', w: 240, h: 144, doorX: 192, floor: 'floor_concrete' },
