@@ -98,8 +98,10 @@ export function candyBanner(candy: CandyId, saved: boolean): Omit<Banner, 'key'>
 export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   const hordeCame = event.type === 'wave_start';
   if (hordeCame) return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
-  if (event.type === 'boss_arrive') return { title: BOSSES[event.boss].name.toUpperCase(), subtitle: 'BOSS NIGHT', tone: 'danger' };
-  if (event.type === 'boss_down') return { title: 'BOSS DOWN', subtitle: BOSSES[event.boss].name.toUpperCase(), tone: 'hope' };
+  const isBossArrival = event.type === 'boss_arrive';
+  if (isBossArrival) return { title: BOSSES[event.boss].name.toUpperCase(), subtitle: 'BOSS NIGHT', tone: 'danger' };
+  const isBossDown = event.type === 'boss_down';
+  if (isBossDown) return { title: 'BOSS DOWN', subtitle: BOSSES[event.boss].name.toUpperCase(), tone: 'hope' };
   return SET_BANNERS[event.type] ?? null;
 }
 
