@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { furnish } from '../shared/building-interiors.ts';
 import { PLAYER_RADIUS, ZOMBIES } from '../shared/constants.ts';
 import type { MapBuilder } from '../shared/map-builder.ts';
-import { BUILDING_KINDS, TILE_SIZE, WALL_THICKNESS } from '../shared/protocol.ts';
+import { BUILDING_KINDS, TILE_SIZE } from '../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, PropInstance, WorldMap } from '../shared/protocol.ts';
-import { blockedTiles, buildingBox, circleHitsSolid, doorBox, propBox } from '../shared/world-query.ts';
+import { backDoorBox } from '../shared/building-plans.ts';
+import { blockedTiles, buildingBox, circleHitsSolid, doorBox, propBox, wallBoxes } from '../shared/world-query.ts';
 import type { Box } from '../shared/world-query.ts';
 
 const COLS = 40;
@@ -98,18 +99,9 @@ function tilesOutOfReach(room: Room, radius: number): string[] {
   return missed;
 }
 
-function solidsOf({ building, props }: Room): Box[] {
-  const { x0, y0, x1, y1 } = buildingBox(building);
-  const door = doorBox(building);
-  const thick = WALL_THICKNESS;
-  return [
-    ...props.map(propBox),
-    { x0, y0, x1, y1: y0 + thick },
-    { x0, y0, x1: x0 + thick, y1 },
-    { x0: x1 - thick, y0, x1, y1 },
-    { x0, y0: y1 - thick, x1: door.x0, y1 },
-    { x0: door.x1, y0: y1 - thick, x1, y1 },
-  ];
+/** Every solid in the room: its furniture and its walls, inside walls included. */
+function solidsOf({ map, props }: Room): Box[] {
+  return [...props.map(propBox), ...wallBoxes(map)];
 }
 
 /** True if solids fill the area's middle from end to end, so nothing can pass along it. */
@@ -160,6 +152,20 @@ describe('room layouts', () => {
   it.each(BUILDING_KINDS)('%s: every free tile can be reached by the widest bodies', (kind) => {
     for (const room of everyVariant(kind)) {
       for (const radius of WIDE_BODIES) expect(tilesOutOfReach(room, radius)).toEqual([]);
+    }
+  });
+
+  it.each(BUILDING_KINDS)('%s: a back door, where there is one, lets the widest body out', (kind) => {
+    for (const room of everyVariant(kind)) {
+      const back = backDoorBox(room.building);
+      if (!back) continue;
+      // Straight through the opening, from the lane behind to the floor inside.
+      const middle = (back.x0 + back.x1) / 2;
+      const blockedAt: number[] = [];
+      for (let y = back.y0 - WIDEST_BODY - 2; y <= back.y1 + WIDEST_BODY + 2; y += 1) {
+        if (circleHitsSolid(room.map, middle, y, WIDEST_BODY)) blockedAt.push(y);
+      }
+      expect(blockedAt).toEqual([]);
     }
   });
 

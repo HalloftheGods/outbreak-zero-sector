@@ -1,6 +1,7 @@
 import { furnish } from './building-interiors.ts';
+import { backDoorBox } from './building-plans.ts';
 import { BUILDING_DEFS, DOOR_WIDTH, TILE_SIZE } from './protocol.ts';
-import type { BuildingKind, TileKind } from './protocol.ts';
+import type { BuildingInstance, BuildingKind, TileKind } from './protocol.ts';
 import type { MapBuilder } from './map-builder.ts';
 import { createRng, pick, randInt } from './rng.ts';
 import { EDGE_TILES, MAP_TILES, WALK_TILES, rectBox } from './town-plan.ts';
@@ -13,6 +14,8 @@ const LANE_TILES = 3;
 const LANE_PAVED_TILES = 2;
 /** Tiles kept clear in front of a door. */
 const DOOR_APRON_TILES = 3;
+/** Tiles of paving kept clear behind a back door. */
+const BACK_STEP_TILES = 1;
 const FORECOURT_W_TILES = 7;
 const FORECOURT_H_TILES = 5;
 
@@ -109,6 +112,15 @@ function forecourt(b: MapBuilder, col: number, bottom: number): void {
   b.reserve(area);
 }
 
+/** A step of paving outside a back door, kept clear, so the door is seen from the lane and never blocked. */
+function backStep(b: MapBuilder, building: BuildingInstance): void {
+  const back = backDoorBox(building);
+  if (!back) return;
+  const step = { x0: back.x0, y0: back.y0 - BACK_STEP_TILES * TILE_SIZE, x1: back.x1, y1: back.y0 };
+  b.fill(step, 'sidewalk');
+  b.reserve({ ...step, x0: step.x0 - DOOR_WIDTH / 2, x1: step.x1 + DOOR_WIDTH / 2 });
+}
+
 function raise(b: MapBuilder, kind: BuildingKind, col: number, bottom: number, walkDown: number): void {
   const building = b.addBuilding(kind, col, bottom - heightOf(kind));
   const door = doorBox(building);
@@ -116,6 +128,7 @@ function raise(b: MapBuilder, kind: BuildingKind, col: number, bottom: number, w
   b.fill({ x0: door.x0, y0: door.y1, x1: door.x1, y1: door.y1 + walkDown * TILE_SIZE }, 'sidewalk');
   const apronDepth = DOOR_APRON_TILES * TILE_SIZE;
   b.reserve({ x0: door.x0 - DOOR_WIDTH / 2, y0: door.y1, x1: door.x1 + DOOR_WIDTH / 2, y1: door.y1 + apronDepth });
+  backStep(b, building);
   furnish(b, building);
   if (kind === 'garage') forecourt(b, col + widthOf(kind) + 1, bottom);
 }

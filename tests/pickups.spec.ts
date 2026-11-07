@@ -382,7 +382,9 @@ describe('town loot', () => {
       const allowed = [...Object.keys(rule.table), ...(rule.fixed ?? [])];
       const ownLoot = items.filter((item) => !isPartPickup(item.type) && !isKitPickup(item.type));
       for (const item of ownLoot) expect(allowed).toContain(item.type);
-      expect(ownLoot.length).toBeLessThanOrEqual(rule.items[1] + (rule.fixed?.length ?? 0));
+      // A town short of ammo tops up with one more box per building at most.
+      const topUp = 1;
+      expect(ownLoot.length).toBeLessThanOrEqual(rule.items[1] + (rule.fixed?.length ?? 0) + topUp);
     }
   });
 

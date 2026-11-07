@@ -1,4 +1,4 @@
-import { EXIT_CLEARANCE } from './constants.ts';
+import { EXIT_CLEARANCE, PLAYER_RADIUS } from './constants.ts';
 import { FlowField } from './flow-field.ts';
 import type { Point } from './flow-field.ts';
 import { TILE_KINDS, TILE_SIZE } from './protocol.ts';
@@ -19,6 +19,11 @@ const ROAD_TILES: ReadonlySet<TileKind> = new Set<TileKind>(['asphalt', 'asphalt
 const VAN_HALF_WIDTH = 24;
 const VAN_DEPTH = 16;
 
+/** Room for a body at the van's side, just clear of it, so someone can stand there and wait for the rest. */
+function roomBeside(map: WorldMap, x: number, y: number): boolean {
+  return !circleHitsSolid(map, x + VAN_HALF_WIDTH + PLAYER_RADIUS + 1, y - 2, PLAYER_RADIUS);
+}
+
 interface ExitCandidate extends Point {
   readonly steps: number;
   readonly onRoad: boolean;
@@ -35,7 +40,7 @@ function exitCandidates(map: WorldMap, walk: FlowField): ExitCandidate[] {
       const y = (row + 0.5) * TILE_SIZE;
       const steps = walk.distanceAt(x, y);
       const clearOfEdge = x > EXIT_CLEARANCE && y > EXIT_CLEARANCE && x < map.width - EXIT_CLEARANCE && y < map.height - EXIT_CLEARANCE;
-      const parkable = Number.isFinite(steps) && clearOfEdge && buildingAt(map, x, y) === null && !circleHitsSolid(map, x, y, EXIT_CLEARANCE);
+      const parkable = Number.isFinite(steps) && clearOfEdge && buildingAt(map, x, y) === null && !circleHitsSolid(map, x, y, EXIT_CLEARANCE) && roomBeside(map, x, y);
       if (parkable) {
         const tile = map.tiles ? TILE_KINDS[map.tiles[row * map.cols + col]] : undefined;
         found.push({ x, y, steps, onRoad: Boolean(tile && ROAD_TILES.has(tile)) });
