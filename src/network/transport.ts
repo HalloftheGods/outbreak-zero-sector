@@ -16,6 +16,8 @@ export interface ConnectOptions {
   readonly home?: JoinHome;
   /** Solo plays in this style, and left off that is Arcade. In co-op the room decides, so `SocketSession.join` is told instead. */
   readonly style?: GameStyle;
+  /** Solo only: the run's seed, so a Daily Night is the same town for everyone. Left off, a random one. */
+  readonly seed?: number;
 }
 
 /** The one seam between the game client and a simulation, in-browser or over ws. */

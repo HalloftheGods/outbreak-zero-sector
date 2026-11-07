@@ -2,6 +2,14 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Daily Night
+
+### Added
+- A Daily Night item on the title menu, after Play. Its page shows today's town (level, rule and difficulty, all picked from the date), your run today, your streak and the time to the next town, then the survivor select and Start tonight.
+- The day's run is solo with Arcade rules on a seed from the date (`src/game/daily-night.ts`), so every player gets the same town on the same day. The first run of the day counts; later ones count as practice and keep a practice best. Days are kept on this device (60 at most), under `outbreak.daily`.
+- The results screen says "Daily Night, 7 Nov" and whether that run counted. Daily runs leave level progress and Arcade bests alone.
+- `ConnectOptions.seed`, so a local session can be started on a fixed seed. Tests in `tests/daily-night.spec.ts`.
+
 ## [2026-11-07] - Supply drops
 
 ### Added

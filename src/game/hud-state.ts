@@ -117,6 +117,8 @@ export interface RunResult {
   readonly score: number;
   readonly kills: number;
   readonly isNewBest: boolean;
+  /** Set for a Daily Night: which day, and whether this was the run that counts or practice. */
+  readonly daily?: { readonly label: string; readonly counted: boolean };
 }
 
 /** Small, plain and replaced whole; the only game state Vue ever sees. */

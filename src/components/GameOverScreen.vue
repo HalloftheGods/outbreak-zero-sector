@@ -4,6 +4,7 @@
     <h2 class="px-heading is-danger">Game over</h2>
     <p class="gameover-difficulty">{{ difficultyDef(result.stats.difficulty).label }}</p>
     <p v-if="result.isNewBest" class="gameover-best px-blink">New best</p>
+    <p v-if="result.daily" class="gameover-difficulty">{{ result.daily.label }}: {{ result.daily.counted ? 'this one counts' : 'practice' }}</p>
 
     <dl class="gameover-stats">
       <div><dt>Level reached</dt><dd>{{ result.stats.level }}</dd></div>

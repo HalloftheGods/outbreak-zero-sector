@@ -1,3 +1,5 @@
+import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { DailyNight } from './daily-night.ts';
 import type { ShallowRef } from 'vue';
 import { cleanCallsign } from '../../shared/callsign.ts';
 import { playsFromHome } from '../../shared/game-style.ts';
@@ -43,6 +45,8 @@ export interface RunState {
   levelNoted: number;
   /** Whether the last snapshot was of the bunker, or null before any. */
   inBunker: boolean | null;
+  /** The day of the Daily Night being played, or null for any other run. */
+  daily: string | null;
 }
 
 /** The controller's parts a run reaches into. */
@@ -68,7 +72,7 @@ export interface RunHost {
 const ONLINE_CONNECT_TIMEOUT_MS = 20_000;
 
 export function newRunState(): RunState {
-  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null };
+  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null, daily: null };
 }
 
 /** Starts, restarts and ends a run: the connection from menu to welcome to menu. */
@@ -87,7 +91,18 @@ export class RunSession {
     this.host.audio.unlock();
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'solo', error: null });
+    this.host.state.daily = null;
     this.beginSession(new LocalSession(), style, fromLevel);
+  }
+
+  /** Today's town: its seed, level and difficulty, Arcade rules, solo. Its first run is the one that counts. */
+  startDaily(night: DailyNight): void {
+    if (!this.canStart()) return;
+    this.host.audio.unlock();
+    this.host.audio.playUi('start');
+    this.host.publish({ mode: 'solo', error: null });
+    this.host.state.daily = night.key;
+    this.beginSession(new LocalSession(), 'arcade', night.level, { seed: night.seed, difficulty: night.difficulty });
   }
 
   /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
@@ -99,6 +114,7 @@ export class RunSession {
   /** `style` is offered to an empty room. A room already playing keeps its own, and this run follows it. */
   startCoop(style: GameStyle): void {
     if (!this.canStart()) return;
+    this.host.state.daily = null;
     this.host.audio.unlock();
     const session = this.coopSession(this.host.ui.value.serverAddress, style);
     if (!session) {
@@ -217,7 +233,7 @@ export class RunSession {
     this.host.publish({ runStyle: style });
   }
 
-  private beginSession(transport: GameTransport, style: GameStyle, startLevel?: number): void {
+  private beginSession(transport: GameTransport, style: GameStyle, startLevel?: number, fixed: { seed?: number; difficulty?: DifficultyId } = {}): void {
     const { state, ui } = this.host;
     state.transport = transport;
     state.welcomed = false;
@@ -226,7 +242,7 @@ export class RunSession {
     transport.onClosed = (reason) => this.onClosed(reason);
     this.followStyle(style);
     // No callsign (blank or refused) goes out as '': every screen then labels the player by survivor name.
-    const options = { name: cleanCallsign(ui.value.callsign), difficulty: loadDifficulty(), character: loadCharacter(), style };
+    const options = { name: cleanCallsign(ui.value.callsign), difficulty: fixed.difficulty ?? loadDifficulty(), character: loadCharacter(), style, ...(fixed.seed === undefined ? {} : { seed: fixed.seed }) };
     const roomDecides = transport.kind === 'coop';
     if (roomDecides || !playsFromHome(style)) transport.connect({ ...options, startLevel });
     else this.readHome(transport, (home) => transport.connect({ ...options, home }));

@@ -15,6 +15,7 @@ import { lockedTracksOf } from '../audio/playlists.ts';
 import { trackName } from './sound-test.ts';
 import { foundTracks, isRadioFound, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
+import { dayLabel, recordDaily } from './daily-night.ts';
 import { TownMapView } from './town-map.ts';
 
 const HUD_INTERVAL_MS = 100;
@@ -52,10 +53,15 @@ export function deathFade(status: PlayerStatus | undefined, gameOver: boolean): 
  * the next run before this player ever sees the results.
  * Someone who joined a finished room has no run of their own.
  */
-export function finishRun(stats: GameOverStats, localId: string): RunResult {
+export function finishRun(stats: GameOverStats, localId: string, dailyKey: string | null = null): RunResult {
   const local = stats.players.find((player) => player.id === localId);
   const score = local?.score ?? 0;
   const kills = local?.kills ?? 0;
+  if (dailyKey !== null) {
+    // A Daily Night keeps its own book, so the leaderboard stays a list of runs anyone could have had.
+    const counted = local ? recordDaily(dailyKey, { score, kills, level: stats.level }) : false;
+    return { stats, localId, score, kills, isNewBest: false, daily: { label: `Daily Night, ${dayLabel(dailyKey)}`, counted } };
+  }
   const isNewBest = local ? recordRun({ score, kills, wave: stats.wave, durationSec: stats.durationSec }, undefined, local.name) : false;
   return { stats, localId, score, kills, isNewBest };
 }

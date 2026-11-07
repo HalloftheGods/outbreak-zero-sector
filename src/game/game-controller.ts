@@ -14,6 +14,7 @@ import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { BenchLink } from './bench-link.ts';
 import type { ClientWorld } from './client-world.ts';
+import { todaysNight } from './daily-night.ts';
 import { HomeLink } from './home-link.ts';
 import type { HomeLinkHost } from './home-link.ts';
 import type { HomeActions } from './home-hud.ts';
@@ -261,6 +262,11 @@ export class GameController {
   /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
   continueSolo(chosen?: number): void {
     this.session.continueSolo(chosen);
+  }
+
+  /** Today's Daily Night: solo, Arcade rules, the day's seed, level and difficulty. */
+  startDaily(): void {
+    this.session.startDaily(todaysNight());
   }
 
   /** Co-op. `style`, by default the one the player last chose, goes to an empty room; a room in play keeps its own and the run follows it. */
