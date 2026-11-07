@@ -20,6 +20,18 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'setup-stepper',
+    date: '2026-11-07',
+    kind: 'better',
+    title: 'Setup shows its steps',
+    deck: 'Getting ready to play now shows where you are and what you picked.',
+    points: [
+      'A row of steps sits under the heading: Style, Mode, Difficulty, Survivor.',
+      'Each finished step shows a little picture of what you chose. Click it to go back.',
+      'Back and Next are proper buttons now, and they stay put from step to step.',
+    ],
+  },
+  {
     id: 'apartment-floors',
     date: '2026-11-07',
     kind: 'new',
