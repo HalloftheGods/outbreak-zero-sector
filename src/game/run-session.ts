@@ -1,3 +1,5 @@
+import type { DifficultyId } from '../../shared/difficulty.ts';
+import type { DailyNight } from './daily-night.ts';
 import type { ShallowRef } from 'vue';
 import { cleanCallsign } from '../../shared/callsign.ts';
 import { playsFromHome } from '../../shared/game-style.ts';
@@ -7,8 +9,12 @@ import type { SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/proto
 import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
-import type { RemoteSession } from '../network/remote-session.ts';
-import { createSocketSession, resolveServerUrl } from '../network/socket-session.ts';
+import { normalizeRoomCode } from '../../shared/lobby/room-code.ts';
+import { HostSession } from '../network/host-session.ts';
+import { onlineRoomsLive, PLAY_API } from '../network/play-api.ts';
+import { RemoteSession, type RoomSession } from '../network/remote-session.ts';
+import { RtcGuestPipe } from '../network/rtc-pipe.ts';
+import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
 import type { GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
 import { ClientWorld } from './client-world.ts';
@@ -39,6 +45,8 @@ export interface RunState {
   levelNoted: number;
   /** Whether the last snapshot was of the bunker, or null before any. */
   inBunker: boolean | null;
+  /** The day of the Daily Night being played, or null for any other run. */
+  daily: string | null;
 }
 
 /** The controller's parts a run reaches into. */
@@ -56,10 +64,15 @@ export interface RunHost {
   readonly titleMap: WorldMap | null;
   publish(patch: Partial<UiState>): void;
   onResize(): void;
+  /** Holds the picture (and, solo, the sim) still for a beat. */
+  hitStop(ms: number): void;
 }
 
+/** WebRTC needs a signal round trip and ICE before the room can answer. */
+const ONLINE_CONNECT_TIMEOUT_MS = 20_000;
+
 export function newRunState(): RunState {
-  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null };
+  return { transport: null, world: null, runResult: null, welcomed: false, lastSnapshotMs: 0, gameOverAtMs: 0, levelNoted: 0, inBunker: null, daily: null };
 }
 
 /** Starts, restarts and ends a run: the connection from menu to welcome to menu. */
@@ -78,7 +91,18 @@ export class RunSession {
     this.host.audio.unlock();
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'solo', error: null });
+    this.host.state.daily = null;
     this.beginSession(new LocalSession(), style, fromLevel);
+  }
+
+  /** Today's town: its seed, level and difficulty, Arcade rules, solo. Its first run is the one that counts. */
+  startDaily(night: DailyNight): void {
+    if (!this.canStart()) return;
+    this.host.audio.unlock();
+    this.host.audio.playUi('start');
+    this.host.publish({ mode: 'solo', error: null });
+    this.host.state.daily = night.key;
+    this.beginSession(new LocalSession(), 'arcade', night.level, { seed: night.seed, difficulty: night.difficulty });
   }
 
   /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
@@ -90,18 +114,41 @@ export class RunSession {
   /** `style` is offered to an empty room. A room already playing keeps its own, and this run follows it. */
   startCoop(style: GameStyle): void {
     if (!this.canStart()) return;
+    this.host.state.daily = null;
     this.host.audio.unlock();
-    const url = resolveServerUrl(this.host.ui.value.serverAddress, window.location);
-    const badAddress = url === null;
-    if (badAddress) {
+    const session = this.coopSession(this.host.ui.value.serverAddress, style);
+    if (!session) {
       this.host.publish({ error: 'That server address does not look right.' });
       return;
     }
     this.host.audio.playUi('start');
-    this.host.publish({ mode: 'coop', error: null, connecting: true });
-    const session = createSocketSession(url);
+    this.host.publish({ mode: 'coop', error: null, connecting: true, onlineRoom: null });
     session.onRoom = (room) => this.answerRoom(session, room ?? style);
     this.beginSession(session, style);
+  }
+
+  /**
+   * In a build with online rooms, a blank field hosts one from this tab and a room code joins one over WebRTC.
+   * Anything else, and every address in a build without them, is a LAN server.
+   */
+  private coopSession(address: string, style: GameStyle): RoomSession | null {
+    const text = address.trim();
+    if (onlineRoomsLive()) {
+      if (!text) {
+        const hosting = new HostSession(style);
+        hosting.onHosted = (code) => this.host.publish({ onlineRoom: code });
+        // The game goes on, but nobody new can join, so the invite stops being offered.
+        hosting.onUnlisted = () => this.host.publish({ onlineRoom: null });
+        return hosting;
+      }
+      const code = normalizeRoomCode(text);
+      if (code.ok) {
+        const words = { badAddress: 'That room code does not look right.', noAnswer: 'Could not reach that game. Ask the host to check it is still open.', unreachable: 'Could not reach that game.' };
+        return new RemoteSession(new RtcGuestPipe(PLAY_API, code.code), words, ONLINE_CONNECT_TIMEOUT_MS);
+      }
+    }
+    const url = resolveServerUrl(text, window.location);
+    return url === null ? null : new SocketSession(url);
   }
 
   playAgain(fromLevel?: number): void {
@@ -135,7 +182,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, runStyle: null, ...loadBests(), leaderboard: loadLeaderboard() });
+    this.host.publish({ ...NO_RUN_UI, screen: 'title', connecting: false, runStyle: null, onlineRoom: null, ...loadBests(), leaderboard: loadLeaderboard() });
   }
 
   onWelcome(packet: WelcomePacket): void {
@@ -162,7 +209,7 @@ export class RunSession {
     this.host.home.close();
     state.transport = null;
     if (!state.welcomed) {
-      this.host.publish({ connecting: false, runStyle: null, error: reason });
+      this.host.publish({ connecting: false, runStyle: null, onlineRoom: null, error: reason });
       return;
     }
     state.world = null;
@@ -172,7 +219,7 @@ export class RunSession {
     this.host.onResize();
     const hasTitleMap = titleMap !== null;
     if (hasTitleMap) renderer?.setMap(titleMap);
-    this.host.publish({ ...NO_RUN_UI, screen: 'lost', runStyle: null, lostReason: reason });
+    this.host.publish({ ...NO_RUN_UI, screen: 'lost', runStyle: null, onlineRoom: null, lostReason: reason });
   }
 
   private canStart(): boolean {
@@ -186,7 +233,7 @@ export class RunSession {
     this.host.publish({ runStyle: style });
   }
 
-  private beginSession(transport: GameTransport, style: GameStyle, startLevel?: number): void {
+  private beginSession(transport: GameTransport, style: GameStyle, startLevel?: number, fixed: { seed?: number; difficulty?: DifficultyId } = {}): void {
     const { state, ui } = this.host;
     state.transport = transport;
     state.welcomed = false;
@@ -195,14 +242,14 @@ export class RunSession {
     transport.onClosed = (reason) => this.onClosed(reason);
     this.followStyle(style);
     // No callsign (blank or refused) goes out as '': every screen then labels the player by survivor name.
-    const options = { name: cleanCallsign(ui.value.callsign), difficulty: loadDifficulty(), character: loadCharacter(), style };
+    const options = { name: cleanCallsign(ui.value.callsign), difficulty: fixed.difficulty ?? loadDifficulty(), character: loadCharacter(), style, ...(fixed.seed === undefined ? {} : { seed: fixed.seed }) };
     const roomDecides = transport.kind === 'coop';
     if (roomDecides || !playsFromHome(style)) transport.connect({ ...options, startLevel });
     else this.readHome(transport, (home) => transport.connect({ ...options, home }));
   }
 
   /** The room has said what it plays, and the screens, the music and the save follow it. */
-  private answerRoom(session: RemoteSession, style: GameStyle): void {
+  private answerRoom(session: RoomSession, style: GameStyle): void {
     this.followStyle(style);
     if (playsFromHome(style)) {
       this.readHome(session, (home) => session.join(style, home));
@@ -231,7 +278,7 @@ export class RunSession {
       transport.disconnect();
       // Left open, the next run would write through a save that never finished opening.
       home.close();
-      this.host.publish({ connecting: false, runStyle: null, error: HOME_UNREADABLE });
+      this.host.publish({ connecting: false, runStyle: null, onlineRoom: null, error: HOME_UNREADABLE });
     };
     void home.open(transport.kind).then(answer, giveUp);
   }

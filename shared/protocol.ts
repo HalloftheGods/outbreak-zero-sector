@@ -59,6 +59,9 @@ export interface PlayerEntity {
   knife: boolean;
   /** Empty bottles to throw. Left off at none. */
   bottles?: number;
+  /** Fuel for molotovs, and flares, found in this town. Left off at none. */
+  fuel?: number;
+  flares?: number;
   /** Sprint stamina, 1 full to 0 empty. Left off while full. */
   stamina?: number;
   /** Ran dry: sprint is off until the bar refills past the re-arm mark. Left off when not. */
@@ -178,7 +181,7 @@ export type GameEvent =
   /** A round's effect took hold: a body lit (`caught` if off another body), acid went a stack deeper, a tranq landed, or a bullet went through. */
   | { readonly type: 'zombie_status'; readonly effect: GunEffect; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly caught?: boolean; readonly stacks?: number }
   | { readonly type: 'headshot'; readonly playerId: EntityId; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly points: number }
-  | { readonly type: 'zombie_die'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly killerId: EntityId | null; readonly points: number }
+  | { readonly type: 'zombie_die'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number; readonly angle: number; readonly killerId: EntityId | null; readonly points: number; readonly chain?: number }
   | { readonly type: 'zombie_attack'; readonly zombieId: EntityId; readonly zombieType: ZombieType; readonly x: number; readonly y: number }
   | { readonly type: 'bloater_burst'; readonly x: number; readonly y: number; readonly radius: number }
   | { readonly type: 'player_hurt'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly damage: number }
@@ -186,10 +189,17 @@ export type GameEvent =
   | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
-  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean }
+  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean; readonly stash?: 'fuel' | 'flare' }
   /** A thrown bottle broke at x,y, thrown from fromX,fromY. */
   | { readonly type: 'bottle_smash'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number }
+  /** A molotov broke at x,y and left a pool of fire `radius` wide for `sec`. */
+  | { readonly type: 'molotov_burst'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number; readonly radius: number; readonly sec: number }
+  /** A flare landed at x,y and burns for `sec`. */
+  | { readonly type: 'flare_lit'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number; readonly sec: number }
   | { readonly type: 'car_alarm'; readonly x: number; readonly y: number }
+  /** A flare went up at x,y: a supply crate comes down on it in `sec`. */
+  | { readonly type: 'drop_called'; readonly x: number; readonly y: number; readonly sec: number }
+  | { readonly type: 'drop_landed'; readonly x: number; readonly y: number }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
   | { readonly type: 'wave_clear'; readonly wave: number }
@@ -236,6 +246,10 @@ export interface ClientInputPacket {
   readonly search: boolean;
   /** Throw a bottle at the crosshair. Left off when not. */
   readonly throw?: boolean;
+  /** Light a bottle with fuel and throw it. Left off when not. */
+  readonly molotov?: boolean;
+  /** Throw a lit flare. Left off when not. */
+  readonly flare?: boolean;
   /** The sneak key is held. Left off when not. Wins over sprint when both are held. */
   readonly sneak?: boolean;
   /** The sprint key is held. Left off when not. */
@@ -264,6 +278,8 @@ export interface SnapshotPacket {
   readonly exit: ExitEntity | null;
   /** Ids of the town's containers that have been opened, so everyone sees them open. */
   readonly openedContainers: readonly number[];
+  /** The town's supply drop, from its flare to the end of its marked time, sent to everyone. Left off otherwise. */
+  readonly drop?: DropView;
   /** Footprints in a snowy town near this viewer. Left off when there are none. */
   readonly tracks?: readonly TrackEntity[];
   /** Events since the previous snapshot, in order. */
@@ -273,6 +289,12 @@ export interface SnapshotPacket {
   readonly bench?: BenchView;
   /** The room's level pick and reach. Left off outside home mode. */
   readonly home?: RoomHomeView;
+}
+
+export interface DropView {
+  readonly x: number;
+  readonly y: number;
+  readonly landed: boolean;
 }
 
 export interface WelcomePacket {

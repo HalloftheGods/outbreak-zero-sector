@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JOIN_TOKEN_MAX_LENGTH } from '../shared/constants.ts';
-import { createSocketSession } from '../src/network/socket-session.ts';
+import { SocketSession } from '../src/network/socket-session.ts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -46,7 +46,7 @@ describe('being turned away', () => {
 
   it('says the server is busy, not that it cannot be reached', () => {
     vi.stubGlobal('WebSocket', ClosingSocket);
-    const session = createSocketSession('ws://host:8097');
+    const session = new SocketSession('ws://host:8097');
     const reasons: string[] = [];
     session.onClosed = (reason) => reasons.push(reason);
     session.connect({ name: 'ANA' });

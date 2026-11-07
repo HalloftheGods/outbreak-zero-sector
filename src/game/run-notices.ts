@@ -12,12 +12,14 @@ import type {
   WeaponId,
 } from '../../shared/protocol.ts';
 import { formatDuration } from './hud-state.ts';
-import type { Banner, LevelCard, PlaceBanner, UiState } from './hud-state.ts';
+import type { Banner, Callout, LevelCard, PlaceBanner, UiState } from './hud-state.ts';
+import type { CalloutWords } from './kill-juice.ts';
 import { levelTitle } from './level-hud.ts';
 import { isRadioFound } from './sound-unlock.ts';
 
 const BANNER_MS = 2600;
 const PLACE_BANNER_MS = 2200;
+const CALLOUT_MS = 1200;
 const LEVEL_CARD_MS = 4200;
 /** A refused item on the floor says so once, and again only if the player lingers. */
 const REFUSAL_REPEAT_MS = 2500;
@@ -75,9 +77,13 @@ export function refusalNote(player: PlayerEntity, type: PickupType): string | nu
 const SET_BANNERS: Partial<Record<GameEvent['type'], Omit<Banner, 'key'>>> = {
   wave_clear: { title: 'THE HORDE MOVES ON', subtitle: 'FOR NOW', tone: 'quiet' },
   exit_open: { title: 'THE VAN IS HERE', subtitle: 'GET EVERYONE ON BOARD', tone: 'hope' },
+  drop_called: { title: 'SUPPLY DROP', subtitle: 'FOLLOW THE RED FLARE', tone: 'hope' },
 };
 
 /** The loud banner for a horde or the van, or null for anything else. */
+/** Said instead of the horde moving on, when the last of it fell. */
+export const HORDE_WIPED_BANNER: Omit<Banner, 'key'> = { title: 'HORDE WIPED OUT', subtitle: 'FOR NOW', tone: 'quiet' };
+
 export function hordeBanner(event: GameEvent): Omit<Banner, 'key'> | null {
   const hordeCame = event.type === 'wave_start';
   if (hordeCame) return { title: `HORDE ${event.wave}`, subtitle: `${event.hostiles} HOSTILES`, tone: 'danger' };
@@ -127,6 +133,8 @@ export function radioBanner(event: GameEvent, track: string | null): Omit<Banner
 export class RunNotices {
   private bannerKey = 0;
   private bannerUntilMs = 0;
+  private calloutKey = 0;
+  private calloutUntilMs = 0;
   private placeKey = 0;
   private placeUntilMs = 0;
   private levelCardKey = 0;
@@ -137,6 +145,7 @@ export class RunNotices {
 
   reset(): void {
     this.bannerUntilMs = 0;
+    this.calloutUntilMs = 0;
     this.placeUntilMs = 0;
     this.levelCardUntilMs = 0;
     this.indoors = null;
@@ -149,16 +158,22 @@ export class RunNotices {
     return { ...banner, key: this.bannerKey };
   }
 
+  callout(words: CalloutWords, now: number): Callout {
+    this.calloutKey += 1;
+    this.calloutUntilMs = now + CALLOUT_MS;
+    return { ...words, key: this.calloutKey };
+  }
+
   place(label: string, now: number): PlaceBanner {
     this.placeKey += 1;
     this.placeUntilMs = now + PLACE_BANNER_MS;
     return { key: this.placeKey, label };
   }
 
-  levelCard(level: number, now: number): LevelCard {
+  levelCard(level: number, now: number, mapSeed: number | null = null): LevelCard {
     this.levelCardKey += 1;
     this.levelCardUntilMs = now + LEVEL_CARD_MS;
-    return { ...levelTitle(level), key: this.levelCardKey };
+    return { ...levelTitle(level, mapSeed), key: this.levelCardKey };
   }
 
   /** The building id the player has just stepped into, or null if nothing changed. */
@@ -188,10 +203,12 @@ export class RunNotices {
   /** Clears whatever has run its time. */
   expired(ui: UiState, now: number): Partial<UiState> {
     const bannerDone = ui.banner !== null && now > this.bannerUntilMs;
+    const calloutDone = (ui.callout ?? null) !== null && now > this.calloutUntilMs;
     const placeDone = ui.place !== null && now > this.placeUntilMs;
     const levelCardDone = ui.levelCard !== null && now > this.levelCardUntilMs;
     return {
       ...(bannerDone ? { banner: null } : {}),
+      ...(calloutDone ? { callout: null } : {}),
       ...(placeDone ? { place: null } : {}),
       ...(levelCardDone ? { levelCard: null } : {}),
     };

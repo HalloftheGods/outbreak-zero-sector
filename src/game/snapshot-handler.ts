@@ -2,8 +2,9 @@ import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { ClientWorld } from './client-world.ts';
 import { recordGameFinished, recordLevelReached } from './level-progress.ts';
-import { finishRun } from './run-hud.ts';
-import { pickupNote } from './run-notices.ts';
+import { KillJuice } from './kill-juice.ts';
+import { HORDE_WIPED_BANNER, pickupNote } from './run-notices.ts';
+import { finishRun, healthFraction } from './run-hud.ts';
 import type { RunHost } from './run-session.ts';
 import { loadLeaderboard } from './storage.ts';
 import { loadBests } from './trip-record.ts';
@@ -17,6 +18,7 @@ const EVENT_MUSIC: Partial<Record<GameEvent['type'], 'wave' | 'intermission'>> =
 export class SnapshotHandler {
   /** The bunker's music is the horde's while the blast door is breached. */
   private breached = false;
+  private readonly juice = new KillJuice();
 
   constructor(
     private readonly host: RunHost,
@@ -34,6 +36,7 @@ export class SnapshotHandler {
       world.restart();
       renderer?.reset();
       stage.rewind();
+      this.juice.reset();
       this.beginRun();
     }
     stage.follow(world, snapshot, now);
@@ -44,7 +47,8 @@ export class SnapshotHandler {
     const onATrip = after?.home !== undefined;
     // Reaching a town on a trip opens nothing: only the van home does, and that comes on a receipt.
     const inArcade = snapshot.home === undefined;
-    const newLevel = inArcade && snapshot.level > state.levelNoted;
+    // A Daily Night starts deep in the game: it unlocks nothing on the Levels page.
+    const newLevel = inArcade && state.daily === null && snapshot.level > state.levelNoted;
     if (newLevel) {
       state.levelNoted = snapshot.level;
       recordLevelReached(snapshot.level);
@@ -52,10 +56,22 @@ export class SnapshotHandler {
     this.setMood(snapshot, world.latest === null);
     state.lastSnapshotMs = now;
     for (const event of snapshot.events) this.onGameEvent(event, world, now, before, after);
+    this.punctuate(snapshot, world.localId, after, now);
     world.push(snapshot, now);
     if (onATrip) home.observe(snapshot, world.localId, now);
     const justEnded = snapshot.gameOver !== null && state.runResult === null;
     if (justEnded) this.enterGameOver(snapshot.gameOver!, world.localId, now);
+  }
+
+  /** The kills in this snapshot that deserve a beat: a held frame, a flash, a word over the action. */
+  private punctuate(snapshot: SnapshotPacket, localId: string | null, after: PlayerEntity | null, now: number): void {
+    const beat = this.juice.read(snapshot.events, localId, healthFraction(after), now);
+    if (!beat) return;
+    const { renderer, runHud } = this.host;
+    if (beat.freezeMs > 0) this.host.hitStop(beat.freezeMs);
+    if (beat.flash > 0) renderer?.effects.addFlash(beat.flash);
+    if (beat.callout) runHud.callout(beat.callout, now);
+    if (beat.hordeWiped) runHud.say(HORDE_WIPED_BANNER, now);
   }
 
   /** Someone joining mid-horde gets no wave_start, so the first frame sets the mood. The bunker has its own. */
@@ -92,9 +108,9 @@ export class SnapshotHandler {
 
   enterGameOver(stats: GameOverStats, localId: string, now: number): void {
     const { state, input, audio } = this.host;
-    state.runResult = finishRun(stats, localId);
+    state.runResult = finishRun(stats, localId, state.daily);
     const won = stats.outcome === 'victory';
-    if (won) recordGameFinished();
+    if (won && state.daily === null) recordGameFinished();
     state.gameOverAtMs = now;
     input.setEnabled(false);
     audio.setScene(won ? 'victory' : 'gameover');

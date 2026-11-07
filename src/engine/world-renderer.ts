@@ -1,4 +1,5 @@
 import type { LevelTheme } from '../../shared/levels.ts';
+import type { NightEventId } from '../../shared/night-events.ts';
 import type { EntityId, GameEvent, WorldMap, ZombieType } from '../../shared/protocol.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
 import { Atmosphere } from './atmosphere.ts';
@@ -143,8 +144,9 @@ export class WorldRenderer {
     this.reset();
   }
 
-  setTheme(theme: LevelTheme): void {
-    this.atmosphere.setTheme(theme);
+  /** A night event darkens, reddens or fogs the town's own look. */
+  setTheme(theme: LevelTheme, event: NightEventId | null = null): void {
+    this.atmosphere.setTheme(theme, event);
     this.groundMotion.setTheme(theme);
     const { ambient, ground } = this.atmosphere.look;
     this.lighting.setAmbient(ambient);

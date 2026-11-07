@@ -27,12 +27,12 @@ describe('title scale', () => {
 
 describe('title menu', () => {
   it('runs in the agreed order, with Play first so it is the default', () => {
-    expect(TITLE_MENU.map((item) => item.label)).toEqual(['Play', 'Levels', 'How to Play', 'Records', 'Sound Test', 'Options']);
+    expect(TITLE_MENU.map((item) => item.label)).toEqual(['Play', 'Daily Night', 'Levels', 'How to Play', 'Records', 'Sound Test', 'Options']);
   });
 
   it('names the Sound Test from the start, with or without a Radio found', () => {
     const labels = (radio: boolean) => TITLE_MENU.map((item) => menuLabel(item, { radio, tracks: [] }));
-    expect(labels(false)).toEqual(['Play', 'Levels', 'How to Play', 'Records', 'Sound Test', 'Options']);
+    expect(labels(false)).toEqual(['Play', 'Daily Night', 'Levels', 'How to Play', 'Records', 'Sound Test', 'Options']);
     expect(labels(true)).toEqual(TITLE_MENU.map((item) => item.label));
   });
 

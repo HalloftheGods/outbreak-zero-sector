@@ -1,20 +1,26 @@
-import { closeText } from '../../shared/close-codes.ts';
 import type { EmoteId } from '../../shared/emotes.ts';
+import { closeText } from '../../shared/close-codes.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
 import type { HomeAction, JoinHome } from '../../shared/home-protocol.ts';
 import { PROTOCOL_VERSION } from '../../shared/protocol.ts';
 import type { ClientInputPacket, ClientPacket, SnapshotPacket, WelcomePacket } from '../../shared/protocol.ts';
 import type { BenchAction } from '../../shared/workbench.ts';
 import { tapRoomDifficulty } from '../game/analytics/event-tap.ts';
-import type { PacketPipe } from './packet-pipe.ts';
+import type { PacketPipe, PipeWords } from './packet-pipe.ts';
 import { parseServerPacket } from './packet-guards.ts';
 import { tabToken } from './tab-token.ts';
 import type { ConnectOptions, GameTransport } from './transport.ts';
 
-const CONNECT_TIMEOUT_MS = 6000;
+/** A co-op transport whose room speaks first: `onRoom`, then `join`. The run answers through these two. */
+export interface RoomSession extends GameTransport {
+  onRoom: (style: GameStyle | null) => void;
+  join(style: GameStyle, home?: JoinHome): void;
+}
 
-/** Co-op play against a room, over whichever link the pipe is. */
-export class RemoteSession implements GameTransport {
+const DEFAULT_TIMEOUT_MS = 6000;
+
+/** Co-op play against a room host at the far end of a pipe: the ws server, a host tab over WebRTC, or this tab's own room. */
+export class RemoteSession implements RoomSession {
   readonly kind = 'coop';
   readonly interpolationDelayMs = 100;
 
@@ -24,30 +30,29 @@ export class RemoteSession implements GameTransport {
   /** What the room plays, or null for an empty one. Heard before joining, and answered with `join`; heard again if the room moved on first. */
   onRoom: (style: GameStyle | null) => void = () => {};
 
-  private readonly pipe: PacketPipe;
   private joiner: ConnectOptions = { name: '' };
   private timeout: ReturnType<typeof setTimeout> | null = null;
   private welcomed = false;
   private finished = false;
+  private opened = false;
 
-  constructor(pipe: PacketPipe) {
-    this.pipe = pipe;
-  }
+  constructor(
+    private readonly pipe: PacketPipe,
+    private readonly words: PipeWords,
+    private readonly timeoutMs = DEFAULT_TIMEOUT_MS,
+  ) {}
 
-  /** Brings the link up. The room speaks first, so nothing is sent until `onRoom` has been answered. */
+  /** Opens the pipe. The room speaks first, so nothing is sent until `onRoom` has been answered. */
   connect(options: ConnectOptions): void {
     this.joiner = options;
-    this.pipe.onText = (text) => this.receive(text);
-    this.pipe.onClose = (code, reason) => this.finish(this.closeReason(code, reason));
     try {
-      this.pipe.open?.();
+      this.pipe.open({ message: (text) => this.receive(text), closed: (code, reason) => this.finish(this.closeReason(code, reason)) });
+      this.opened = true;
     } catch {
-      this.finish(`Bad server address: ${this.pipe.label}`);
+      this.finish(this.words.badAddress);
       return;
     }
-    this.timeout = setTimeout(() => {
-      this.finish(`No answer from ${this.pipe.label}. Is the server running?`);
-    }, CONNECT_TIMEOUT_MS);
+    this.timeout = setTimeout(() => this.finish(this.words.noAnswer), this.timeoutMs);
   }
 
   /** Asks in, as the style the room said it plays. Campaign brings its gear; Arcade has none to bring. */
@@ -85,7 +90,7 @@ export class RemoteSession implements GameTransport {
   }
 
   private send(packet: ClientPacket): void {
-    this.pipe.send(JSON.stringify(packet));
+    if (!this.finished) this.pipe.send(JSON.stringify(packet));
   }
 
   private receive(raw: unknown): void {
@@ -109,7 +114,7 @@ export class RemoteSession implements GameTransport {
     const told = closeText(code, reason);
     if (told) return told;
     if (this.welcomed) return 'The connection to the server dropped.';
-    return `Could not reach ${this.pipe.label}. Is the server running?`;
+    return this.words.unreachable;
   }
 
   private finish(reason: string): void {
@@ -126,6 +131,8 @@ export class RemoteSession implements GameTransport {
 
   private teardown(): void {
     this.clearTimeout();
+    if (!this.opened) return;
+    this.opened = false;
     this.pipe.close();
   }
 }

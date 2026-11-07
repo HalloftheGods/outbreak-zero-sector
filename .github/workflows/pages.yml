@@ -39,6 +39,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run build
+        env:
+          # Online rooms switch on when the repository variable ZOMBIE_PLAY_API is set (e.g. https://play-api.forthexp.com).
+          ZOMBIE_PLAY_API: ${{ vars.ZOMBIE_PLAY_API }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

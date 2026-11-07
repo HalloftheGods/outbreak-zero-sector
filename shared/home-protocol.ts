@@ -12,8 +12,8 @@ export const BUNKER_SEED = -1;
 /** `sim.level` in the bunker, which clamps to level 1's look and triggers no town rule. */
 export const BUNKER_LEVEL = 0;
 
-/** The bunker's horde clock. Off until its soak (#7223); a dev build turns it on with `?overrun`. */
-export const OVERRUN_LIVE = false;
+/** The bunker's horde clock. Live for everyone since 2026-11-07; flip back to false to hide it (a dev build then turns it on with `?overrun`). */
+export const OVERRUN_LIVE = true;
 
 export const MERCHANT_IDS = ['gunsmith', 'quartermaster', 'medic', 'powder'] as const;
 export type MerchantId = (typeof MERCHANT_IDS)[number];

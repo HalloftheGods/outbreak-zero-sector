@@ -1,17 +1,79 @@
-/**
- * One text link to a room: a WebSocket to the ws server, or a data channel to a friend's browser.
- * The session speaks packets over it and knows nothing of which kind it holds.
- * A link with no close code of its own (a data channel) maps a `bye` packet to one before it calls `onClose`.
- */
+// What a remote session sends packets over: a WebSocket, a WebRTC data channel, or an in-tab loopback to the
+// host's own room. Every pipe carries the same JSON text in order, so the packet protocol never changes with it.
+import type { PeerSocket } from '../../shared/room/peer.ts';
+
+export interface PipeHandlers {
+  message(text: string): void;
+  /** Fires at most once. A data channel has no close code, so its pipe passes 1006 unless it knows better. */
+  closed(code: number, reason: string): void;
+}
+
 export interface PacketPipe {
-  /** What to call the far end in a message to the player, such as the server address. */
-  readonly label: string;
-  onText: (text: string) => void;
-  onClose: (code: number, reason: string) => void;
-  /** Starts a link that is not up yet; throws if it cannot. A link that is already up leaves this out. */
-  open?(): void;
-  /** Sends when the link is up, and drops the text when it is not. */
+  /** Starts connecting. Throws only for an address that can never work. */
+  open(handlers: PipeHandlers): void;
+  /** Dropped while the pipe is not open yet. */
   send(text: string): void;
-  /** Hangs up without calling `onClose`. */
+  /** Closes without calling `closed`: the caller is the one leaving. */
   close(): void;
+}
+
+/** What a session says about a pipe that failed, in the player's words. */
+export interface PipeWords {
+  readonly badAddress: string;
+  readonly noAnswer: string;
+  readonly unreachable: string;
+}
+
+/** Reported when the far end vanished without a reason. */
+export const DROPPED = 1006;
+
+/**
+ * Two ends in one tab: the host's own player talks to its room with no network between. Delivery waits
+ * a microtask, as a socket would, so neither side ever runs inside the other's send.
+ */
+export function loopbackPair(): {
+  pipe: PacketPipe;
+  peer: PeerSocket & { onFrame: (text: string) => void; onClosed: () => void; onProbe: () => void };
+} {
+  let handlers: PipeHandlers | null = null;
+  let open = true;
+  const later = (fn: () => void): void => queueMicrotask(fn);
+  const shut = (code: number, reason: string, tellClient: boolean): void => {
+    if (!open) return;
+    open = false;
+    const told = handlers;
+    handlers = null;
+    later(() => {
+      if (tellClient) told?.closed(code, reason);
+      peer.onClosed();
+    });
+  };
+  const peer = {
+    onFrame: (_text: string): void => {},
+    onClosed: (): void => {},
+    /** Nothing can drop between two ends in one tab, so a probe is answered at once. */
+    onProbe: (): void => {},
+    get open() {
+      return open;
+    },
+    send: (text: string) => {
+      if (open) later(() => handlers?.message(text));
+    },
+    close: (code: number, reason: string) => shut(code, reason, true),
+    drop: () => shut(DROPPED, '', true),
+    canTakeFrame: () => true,
+    probe: () => {
+      if (open) peer.onProbe();
+    },
+  };
+  const pipe: PacketPipe = {
+    open: (next) => {
+      handlers = next;
+    },
+    send: (text) => {
+      if (open) later(() => peer.onFrame(text));
+    },
+    close: () => shut(1000, 'left', false),
+  };
+  return { pipe, peer };
 }

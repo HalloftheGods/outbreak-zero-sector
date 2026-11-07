@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 // Ports: ZOMBIE_CLIENT_PORT (default 8096) for this dev server, ZOMBIE_PORT (default 8097) for the co-op server.
 const clientPort = Number(process.env.ZOMBIE_CLIENT_PORT) || 8096;
 const serverPort = Number(process.env.ZOMBIE_PORT) || 8097;
+// The play API (play-api/, a Cloudflare Worker) for online rooms. Unset, the build has no online play.
+const playApi = process.env.ZOMBIE_PLAY_API ?? '';
 
 const { version } = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
 
@@ -19,6 +21,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __ZOMBIE_SERVER_PORT__: JSON.stringify(serverPort),
+    __ZOMBIE_PLAY_API__: JSON.stringify(playApi),
   },
   plugins: [
     vue(),

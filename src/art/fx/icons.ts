@@ -172,6 +172,36 @@ const BOTTLE: Grid = [
   '.aaa.',
 ];
 
+/** A jerrycan of fuel: what turns a bottle into a molotov. */
+const FUEL_CAN: Grid = [
+  '..nnn.....',
+  '..n.nmm...',
+  '.ssssssst.',
+  'sttttttsst',
+  'stuuuuutst',
+  'stussssust',
+  'stusttsust',
+  'stusttsust',
+  'stussssust',
+  'stuuuuutst',
+  'sttttttsst',
+  '.ssssssss.',
+];
+
+/** A road flare: a red stick with its cap struck and burning. */
+const FLARE: Grid = [
+  '....Y',
+  '...YB',
+  '..CBY',
+  '..sC.',
+  '.sts.',
+  '.st..',
+  'sts..',
+  'st...',
+  'ts...',
+  'p....',
+];
+
 const SKULL: Grid = [
   '...eeeeeee...',
   '.eeeeeeeeeff.',
@@ -258,6 +288,14 @@ export function buildHeart(): PixelSprite {
 
 export function buildBottle(): PixelSprite {
   return outlined(BOTTLE, 15, 14);
+}
+
+export function buildFuelCan(): PixelSprite {
+  return outlined(FUEL_CAN, 15, 14);
+}
+
+export function buildFlare(): PixelSprite {
+  return outlined(FLARE, 15, 14);
 }
 
 export function buildSkull(): PixelSprite {

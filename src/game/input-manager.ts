@@ -20,6 +20,8 @@ const SHOVE_CODE = 'KeyF';
 const HEAL_CODE = 'KeyH';
 const SEARCH_CODE = 'KeyE';
 const THROW_CODE = 'KeyG';
+const MOLOTOV_CODE = 'KeyT';
+const FLARE_CODE = 'KeyV';
 const SNEAK_CODES = ['KeyC'];
 const SPRINT_CODES = ['ShiftLeft', 'ShiftRight'];
 const MAP_CODES: ReadonlySet<string> = new Set(['Tab', 'KeyN']);
@@ -37,6 +39,8 @@ const GAME_CODES: ReadonlySet<string> = new Set([
   HEAL_CODE,
   SEARCH_CODE,
   THROW_CODE,
+  MOLOTOV_CODE,
+  FLARE_CODE,
   ...SNEAK_CODES,
   ...SPRINT_CODES,
   ...Object.keys(WEAPON_KEYS),
@@ -101,6 +105,8 @@ export class InputManager {
   private shoveLatch = false;
   private healLatch = false;
   private throwLatch = false;
+  private molotovLatch = false;
+  private flareLatch = false;
   private reloadLatch = false;
   private weaponLatch: WeaponId | null = null;
   private cycleLatch = 0;
@@ -162,6 +168,8 @@ export class InputManager {
     this.shoveLatch = false;
     this.healLatch = false;
     this.throwLatch = false;
+    this.molotovLatch = false;
+    this.flareLatch = false;
     this.reloadLatch = false;
     this.weaponLatch = null;
     this.cycleLatch = 0;
@@ -221,6 +229,8 @@ export class InputManager {
       melee: this.shoveLatch || (this.enabled && this.shoving) || this.isHeld([SHOVE_CODE]),
       heal: this.healLatch,
       ...(this.throwLatch ? { throw: true } : {}),
+      ...(this.molotovLatch ? { molotov: true } : {}),
+      ...(this.flareLatch ? { flare: true } : {}),
       search: this.isHeld([SEARCH_CODE]),
       ...(this.stance === 'sneak' ? { sneak: true } : {}),
       ...(this.stance === 'sprint' ? { sprint: true } : {}),
@@ -266,6 +276,8 @@ export class InputManager {
     this.shoveLatch ||= code === SHOVE_CODE;
     this.healLatch ||= code === HEAL_CODE;
     this.throwLatch ||= code === THROW_CODE;
+    this.molotovLatch ||= code === MOLOTOV_CODE;
+    this.flareLatch ||= code === FLARE_CODE;
     const weapon = WEAPON_KEYS[code];
     if (weapon) this.weaponLatch = weapon;
   }

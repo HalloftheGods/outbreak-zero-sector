@@ -4,6 +4,7 @@
     <h2 class="px-heading is-danger">Game over</h2>
     <p class="gameover-difficulty">{{ difficultyDef(result.stats.difficulty).label }}</p>
     <p v-if="result.isNewBest" class="gameover-best px-blink">New best</p>
+    <p v-if="result.daily" class="gameover-difficulty">{{ result.daily.label }}: {{ result.daily.counted ? 'this one counts' : 'practice' }}</p>
 
     <dl class="gameover-stats">
       <div><dt>Level reached</dt><dd>{{ result.stats.level }}</dd></div>
@@ -33,6 +34,7 @@
       <PixelButton v-if="resumeAt !== null" :disabled="restarting" @press="game.continueAgain()">
         Continue from level {{ resumeAt }}
       </PixelButton>
+      <ShareButton v-if="result.daily" :text="result.daily.share" />
       <PixelButton @press="game.toMenu()">Main menu</PixelButton>
     </div>
   </section>
@@ -48,6 +50,7 @@ import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import { continuesAfterDeath } from '../game/play-flow.ts';
 import PixelButton from './PixelButton.vue';
+import ShareButton from './ShareButton.vue';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
 

@@ -4,6 +4,7 @@
     <strong class="level-card-title">{{ card.title }}</strong>
     <span class="level-card-goal">{{ card.goal }}</span>
     <span v-if="card.rule" class="level-card-rule">{{ card.rule }}</span>
+    <span v-if="card.event" class="level-card-event">Tonight: {{ card.event }}</span>
   </div>
 </template>
 
@@ -47,6 +48,10 @@ defineProps<{ card: LevelCard }>();
 
 .level-card-rule {
   color: var(--amber);
+}
+
+.level-card-event {
+  color: var(--blood, #e4502e);
 }
 
 @keyframes level-card-life {

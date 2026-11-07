@@ -2,7 +2,7 @@
   <div class="select">
     <div class="select-card">
       <div class="select-bust px-frame">
-        <SpriteImg v-if="art" :sprite="art.survivors[shown].select" :scale="3" />
+        <SpriteImg v-if="art" :sprite="art.survivors[shown].select" :scale="bustScale" />
         <div class="select-plate">
           <p class="select-name">{{ survivor.name }}</p>
           <p class="select-trait">{{ survivor.trait }}</p>
@@ -28,7 +28,8 @@ import StatBars from './StatBars.vue';
 import SurvivorRoster from './SurvivorRoster.vue';
 import { useGame } from './use-game.ts';
 
-const { art } = defineProps<{ art: ArtBook | null }>();
+/** A page with its own header above takes a smaller bust, so the roster still fits without scrolling. */
+const { art, bustScale = 3 } = defineProps<{ art: ArtBook | null; bustScale?: number }>();
 const game = useGame();
 const roster = useTemplateRef<InstanceType<typeof SurvivorRoster>>('roster');
 

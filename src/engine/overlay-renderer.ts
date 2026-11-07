@@ -2,7 +2,7 @@ import { tagLabel } from '../../shared/callsign.ts';
 import { EXIT_RADIUS, ZOMBIES } from '../../shared/constants.ts';
 import { CONTAINER_LABEL } from '../../shared/containers.ts';
 import { HEAD_MARGIN, isOnHead, TOUCH_HEAD_MARGIN } from '../../shared/headshots.ts';
-import type { EntityId, ExitEntity, PlayerEntity, ZombieEntity } from '../../shared/protocol.ts';
+import type { DropView, EntityId, ExitEntity, PlayerEntity, ZombieEntity } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT } from './bitmap-font.ts';
@@ -234,6 +234,26 @@ export class OverlayRenderer {
     }
   }
 
+  /** An arrow to the supply drop while it is out of sight; in sight, a red ring and what it is. */
+  private drawDrop(ctx: CanvasRenderingContext2D, drop: DropView, left: number, top: number, viewW: number, viewH: number, time: number): void {
+    const x = Math.round(drop.x) - left;
+    const y = Math.round(drop.y) - top;
+    const label = drop.landed ? 'SUPPLIES' : 'DROP';
+    const pointer = edgePointer(x, y, viewW, viewH, VAN_POINTER_INSET);
+    if (pointer) {
+      drawArrow(ctx, pointer, BLOOD);
+      const labelBelow = pointer.y < viewH / 2;
+      const labelY = labelBelow ? pointer.y + VAN_POINTER_LABEL_GAP : pointer.y - VAN_POINTER_LABEL_GAP - FONT_HEIGHT;
+      drawOutlinedText(ctx, label, pointer.x, labelY, BLOOD);
+      return;
+    }
+    const blinkOn = drop.landed || Math.floor(time * 3) % 2 === 0;
+    if (!blinkOn) return;
+    ctx.fillStyle = BLOOD;
+    for (const [dx, dy] of EXIT_RING) ctx.fillRect(x + dx, y + dy, 1, 1);
+    drawOutlinedText(ctx, label, x, y - VAN_TAG_HEIGHT / 2, BLOOD);
+  }
+
   /** An arrow to the van while it is out of sight. In sight, the ring to stand in and the wait. */
   private drawExit(ctx: CanvasRenderingContext2D, exit: ExitEntity, left: number, top: number, viewW: number, viewH: number): void {
     const x = Math.round(exit.x) - left;
@@ -280,6 +300,8 @@ export class OverlayRenderer {
     this.drawPointers(ctx, scene, left, top, viewW, viewH);
     const exitShown = scene.exit !== null && scene.phase !== 'gameover';
     if (exitShown) this.drawExit(ctx, scene.exit, left, top, viewW, viewH);
+    const dropShown = scene.drop !== null && scene.phase !== 'gameover';
+    if (dropShown) this.drawDrop(ctx, scene.drop, left, top, viewW, viewH, time);
   }
 
   drawCrosshair(

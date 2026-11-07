@@ -1,3 +1,4 @@
+import type { CalloutTone } from './kill-juice.ts';
 import { displayName } from '../../shared/callsign.ts';
 import { characterOf } from '../../shared/characters.ts';
 import type { GameStyle } from '../../shared/game-style.ts';
@@ -53,6 +54,9 @@ export interface HudState {
   readonly medkits: number;
   /** Empty bottles to throw. */
   readonly bottles: number;
+  /** Fuel for molotovs (each also takes a bottle), and flares. */
+  readonly fuel: number;
+  readonly flares: number;
   readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
@@ -83,6 +87,14 @@ export interface Banner {
   readonly tone: 'danger' | 'quiet' | 'hope';
 }
 
+/** A word or two over the action for a kill worth noticing: a chain, a close call, a horde wiped out. */
+export interface Callout {
+  /** Changes with every callout, so the component replays its entrance. */
+  readonly key: number;
+  readonly text: string;
+  readonly tone: CalloutTone;
+}
+
 /** Names a level as it starts. */
 export interface LevelCard {
   readonly key: number;
@@ -91,6 +103,8 @@ export interface LevelCard {
   readonly goal: string;
   /** What this town's weather does to play, for towns where it does something. */
   readonly rule?: string;
+  /** A night event, for towns that drew one (`shared/night-events.ts`). */
+  readonly event?: string;
 }
 
 /** A small label for the place the player just walked into. */
@@ -105,6 +119,9 @@ export interface RunResult {
   readonly score: number;
   readonly kills: number;
   readonly isNewBest: boolean;
+  /** Set for a Daily Night: which day, and whether this was the run that counts or practice. */
+  /** A Daily Night run: its day, whether it counted, and the day's counted run in words to share. */
+  readonly daily?: { readonly label: string; readonly counted: boolean; readonly share: string | null };
 }
 
 /** Small, plain and replaced whole; the only game state Vue ever sees. */
@@ -120,6 +137,7 @@ export interface UiState {
   readonly mapOpen: boolean;
   readonly hud: HudState | null;
   readonly banner: Banner | null;
+  readonly callout: Callout | null;
   readonly place: PlaceBanner | null;
   readonly levelCard: LevelCard | null;
   /** The bunker and the trip, on a Campaign run. */
@@ -139,6 +157,8 @@ export interface UiState {
   readonly leaderboard: readonly LeaderboardEntry[];
   readonly callsign: string;
   readonly serverAddress: string;
+  /** The code of the online room this tab is hosting, for the host to share; null otherwise. */
+  readonly onlineRoom: string | null;
   readonly volume: number;
   readonly muted: boolean;
 }
@@ -157,6 +177,8 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     mags: local.mags,
     medkits: local.medkits,
     bottles: local.bottles ?? 0,
+    fuel: local.fuel ?? 0,
+    flares: local.flares ?? 0,
     knife: local.knife,
     reload: local.reload,
     score: local.score,

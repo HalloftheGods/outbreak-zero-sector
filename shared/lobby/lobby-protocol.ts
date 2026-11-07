@@ -39,14 +39,27 @@ export type GuestSignal =
   | { readonly type: 'offer'; readonly sdp: string }
   | { readonly type: 'ice'; readonly ice: IceCandidate };
 
-/** DO to host. `peer-left` tells the host to drop a half-open connection. */
+/** One entry of RTCConfiguration.iceServers, as the Room DO hands it out. */
+export interface IceServer {
+  readonly urls: string | readonly string[];
+  readonly username?: string;
+  readonly credential?: string;
+}
+
+/**
+ * DO to host. `ready` answers a good `auth` with the ICE servers to use; `relayOnly` means
+ * iceTransportPolicy 'relay' (public rooms). `peer-left` tells the host to drop a connection
+ * whose channel has not opened yet: a guest also closes its signal socket once the channel is up.
+ */
 export type ToHostSignal =
+  | { readonly type: 'ready'; readonly iceServers: readonly IceServer[]; readonly relayOnly: boolean }
   | { readonly type: 'offer'; readonly peerId: string; readonly sdp: string }
   | { readonly type: 'ice'; readonly peerId: string; readonly ice: IceCandidate }
   | { readonly type: 'peer-left'; readonly peerId: string };
 
-/** DO to guest. */
+/** DO to guest. `admitted` is the first message on an admitted guest's socket. */
 export type ToGuestSignal =
+  | { readonly type: 'admitted'; readonly peerId: string; readonly iceServers: readonly IceServer[]; readonly relayOnly: boolean }
   | { readonly type: 'answer'; readonly sdp: string }
   | { readonly type: 'ice'; readonly ice: IceCandidate }
   | { readonly type: 'peer-left' };
@@ -123,9 +136,39 @@ export function parseGuestSignal(text: unknown): GuestSignal | null {
   return null;
 }
 
+const ICE_SERVERS_MAX = 8;
+const ICE_URLS_MAX = 8;
+const ICE_URL_MAX = 256;
+const ICE_SECRET_MAX = 512;
+
+function parseIceServer(value: unknown): IceServer | null {
+  if (!isRaw(value)) return null;
+  const { urls, username, credential } = value;
+  const listOk = Array.isArray(urls) && urls.length > 0 && urls.length <= ICE_URLS_MAX && urls.every((url) => isText(url, ICE_URL_MAX));
+  if (!isText(urls, ICE_URL_MAX) && !listOk) return null;
+  if (username !== undefined && !isText(username, ICE_SECRET_MAX)) return null;
+  if (credential !== undefined && !isText(credential, ICE_SECRET_MAX)) return null;
+  return {
+    urls: urls as string | string[],
+    ...(username === undefined ? {} : { username: username as string }),
+    ...(credential === undefined ? {} : { credential: credential as string }),
+  };
+}
+
+/** A non-empty list of at most ICE_SERVERS_MAX good entries, or null. */
+export function parseIceServers(value: unknown): IceServer[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > ICE_SERVERS_MAX) return null;
+  const servers = value.map(parseIceServer);
+  return servers.every((server): server is IceServer => server !== null) ? servers : null;
+}
+
 /** The DO's side: what the host or guest receives. */
 export function parseToHostSignal(text: unknown): ToHostSignal | null {
   const m = parseSignalText(text);
+  if (m?.type === 'ready') {
+    const iceServers = parseIceServers(m.iceServers);
+    return iceServers && typeof m.relayOnly === 'boolean' ? { type: 'ready', iceServers, relayOnly: m.relayOnly } : null;
+  }
   if (!m || !isText(m.peerId, PEER_ID_MAX)) return null;
   if (m.type === 'peer-left') return { type: 'peer-left', peerId: m.peerId };
   if (m.type === 'offer') return isText(m.sdp, SDP_MAX) ? { type: 'offer', peerId: m.peerId, sdp: m.sdp } : null;
@@ -137,6 +180,11 @@ export function parseToGuestSignal(text: unknown): ToGuestSignal | null {
   const m = parseSignalText(text);
   if (!m) return null;
   if (m.type === 'peer-left') return { type: 'peer-left' };
+  if (m.type === 'admitted') {
+    const iceServers = parseIceServers(m.iceServers);
+    const shapeOk = isText(m.peerId, PEER_ID_MAX) && iceServers && typeof m.relayOnly === 'boolean';
+    return shapeOk ? { type: 'admitted', peerId: m.peerId as string, iceServers, relayOnly: m.relayOnly as boolean } : null;
+  }
   if (m.type === 'answer') return isText(m.sdp, SDP_MAX) ? { type: 'answer', sdp: m.sdp } : null;
   const ice = m.type === 'ice' ? parseIce(m.ice) : null;
   return ice ? { type: 'ice', ice } : null;

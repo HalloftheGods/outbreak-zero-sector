@@ -8,12 +8,14 @@ import { homeUi } from './home-hud.ts';
 import type { HomeFacts } from './home-hud.ts';
 import { buildHud } from './hud-state.ts';
 import type { Banner, RunResult, UiState } from './hud-state.ts';
+import type { CalloutWords } from './kill-juice.ts';
 import { hordeBanner, isLandmark, overrunBanner, radioBanner, RunNotices } from './run-notices.ts';
 import { tapGameEvent, tapLocalPlayer } from './analytics/event-tap.ts';
 import { lockedTracksOf } from '../audio/playlists.ts';
 import { trackName } from './sound-test.ts';
 import { foundTracks, isRadioFound, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
+import { dailyShare, dayLabel, recordDaily } from './daily-night.ts';
 import { TownMapView } from './town-map.ts';
 
 const HUD_INTERVAL_MS = 100;
@@ -32,6 +34,7 @@ export const NO_RUN_UI = {
   mapOpen: false,
   hud: null,
   banner: null,
+  callout: null,
   place: null,
   levelCard: null,
   home: null,
@@ -57,10 +60,15 @@ export function deathFade(status: PlayerStatus | undefined, gameOver: boolean): 
  * the next run before this player ever sees the results.
  * Someone who joined a finished room has no run of their own.
  */
-export function finishRun(stats: GameOverStats, localId: string): RunResult {
+export function finishRun(stats: GameOverStats, localId: string, dailyKey: string | null = null): RunResult {
   const local = stats.players.find((player) => player.id === localId);
   const score = local?.score ?? 0;
   const kills = local?.kills ?? 0;
+  if (dailyKey !== null) {
+    // A Daily Night keeps its own book, so the leaderboard stays a list of runs anyone could have had.
+    const counted = local ? recordDaily(dailyKey, { score, kills, level: stats.level }) : false;
+    return { stats, localId, score, kills, isNewBest: false, daily: { label: `Daily Night, ${dayLabel(dailyKey)}`, counted, share: dailyShare(dailyKey) } };
+  }
   const isNewBest = local ? recordRun({ score, kills, wave: stats.wave, durationSec: stats.durationSec }, undefined, local.name) : false;
   return { stats, localId, score, kills, isNewBest };
 }
@@ -140,7 +148,7 @@ export class RunHud {
     if (!canPaint) return;
     this.mapOpenedMs ??= ms;
     const clock = { nowMs: ms, openedMs: this.mapOpenedMs, reducedMotion: prefersReducedMotion() };
-    this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers, clock);
+    this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers, scene.drop, clock);
   }
 
   onEvent(event: GameEvent, now: number): void {
@@ -162,6 +170,11 @@ export class RunHud {
     this.publish({ levelCard: null, banner: null, place: null });
   }
 
+  /** A kill worth a word over the action. */
+  callout(words: CalloutWords, now: number): void {
+    this.publish({ callout: this.notices.callout(words, now) });
+  }
+
   /** A banner of the game's own, outside any event: a hint, or a question put to the player. */
   say(banner: Omit<Banner, 'key'>, now: number): void {
     this.publish({ banner: this.notices.banner(banner, now) });
@@ -177,9 +190,9 @@ export class RunHud {
   }
 
   /** The level's title card. Nothing said in the last town is worth keeping up beside it. */
-  showLevel(level: number, now: number): void {
+  showLevel(level: number, now: number, mapSeed: number | null = null): void {
     this.level = level;
-    this.publish({ levelCard: this.notices.levelCard(level, now), banner: null, place: null });
+    this.publish({ levelCard: this.notices.levelCard(level, now, mapSeed), banner: null, place: null });
   }
 
   /** Who walked in where, and what the floor would not give up. */

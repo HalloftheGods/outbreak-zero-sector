@@ -78,6 +78,8 @@ function holdPlayer(p: PlayerState): void {
   p.meleeQueued = false;
   p.healQueued = false;
   p.throwQueued = false;
+  p.molotovQueued = false;
+  p.flareQueued = false;
   p.shootQueued = false;
 }
 

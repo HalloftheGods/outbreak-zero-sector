@@ -15,6 +15,7 @@ import { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
 import { BenchLink } from './bench-link.ts';
 import type { ClientWorld } from './client-world.ts';
+import { todaysNight } from './daily-night.ts';
 import { HomeLink } from './home-link.ts';
 import type { HomeLinkHost } from './home-link.ts';
 import type { HomeActions } from './home-hud.ts';
@@ -80,6 +81,8 @@ export class GameController {
   private lastSnapshotMs = 0;
   private aim = 0;
   private titleTime = 0;
+  /** A hit-stop holds the picture until this frame time. */
+  private heldUntilMs = 0;
   /** Read once, as the solo session reads it: the blast door is drawn only with the overrun on. */
   private readonly overrunOn = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
 
@@ -101,6 +104,7 @@ export class GameController {
       leaderboard: loadLeaderboard(),
       callsign: prefs.callsign || DEFAULT_PREFS.callsign,
       serverAddress: prefs.serverAddress,
+      onlineRoom: null,
       volume: this.audio.volume,
       muted: this.audio.muted,
     });
@@ -261,6 +265,11 @@ export class GameController {
     this.session.continueSolo(chosen);
   }
 
+  /** Today's Daily Night: solo, Arcade rules, the day's seed, level and difficulty. */
+  startDaily(): void {
+    this.session.startDaily(todaysNight());
+  }
+
   /** Co-op. `style`, by default the one the player last chose, goes to an empty room; a room in play keeps its own and the run follows it. */
   startCoop(style: GameStyle = this.ui.value.style): void {
     this.session.startCoop(style);
@@ -369,6 +378,7 @@ export class GameController {
       get titleMap() { return controller.titleMap; },
       publish: (patch) => this.publish(patch),
       onResize: () => this.onResize(),
+      hitStop: (ms) => this.hitStop(ms),
     };
   }
 
@@ -390,6 +400,14 @@ export class GameController {
         this.publish({ screen: 'game', result: null });
       },
     };
+  }
+
+  /** Solo only: the sim and the picture stop together, so nothing drifts. In co-op the town carries on, so the picture does too. */
+  private hitStop(ms: number): void {
+    const transport = this.run.transport;
+    if (transport?.kind !== 'solo' || this.isMenuUp()) return;
+    transport.hold?.(ms);
+    this.heldUntilMs = Math.max(this.heldUntilMs, performance.now() + ms);
   }
 
   // --- Frame loop ----------------------------------------------------------
@@ -422,6 +440,10 @@ export class GameController {
     if (frozen) {
       renderer.render({ ...this.lastScene, showCrosshair: false }, 0);
       this.runHud.repaintMap(ms);
+      return;
+    }
+    if (ms < this.heldUntilMs) {
+      renderer.render(this.lastScene, 0);
       return;
     }
     const dirX = this.input.dirX;

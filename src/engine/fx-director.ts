@@ -1,4 +1,6 @@
 import { MUZZLE_OFFSET } from '../../shared/constants.ts';
+import { chainMultiplier } from '../../shared/kill-chain.ts';
+import { FLARE_SEC } from '../../shared/throwables.ts';
 import type { EntityId, GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
@@ -14,6 +16,12 @@ const BLOOD = ['#8c1a14', '#a8231a', '#5e100c'];
 const ACID = ['#a9d94a', '#6d9c22', '#d4f07a'];
 const SPARK = ['#fff0b8', '#ffc04a', '#ff8e2e'];
 const BOTTLE_GLASS = ['#8c8c56', '#c4f048', '#e4f0c0'];
+const FLAMES = ['#ffd27a', '#ff9a2e', '#ff5a1c', '#c4300f'];
+const DUST = ['#8a7a5c', '#b3a27a', '#5e523e'];
+const FLARE_SPARKS = ['#ffd0d0', '#ff4a3c', '#ff7a5c'];
+/** Flames and sparks a second for a pool of fire and for a flare. */
+const FIRE_DOTS_PER_SEC = 70;
+const FLARE_DOTS_PER_SEC = 24;
 const SKULL_CHIPS = ['#e4dcc3', '#c9bd9c', '#a8231a'];
 const HEADSHOT_COLOR = '#ff5a3c';
 /** The word goes over the head it names. */
@@ -61,6 +69,16 @@ const PICKUP_LABEL: Record<PickupType, string> = {
   jewel_large: 'LARGE JEWEL',
 };
 
+/** A pool of fire or a lit flare, drawn from its event alone until it burns out. */
+interface Burning {
+  readonly kind: 'fire' | 'flare';
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  left: number;
+  owed: number;
+}
+
 export interface PulseLight {
   x: number;
   y: number;
@@ -97,6 +115,7 @@ function spread(amount: number): number {
 export class FxDirector {
   readonly particles: ParticleSystem;
   readonly pulses: PulseLight[] = [];
+  private readonly burning: Burning[] = [];
   private readonly art: ArtBook;
   private readonly visuals: VisualStore;
   private readonly effects: ScreenEffects;
@@ -113,6 +132,7 @@ export class FxDirector {
   clear(): void {
     this.particles.clear();
     this.pulses.length = 0;
+    this.burning.length = 0;
   }
 
   update(dt: number): void {
@@ -121,6 +141,8 @@ export class FxDirector {
       this.pulses[i].life -= dt;
       if (this.pulses[i].life <= 0) this.pulses.splice(i, 1);
     }
+    // After the pulses age, so this frame's glow is drawn at full strength and gone by the next.
+    this.burnOn(dt);
   }
 
   handle(event: GameEvent, ctx: FxContext): void {
@@ -139,6 +161,10 @@ export class FxDirector {
       case 'pickup': this.onPickup(event, ctx); break;
       case 'container_opened': this.onContainerOpened(event, ctx); break;
       case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
+      case 'molotov_burst': this.onMolotov(event.x, event.y, event.radius, event.sec); break;
+      case 'flare_lit': this.onFlare(event.x, event.y, event.sec); break;
+      case 'drop_called': this.onFlare(event.x, event.y, FLARE_SEC); break;
+      case 'drop_landed': this.onDropLanded(event.x, event.y); break;
       case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
       case 'zombie_status': this.onZombieStatus(event); break;
       case 'overrun_breach': this.effects.addShake(OVERRUN_BURST_SHAKE); break;
@@ -235,7 +261,10 @@ export class FxDirector {
     this.stampBlood(x, y);
     this.stampBlood(x + Math.cos(angle) * 9, y + Math.sin(angle) * 9);
     if (event.killerId === ctx.localId && event.points > 0) {
-      this.particles.addText(`+${event.points}`, x, y - 16, SCORE_COLOR);
+      // A chained kill shows what the chain paid it, so the callout's words come with a number.
+      const chained = (event.chain ?? 1) > 1;
+      const bonus = chained ? ` x${chainMultiplier(event.chain ?? 1)}` : '';
+      this.particles.addText(`+${event.points}${bonus}`, x, y - 16, SCORE_COLOR);
     }
   }
 
@@ -278,6 +307,7 @@ export class FxDirector {
     const gotBottle = event.bottle === true && event.playerId === ctx.localId;
     if (event.noisy) this.particles.addText('CLATTER', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR);
     else if (gotBottle) this.note('BOTTLE', event.x, event.y);
+    else if (event.stash && event.playerId === ctx.localId) this.particles.addText(event.stash === 'fuel' ? 'FUEL' : 'FLARE', event.x, event.y - NOTE_HEIGHT, PICKUP_COLOR);
     else if (emptyHanded) this.note('NOTHING', event.x, event.y);
   }
 
@@ -285,6 +315,64 @@ export class FxDirector {
   private onBottleSmash(x: number, y: number): void {
     this.burstDots(x, y, 0, BOTTLE_GLASS, 14, 70, false, Math.PI);
     this.particles.addText('SMASH', x, y - NOTE_HEIGHT, SCORE_COLOR);
+  }
+
+  private onMolotov(x: number, y: number, radius: number, sec: number): void {
+    this.burstDots(x, y, 0, BOTTLE_GLASS, 10, 70, false, Math.PI);
+    this.burstDots(x, y, -Math.PI / 2, FLAMES, 30, 120, true, Math.PI);
+    this.pulses.push({ x, y, radius: radius * 4, color: '#ff8a1c', life: 0.3, maxLife: 0.3 });
+    this.burning.push({ kind: 'fire', x, y, radius, left: sec, owed: 0 });
+    this.effects.addShake(0.3);
+  }
+
+  /** The crate hits the street: dust, splinters and a thump felt by anyone near. */
+  private onDropLanded(x: number, y: number): void {
+    this.burstDots(x, y, -Math.PI / 2, DUST, 26, 110, false, Math.PI);
+    this.particles.addClip(this.art.fx.smokePuff, x + spread(8), y - 4, false);
+    this.particles.addClip(this.art.fx.smokePuff, x + spread(12), y - 2, false);
+    this.particles.addText('SUPPLIES', x, y - NOTE_HEIGHT, PICKUP_COLOR);
+    this.effects.addShake(0.35);
+  }
+
+  private onFlare(x: number, y: number, sec: number): void {
+    this.burstDots(x, y, -Math.PI / 2, FLARE_SPARKS, 12, 90, true, Math.PI);
+    this.burning.push({ kind: 'flare', x, y, radius: 4, left: sec, owed: 0 });
+  }
+
+  /** Keeps every pool of fire and every flare alight: flames, sparks and a flickering glow each frame. */
+  private burnOn(dt: number): void {
+    for (let i = this.burning.length - 1; i >= 0; i -= 1) {
+      const burn = this.burning[i];
+      burn.left -= dt;
+      if (burn.left <= 0) {
+        this.burning.splice(i, 1);
+        continue;
+      }
+      const fire = burn.kind === 'fire';
+      const fade = fire ? Math.min(1, burn.left / 1.2) : Math.min(1, burn.left / 3);
+      burn.owed += dt * (fire ? FIRE_DOTS_PER_SEC : FLARE_DOTS_PER_SEC) * fade;
+      for (; burn.owed >= 1; burn.owed -= 1) this.flameDot(burn, fire);
+      const flicker = 0.85 + Math.random() * 0.15;
+      const radius = (fire ? burn.radius * 3.4 : 130) * flicker * (0.5 + fade * 0.5);
+      this.pulses.push({ x: burn.x, y: burn.y, radius, color: fire ? '#ff8a1c' : '#ff3a2a', life: dt * 1.01, maxLife: dt * 1.01 });
+    }
+  }
+
+  private flameDot(burn: Burning, fire: boolean): void {
+    const spot = Math.random() * Math.PI * 2;
+    const reach = fire ? Math.sqrt(Math.random()) * burn.radius : 1;
+    this.particles.addDot({
+      x: burn.x + Math.cos(spot) * reach,
+      y: burn.y + Math.sin(spot) * reach * 0.7,
+      z: 1,
+      vx: spread(fire ? 8 : 30),
+      vy: spread(fire ? 4 : 30),
+      vz: fire ? 30 + Math.random() * 40 : 40 + Math.random() * 60,
+      life: 0.25 + Math.random() * 0.35,
+      color: pick(fire ? FLAMES : FLARE_SPARKS),
+      size: Math.random() < 0.3 ? 2 : 1,
+      emissive: true,
+    });
   }
 
   /** Over the local player's head, for what the sim says nothing about: an item left where it lay. */

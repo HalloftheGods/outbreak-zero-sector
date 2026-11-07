@@ -229,12 +229,12 @@ describe('the bunker map', () => {
 });
 
 describe('the overrun switch', () => {
-  it('is off, and a dev build turns it on only when asked', () => {
-    expect(OVERRUN_LIVE).toBe(false);
-    expect(overrunOn('', true)).toBe(false);
+  it('is live for everyone, in dev and production builds alike', () => {
+    expect(OVERRUN_LIVE).toBe(true);
+    expect(overrunOn('', true)).toBe(true);
+    expect(overrunOn('', false)).toBe(true);
     expect(overrunOn('?overrun', true)).toBe(true);
-    expect(overrunOn('?nosplash&overrun', true)).toBe(true);
-    expect(overrunOn('?overrun', false)).toBe(false);
+    expect(overrunOn('?nosplash&overrun', false)).toBe(true);
   });
 
   it('leaves a home sim without a clock unless asked, and Arcade without one even when asked', () => {

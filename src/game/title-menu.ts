@@ -5,7 +5,7 @@ import type { SoundUnlock } from './sound-unlock.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 /** The title's menu, what each item opens, and the words its pages show. The components only lay these out. */
-export type TitlePage = 'play' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
+export type TitlePage = 'play' | 'daily' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
 
 export interface TitleMenuItem {
   readonly page: TitlePage;
@@ -22,6 +22,7 @@ export function menuLabel(item: TitleMenuItem, unlock: SoundUnlock): string {
 
 export const TITLE_MENU: readonly TitleMenuItem[] = [
   { page: 'play', label: 'Play' },
+  { page: 'daily', label: 'Daily Night' },
   { page: 'levels', label: 'Levels' },
   { page: 'howto', label: 'How to Play' },
   { page: 'records', label: 'Records' },
@@ -134,12 +135,31 @@ export interface RecordRow {
   readonly style: GameStyle;
   /** The same, in words. */
   readonly label: string;
+  /** The ledger's other columns: hordes, kills, time and the day it was logged. */
+  readonly hordes: number;
+  readonly kills: number;
+  readonly time: string;
+  readonly date: string;
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** The trip-end recorder marks what it saves, and an entry without the mark is a whole Arcade run. */
 export function recordRows(leaderboard: readonly (LeaderboardEntry & { readonly trip?: boolean })[]): readonly RecordRow[] {
   return leaderboard.slice(0, SHOWN_RUNS).map((entry, index) => {
     const style: GameStyle = entry.trip === true ? 'campaign' : 'arcade';
-    return { key: `${entry.timestamp}-${index}`, rank: `#${index + 1}`, name: entry.callsign || 'SURVIVOR', score: entry.score, style, label: ROW_LABELS[style] };
+    const when = new Date(entry.timestamp);
+    return {
+      key: `${entry.timestamp}-${index}`,
+      rank: `#${index + 1}`,
+      name: entry.callsign || 'SURVIVOR',
+      score: entry.score,
+      style,
+      label: ROW_LABELS[style],
+      hordes: entry.wave ?? 0,
+      kills: entry.kills ?? 0,
+      time: formatDuration(entry.durationSec ?? 0),
+      date: `${when.getDate()} ${MONTH_NAMES[when.getMonth()]}`,
+    };
   });
 }

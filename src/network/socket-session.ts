@@ -1,6 +1,6 @@
 import { DEFAULT_SERVER_PORT } from '../../shared/constants.ts';
+import type { PacketPipe, PipeHandlers } from './packet-pipe.ts';
 import { RemoteSession } from './remote-session.ts';
-import { SocketPipe } from './socket-pipe.ts';
 
 interface PageLocation {
   readonly hostname: string;
@@ -29,7 +29,40 @@ export function resolveServerUrl(address: string, page: PageLocation): string | 
   }
 }
 
+/** A WebSocket as a pipe. */
+export class WsPipe implements PacketPipe {
+  private socket: WebSocket | null = null;
+
+  constructor(private readonly url: string) {}
+
+  open(handlers: PipeHandlers): void {
+    const socket = new WebSocket(this.url);
+    this.socket = socket;
+    socket.onmessage = (event) => handlers.message(event.data);
+    socket.onclose = (event) => handlers.closed(event.code, event.reason);
+  }
+
+  send(text: string): void {
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(text);
+  }
+
+  close(): void {
+    const socket = this.socket;
+    this.socket = null;
+    if (!socket) return;
+    socket.onmessage = null;
+    socket.onclose = null;
+    socket.close();
+  }
+}
+
 /** Co-op play against the ws server. */
-export function createSocketSession(url: string): RemoteSession {
-  return new RemoteSession(new SocketPipe(url));
+export class SocketSession extends RemoteSession {
+  constructor(url: string) {
+    super(new WsPipe(url), {
+      badAddress: `Bad server address: ${url}`,
+      noAnswer: `No answer from ${url}. Is the server running?`,
+      unreachable: `Could not reach ${url}. Is the server running?`,
+    });
+  }
 }

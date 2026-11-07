@@ -115,14 +115,6 @@ export function playHeading(flow: PlayFlow): string {
   return HEADINGS[flow.step];
 }
 
-function stopState(index: number, at: number): StepperStop['state'] {
-  const isBehind = index < at;
-  const isHere = index === at;
-  if (isBehind) return 'done';
-  if (isHere) return 'current';
-  return 'next';
-}
-
 /** The stepper over the setup: every step this walk has, numbered from 1, marked against where the player stands. */
 export function playStepper(flow: PlayFlow): readonly StepperStop[] {
   const steps = playSteps(flow);
@@ -133,6 +125,15 @@ export function playStepper(flow: PlayFlow): readonly StepperStop[] {
     number: index + 1,
     state: stopState(index, at),
   }));
+}
+
+/** Where one stop stands against the step the player is on. */
+function stopState(index: number, at: number): StepperStop['state'] {
+  const isBehind = index < at;
+  const isHere = index === at;
+  if (isBehind) return 'done';
+  if (isHere) return 'current';
+  return 'next';
 }
 
 /** A done step picked on the stepper: back to it, the mode kept. A step ahead, or one this walk skips, leaves the flow as it is. */

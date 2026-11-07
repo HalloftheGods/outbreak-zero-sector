@@ -13,6 +13,7 @@
       </template>
       <LevelCard v-if="ui.levelCard" :key="ui.levelCard.key" :card="ui.levelCard" />
       <WaveBanner v-if="ui.banner" :key="ui.banner.key" :banner="ui.banner" />
+      <KillCallout v-if="ui.callout" :key="ui.callout.key" :callout="ui.callout" />
       <WorkbenchScreen v-if="ui.hud?.bench && ui.art" :hud="ui.hud" :bench="ui.hud.bench" :art="ui.art" />
       <template v-if="ui.home">
         <LockerScreen v-if="ui.home.station === 'locker'" :home="ui.home" :art="ui.art" />
@@ -72,6 +73,7 @@ import TownMap from './components/TownMap.vue';
 import { GAME_KEY } from './components/use-game.ts';
 import VanTransition from './components/VanTransition.vue';
 import WaveBanner from './components/WaveBanner.vue';
+import KillCallout from './components/KillCallout.vue';
 import WorkbenchScreen from './components/WorkbenchScreen.vue';
 import { privacyOpen, startAnalytics } from './game/analytics/index.ts';
 import { GameController } from './game/game-controller.ts';

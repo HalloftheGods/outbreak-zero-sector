@@ -17,6 +17,8 @@ export interface ConnectOptions {
   readonly home?: JoinHome;
   /** Solo plays in this style, and left off that is Arcade. In co-op the room decides, so `RemoteSession.join` is told instead. */
   readonly style?: GameStyle;
+  /** Solo only: the run's seed, so a Daily Night is the same town for everyone. Left off, a random one. */
+  readonly seed?: number;
 }
 
 /** The one seam between the game client and a simulation, in-browser or over ws. */
@@ -37,5 +39,7 @@ export interface GameTransport {
   /** Solo can begin again from a later level; co-op restarts at level 1 and ignores it. */
   requestRestart(fromLevel?: number): void;
   setPaused(paused: boolean): void;
+  /** Solo only: stop the clock for a beat (a hit-stop), then carry on unless paused meanwhile. */
+  hold?(ms: number): void;
   disconnect(): void;
 }

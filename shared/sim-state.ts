@@ -1,3 +1,6 @@
+import type { SupplyDrop } from './supply-drop.ts';
+import type { KillChain } from './kill-chain.ts';
+import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type {
   BulletEntity,
@@ -53,12 +56,17 @@ export interface PlayerHome extends Omit<HomeView, 'overrun' | 'chest'> {
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'home'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home'> {
   bottles: number;
+  /** Fuel for molotovs and flares to throw, found in town and left there (`shared/throwables.ts`). */
+  fuel: number;
+  flares: number;
   /** Null outside home mode. */
   home: PlayerHome | null;
   /** A throw asked for and not yet made. */
   throwQueued: boolean;
+  molotovQueued: boolean;
+  flareQueued: boolean;
   throwCooldown: number;
   parts: PartCounts;
   kits: KitCounts;
@@ -266,6 +274,15 @@ export interface SimState {
   noises: Point[];
   /** Footprints in a snowy town, oldest first. */
   tracks: Footprint[];
+  /** Each survivor's kill chain, for the points it multiplies (`shared/kill-chain.ts`). */
+  killChains: Map<EntityId, KillChain>;
+  /** Pools of molotov fire and lit flares, burning down. */
+  fires: FireState[];
+  flares: FlareState[];
+  /** This town's supply drop, from arming to the end of its marked time. */
+  drop: SupplyDrop | null;
+  /** The town has had its drop, or tried to and found no ground for it. */
+  dropDone: boolean;
   players: PlayerState[];
   /** Who left this run, by reconnect token, as they stood when they went. */
   departed: Map<string, PlayerState>;

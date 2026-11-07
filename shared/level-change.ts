@@ -36,6 +36,11 @@ function emptyWorld(sim: SimState, level: number): void {
   sim.topUpTimer = 0;
   sim.noises = [];
   sim.tracks = [];
+  sim.fires = [];
+  sim.killChains.clear();
+  sim.flares = [];
+  sim.drop = null;
+  sim.dropDone = false;
   sim.zombies = [];
   sim.bullets = [];
   sim.pickups = [];
@@ -77,6 +82,11 @@ export function placeAtEntry(sim: SimState, p: PlayerState): void {
   p.meleeQueued = false;
   p.healQueued = false;
   p.throwQueued = false;
+  p.molotovQueued = false;
+  p.flareQueued = false;
+  // Fuel and flares are the town's: they stay behind when the van leaves it.
+  p.fuel = 0;
+  p.flares = 0;
   p.shootQueued = false;
   stopSearch(p);
 }

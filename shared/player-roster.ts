@@ -45,6 +45,8 @@ const FRESH_CONNECTION = {
   staminaRest: 0,
   stepNoiseLeft: 0,
   throwQueued: false,
+  molotovQueued: false,
+  flareQueued: false,
   throwCooldown: 0,
 } as const;
 
@@ -74,6 +76,8 @@ export function createPlayer(arrival: Arrival, spot: { x: number; y: number }): 
     medkits: 0,
     knife: false,
     bottles: 0,
+    fuel: 0,
+    flares: 0,
     indoors: null,
     bleedout: 0,
     score: 0,

@@ -7,6 +7,69 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 ### Added
 - How to Play (Searching) and the README name S.O.S. Discount, the downtown store with a back room worth checking (#7319).
 
+## [2026-11-07] - Night events
+
+### Added
+- About three towns in ten, from level 2, get a night event, drawn from the town's seed on a generator of its own (`shared/night-events.ts`):
+  - **Fog**: zombies spot you from 55% of the usual range, and the town is washed grey.
+  - **Blood moon**: hordes half as big again, every kill worth double, and a red sky that pulses.
+  - **Power cut**: zombies see 70% as far and hear 30% further, and most lamps are dead. A blackout town gets fog instead.
+- The level card names the event ("Tonight: Fog. ..."), and the Daily Night page shows it next to the difficulty. The client works it out from the snapshot's map seed, so nothing new goes over the wire.
+
+## [2026-11-07] - Chains that pay, and a Daily result to share
+
+### Added
+- Kill chains pay: each kill by the same survivor within 1.4 seconds of the last is worth a quarter more, up to double from the fifth (`shared/kill-chain.ts`). The floating score says so ("+18 x1.5"), and `zombie_die` carries the kill's place in the chain.
+- A Copy result button on the Daily Night page (once played) and on the results screen after a Daily run. It copies the day, level, points, kills and streak with the game's link, ready to paste anywhere.
+
+## [2026-11-07] - The record book
+
+### Changed
+- Records is now a printed record book on the How to Play magazine's paper: four ruled pages read as two spreads (one page at a time on a tall screen), turned with Prev and Next, the arrow keys or a swipe.
+- Personal bests: a card each for Campaign and Arcade, the numbers written in by hand, stamped "No run yet" until there is one.
+- The ledger: the top five with hordes, kills, time and date as well as the score, the empty lines left ruled and waiting.
+- Daily Night: tonight's town on a ticket stub, your streak, best night and nights logged.
+- The last seven nights, each stamped Counted, Missed or Tonight (`src/game/record-book.ts`, tests in `tests/record-book.spec.ts`).
+
+## [2026-11-07] - Daily Night
+
+### Added
+- A Daily Night item on the title menu, after Play. Its page shows today's town (level, rule and difficulty, all picked from the date), your run today, your streak and the time to the next town, then the survivor select and Start tonight.
+- The day's run is solo with Arcade rules on a seed from the date (`src/game/daily-night.ts`), so every player gets the same town on the same day. The first run of the day counts; later ones count as practice and keep a practice best. Days are kept on this device (60 at most), under `outbreak.daily`.
+- The results screen says "Daily Night, 7 Nov" and whether that run counted. Daily runs leave level progress and Arcade bests alone.
+- `ConnectOptions.seed`, so a local session can be started on a fixed seed. Tests in `tests/daily-night.spec.ts`.
+
+## [2026-11-07] - Supply drops
+
+### Added
+- Once a town, after the first horde, a red flare goes up on open ground a fair walk away and a supply crate lands on it ten seconds later: a round kit, two double boxes of ammo, a medkit, and a large jewel (Campaign) or a gun part (Arcade). The flare hisses the whole time and the crate lands loud, so the town comes too.
+- `drop_called` and `drop_landed` events, `SnapshotPacket.drop`, a SUPPLY DROP banner, a red arrow on screen, a red box on the town map (with a key entry) and dust when it lands.
+- Spot and contents are rolled from the town's seed on their own generator (`shared/supply-drop.ts`), so the simulation's rolls are unchanged. Tests in `tests/supply-drop.spec.ts`.
+
+## [2026-11-07] - Molotovs and flares
+
+### Added
+- Fuel and flares, found by searching (fuel in garages, warehouses and diners; flares at the police station, in garages and in cars) and carried two of each. Which containers hold them is rolled from the town's seed on a generator of its own (`stashIn` in `shared/throwables.ts`), so the simulation's rolls are unchanged.
+- T throws a molotov (a bottle plus a fuel): a smash heard 240 pixels off, then a 30-pixel pool of fire for 5 seconds that lights every zombie that walks in and burns any survivor standing in it.
+- V throws a flare: a red light that hisses for 20 seconds, a noise every 1.5 seconds that keeps pulling zombies in.
+- HUD chips for fuel (greyed with no bottle to fill) and flares, new icons, flames and glow drawn from the `molotov_burst` and `flare_lit` events, and a How to Play note.
+- Fuel and flares stay in the town: the van leaves them behind. A molotov counts toward bottle quests.
+
+## [2026-11-07] - Kills that land
+
+### Added
+- A hit-stop: in solo the picture and the sim hold still for a beat on your headshot (45 ms), a chain kill (35 ms) and a brute you drop (110 ms). Co-op keeps moving, since the town does.
+- Kill-chain callouts over the action (`KillCallout.vue`): DOUBLE, TRIPLE, QUAD, then MASSACRE xN for your kills less than 1.4 seconds apart, counting every kill in one shotgun blast.
+- CLOSE CALL for a kill made at 20% health or less, at most once every 8 seconds.
+- When the last zombie of a horde falls (rather than the horde giving up), the banner reads HORDE WIPED OUT, the frame holds for a quarter second and the screen flashes warm white. Reduced motion skips the flash.
+- The rules are one pure module, `src/game/kill-juice.ts`, reading only snapshot events, so play is unchanged; tests in `tests/kill-juice.spec.ts`.
+
+## [2026-11-07] - The Overrun goes live
+
+### Changed
+- `OVERRUN_LIVE` is now true: every Campaign player gets the bunker clock, the breach and the reward chest once someone in the room has reached level 2. Solo and the co-op server both follow it.
+- How to Play has a Campaign chapter on the overrun (the clock by difficulty, the half-speed menus, the warnings, and holding, running or going down), with the blast door and the chest as its pictures.
+
 ## [2026-11-07] - Biomes, terrain, ground effects and footsteps
 
 ### Added

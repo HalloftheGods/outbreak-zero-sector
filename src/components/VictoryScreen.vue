@@ -3,6 +3,7 @@
     <SpriteImg v-if="art" :sprite="art.ui.skull" :scale="3" />
     <h2 class="px-heading">The night is over</h2>
     <p v-if="result.isNewBest" class="victory-best px-blink">New best</p>
+    <p v-if="result.daily" class="victory-best">{{ result.daily.label }}: {{ result.daily.counted ? 'this one counts' : 'practice' }}</p>
 
     <dl class="victory-stats">
       <div><dt>Towns cleared</dt><dd>{{ result.stats.level }}</dd></div>
@@ -27,6 +28,7 @@
 
     <div class="victory-actions">
       <PixelButton primary @press="emit('continue')">Continue</PixelButton>
+      <ShareButton v-if="result.daily" :text="result.daily.share" />
     </div>
   </section>
 </template>
@@ -38,6 +40,7 @@ import { displayName } from '../../shared/callsign.ts';
 import { formatDuration } from '../game/hud-state.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import PixelButton from './PixelButton.vue';
+import ShareButton from './ShareButton.vue';
 import SpriteImg from './SpriteImg.vue';
 
 const { result } = defineProps<{ result: RunResult; art: ArtBook | null }>();
