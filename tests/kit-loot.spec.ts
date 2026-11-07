@@ -8,7 +8,8 @@ import type { RoundKitId } from '../shared/round-effect-data.ts';
 import { isKitPickup } from '../shared/round-effects.ts';
 import type { SimState } from '../shared/sim-state.ts';
 import { GameSimulation } from '../shared/simulation.ts';
-import { buildingAt } from '../shared/world-query.ts';
+import { PLAYER_RADIUS } from '../shared/constants.ts';
+import { buildingAt, circleHitsSolid } from '../shared/world-query.ts';
 import { eventsOf, input, quietSim, stateOf, steps } from './helpers/sim-harness.ts';
 
 const SEEDS = Array.from({ length: 24 }, (_, i) => 100 + i);
@@ -105,7 +106,9 @@ describe('picking up a round kit', () => {
   it('falls out of a searched container like anything else', () => {
     const { sim, state } = quietSim();
     const [p] = state.players;
-    const container = townContainers(state.map)[0];
+    // One with room to stand on its left: a piece against a side wall has none.
+    const standable = (box: { x0: number; y0: number; y1: number }) => !circleHitsSolid(state.map, box.x0 - 8, (box.y0 + box.y1) / 2, PLAYER_RADIUS - 0.1) && buildingAt(state.map, box.x0 - 8, box.y0) !== null;
+    const container = townContainers(state.map).find(({ box }) => standable(box)) ?? townContainers(state.map)[0];
     state.containers.forEach((each) => {
       each.loot = null;
     });
