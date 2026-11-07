@@ -16,6 +16,7 @@ import { useMedkit } from './player-health.ts';
 import { updateThrow } from './bottles.ts';
 import { updateThrowables } from './throwables.ts';
 import { candySpeed, sugarOf, updateCandy } from './candy.ts';
+import { takeKeepsake } from './keepsakes.ts';
 import { isBunkerMap } from './home-protocol.ts';
 import { gunsFree } from './overrun.ts';
 import type { ClientInputPacket, Stance } from './protocol.ts';
@@ -85,6 +86,7 @@ export function receiveInput(p: PlayerState, input: ClientInputPacket): void {
   p.molotovQueued ||= input.molotov === true;
   p.flareQueued ||= input.flare === true;
   p.eatQueued ||= input.eat === true;
+  if (input.keepsake) p.keepsakeQueued = input.keepsake;
   p.searchHeld = input.search === true;
   p.stanceWanted = stanceOf(input);
   if (input.weapon) p.weaponQueued = input.weapon;
@@ -148,6 +150,9 @@ export function updatePlayer(sim: SimState, p: PlayerState): void {
   updateThrow(sim, p);
   updateThrowables(sim, p);
   updateCandy(sim, p);
+  const pick = p.keepsakeQueued;
+  p.keepsakeQueued = null;
+  if (pick) takeKeepsake(sim, p, pick);
   updateSearch(sim, p);
   updateStations(sim, p);
 }

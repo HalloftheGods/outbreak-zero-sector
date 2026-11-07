@@ -12,6 +12,7 @@ import { makeNoise } from './zombie-senses.ts';
 import { maybeCarAlarm, scroungeBottle } from './bottles.ts';
 import { stashIn, takeStash } from './throwables.ts';
 import { candyIn, takeCandy } from './candy.ts';
+import { hasKeepsake, RABBIT_LUCK } from './keepsakes.ts';
 
 /** Odds that a search knocks something over. */
 export const CLATTER_CHANCE = 0.1;
@@ -43,7 +44,8 @@ function findIn(sim: SimState, p: PlayerState, id: number): Finds {
   const { loot } = sim.containers[id];
   const treasure = loot !== null && isTreasurePickup(loot.type) ? loot : null;
   const stored = treasure ? null : loot;
-  const lucky = stored === null && sim.rng() < characterOf(p.skin).searchLuck;
+  const luck = characterOf(p.skin).searchLuck + (hasKeepsake(p, 'rabbit_foot') ? RABBIT_LUCK : 0);
+  const lucky = stored === null && sim.rng() < luck;
   const ordinary = lucky ? rollFind(sim, townContainers(sim.map)[id].buildingKind) : stored;
   return { treasure, ordinary };
 }

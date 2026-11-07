@@ -1,3 +1,4 @@
+import { ammoCapOf } from './keepsakes.ts';
 import { characterOf } from './characters.ts';
 import {
   AMMO_PICKUPS,
@@ -42,7 +43,7 @@ export function maybeDropOnKill(sim: SimState, x: number, y: number, killer?: Pl
 /** Banks as much as fits, gun or no gun, and leaves the rest of the box lying there. */
 function takeAmmo(p: PlayerState, item: PickupState, type: AmmoPickup): boolean {
   const { weapon } = AMMO_PICKUPS[type];
-  const room = WEAPONS[weapon].reserveCap - p.ammoBag[weapon];
+  const room = ammoCapOf(p, weapon) - p.ammoBag[weapon];
   const taken = Math.min(room, item.rounds);
   if (taken <= 0) return false;
   p.ammoBag[weapon] += taken;
@@ -56,7 +57,7 @@ function takeGun(p: PlayerState, item: PickupState, weapon: WeaponId): boolean {
   // Zero means nobody has been at it yet: it still holds what it was found with.
   const loaded = item.rounds > 0 ? item.rounds : stats.foundAmmo;
   if (p.guns[weapon]) {
-    const taken = Math.min(stats.reserveCap - p.ammoBag[weapon], loaded);
+    const taken = Math.min(ammoCapOf(p, weapon) - p.ammoBag[weapon], loaded);
     if (taken <= 0) return false;
     p.ammoBag[weapon] += taken;
     item.rounds = loaded - taken;

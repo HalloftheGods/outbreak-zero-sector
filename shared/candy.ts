@@ -6,6 +6,7 @@
 import { TICK_DT } from './constants.ts';
 import type { Container } from './containers.ts';
 import type { CandyId, EntityId } from './protocol.ts';
+import { hasKeepsake, TREAT_BAG_CANDY } from './keepsakes.ts';
 import { createRng, pickWeighted } from './rng.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { emit } from './sim-state.ts';
@@ -86,9 +87,14 @@ export function candyIn(seed: number, container: Container): CandyId | null {
   return found ? pickWeighted(rng, WEIGHTS) : null;
 }
 
+/** Two, or three with a Trick-or-Treat Bag. */
+export function candyCarry(p: Pick<PlayerState, 'keepsakes'>): number {
+  return hasKeepsake(p, 'treat_bag') ? TREAT_BAG_CANDY : CANDY_CARRY;
+}
+
 /** Into the bag if it has room. */
 export function takeCandy(p: PlayerState, candy: CandyId | null): CandyId | null {
-  const room = p.candy.length < CANDY_CARRY;
+  const room = p.candy.length < candyCarry(p);
   const taken = candy !== null && room;
   if (!taken) return null;
   p.candy.push(candy);

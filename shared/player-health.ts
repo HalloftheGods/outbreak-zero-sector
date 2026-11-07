@@ -1,3 +1,4 @@
+import { DOG_TAG_REVIVE, hasKeepsake, ROSARY_BLEEDOUT } from './keepsakes.ts';
 import { caramelCatch, JAWBREAKER_GUARD, sugarOf } from './candy.ts';
 import {
   BLEEDOUT_ALONE_RATE,
@@ -80,7 +81,7 @@ function down(sim: SimState, p: PlayerState): void {
   p.status = 'downed';
   p.health = 0;
   p.moving = false;
-  p.bleedout = BLEEDOUT_SEC;
+  p.bleedout = BLEEDOUT_SEC * (hasKeepsake(p, 'rosary') ? ROSARY_BLEEDOUT : 1);
   p.revive = 0;
   p.reload = 0;
   p.reloadLeft = 0;
@@ -106,9 +107,11 @@ export function updateDownedPlayers(sim: SimState): void {
   const rescuers = alivePlayers(sim);
   for (const p of sim.players) {
     if (p.status !== 'downed') continue;
-    const beingRevived = rescuers.some((r) => Math.hypot(r.x - p.x, r.y - p.y) <= REVIVE_RANGE);
+    const near = rescuers.filter((r) => Math.hypot(r.x - p.x, r.y - p.y) <= REVIVE_RANGE);
+    const beingRevived = near.length > 0;
+    const tagged = near.some((r) => hasKeepsake(r, 'dog_tags'));
     if (beingRevived) {
-      p.revive = Math.min(1, p.revive + TICK_DT / REVIVE_SEC);
+      p.revive = Math.min(1, p.revive + (TICK_DT * (tagged ? DOG_TAG_REVIVE : 1)) / REVIVE_SEC);
       if (p.revive >= 1) {
         p.status = 'alive';
         p.health = Math.ceil(p.maxHealth / 2);

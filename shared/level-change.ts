@@ -1,3 +1,4 @@
+import { offerKeepsakes } from './keepsakes.ts';
 import { LEAD_IN_SEC, LEVEL_CLEAR_HEAL, PLAYER_RADIUS, SPAWN_SCATTER } from './constants.ts';
 import { stopSearch } from './container-search.ts';
 import { FlowField } from './flow-field.ts';
@@ -115,6 +116,7 @@ export function moveToNextTown(sim: SimState): void {
   enterTown(sim, finished + 1);
   for (const p of sim.players) settleInNewTown(sim, p);
   for (const p of sim.departed.values()) settleInNewTown(sim, p);
+  offerKeepsakes(sim, [...sim.players, ...sim.departed.values()]);
   emit(sim, { type: 'level_complete', level: finished });
   emit(sim, { type: 'level_start', level: sim.level });
   for (const p of returning) emit(sim, { type: 'player_revived', playerId: p.id, x: p.x, y: p.y });

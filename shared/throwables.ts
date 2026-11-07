@@ -1,3 +1,4 @@
+import { hasKeepsake, LIGHTER_FIRE } from './keepsakes.ts';
 // Molotovs and flares: two throws besides the bottle, both found in town and both left behind
 // when the town is. A molotov is a bottle with fuel in it, so it spends one of each.
 
@@ -108,9 +109,10 @@ function throwMolotov(sim: SimState, p: PlayerState): void {
   p.bottles -= 1;
   p.throwCooldown = THROW_COOLDOWN_SEC;
   const spot = landingSpot(sim, p, MOLOTOV_RANGE);
-  sim.fires.push({ x: spot.x, y: spot.y, ownerId: p.id, left: FIRE_SEC, noiseLeft: FIRE_NOISE_SEC });
+  const sec = FIRE_SEC * (hasKeepsake(p, 'lighter') ? LIGHTER_FIRE : 1);
+  sim.fires.push({ x: spot.x, y: spot.y, ownerId: p.id, left: sec, noiseLeft: FIRE_NOISE_SEC });
   makeNoise(sim, spot.x, spot.y, MOLOTOV_NOISE_RADIUS);
-  emit(sim, { type: 'molotov_burst', playerId: p.id, x: spot.x, y: spot.y, fromX: p.x, fromY: p.y, radius: FIRE_RADIUS, sec: FIRE_SEC });
+  emit(sim, { type: 'molotov_burst', playerId: p.id, x: spot.x, y: spot.y, fromX: p.x, fromY: p.y, radius: FIRE_RADIUS, sec });
 }
 
 function throwFlare(sim: SimState, p: PlayerState): void {
