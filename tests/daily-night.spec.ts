@@ -75,3 +75,14 @@ describe('Daily Night', () => {
     expect(loadDailyLog(store)).toEqual({});
   });
 });
+
+describe('the shared Daily result', () => {
+  it('names the day, the level, the points and kills, and a streak past one night', async () => {
+    const { shareText } = await import('../src/game/daily-night.ts');
+    const run = { score: 1310, kills: 61, level: 6 };
+    expect(shareText('2026-11-07', run, 3, 'https://x/')).toBe(
+      'Undead of Night - Daily Night, 7 Nov\nReached level 6: 1310 points, 61 kills\nStreak: 3 nights in a row\nhttps://x/',
+    );
+    expect(shareText('2026-11-07', run, 1, 'https://x/')).not.toContain('Streak');
+  });
+});

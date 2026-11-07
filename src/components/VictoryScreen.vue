@@ -28,6 +28,7 @@
 
     <div class="victory-actions">
       <PixelButton primary @press="emit('continue')">Continue</PixelButton>
+      <ShareButton v-if="result.daily" :text="result.daily.share" />
     </div>
   </section>
 </template>
@@ -39,6 +40,7 @@ import { displayName } from '../../shared/callsign.ts';
 import { formatDuration } from '../game/hud-state.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import PixelButton from './PixelButton.vue';
+import ShareButton from './ShareButton.vue';
 import SpriteImg from './SpriteImg.vue';
 
 const { result } = defineProps<{ result: RunResult; art: ArtBook | null }>();

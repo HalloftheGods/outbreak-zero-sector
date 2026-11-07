@@ -1,0 +1,32 @@
+// Kill chains pay: kills by one survivor in quick succession are each worth more than the last, up to double.
+// The client's DOUBLE/TRIPLE callouts use the same window, so the words and the points agree.
+
+import { TICK_DT } from './constants.ts';
+import type { EntityId } from './protocol.ts';
+import type { SimState } from './sim-state.ts';
+
+/** Kills this close together chain. Matches CHAIN_WINDOW_MS in src/game/kill-juice.ts. */
+export const CHAIN_WINDOW_SEC = 1.4;
+/** Each kill in a chain past the first adds this much to the multiplier, up to the cap. */
+export const CHAIN_STEP = 0.25;
+export const CHAIN_MAX_MULTIPLIER = 2;
+
+export interface KillChain {
+  count: number;
+  /** The last tick a kill still chains on. */
+  until: number;
+}
+
+/** What the nth kill in a chain multiplies its points by: 1, 1.25, 1.5, 1.75, then 2 from the fifth on. */
+export function chainMultiplier(count: number): number {
+  return Math.min(CHAIN_MAX_MULTIPLIER, 1 + CHAIN_STEP * Math.max(0, count - 1));
+}
+
+/** Counts a kill into its killer's chain and returns the kill's place in it. */
+export function chainKill(sim: SimState, killerId: EntityId): number {
+  const chain = sim.killChains.get(killerId);
+  const chained = chain !== undefined && sim.tick <= chain.until;
+  const count = chained ? chain.count + 1 : 1;
+  sim.killChains.set(killerId, { count, until: sim.tick + Math.round(CHAIN_WINDOW_SEC / TICK_DT) });
+  return count;
+}

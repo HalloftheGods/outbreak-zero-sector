@@ -70,6 +70,7 @@ export function createSimState(options: SimulationOptions): SimState {
     topUpTimer: 0,
     noises: [],
     tracks: [],
+    killChains: new Map(),
     fires: [],
     flares: [],
     drop: null,

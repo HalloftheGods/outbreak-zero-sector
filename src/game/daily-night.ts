@@ -169,3 +169,23 @@ export function recentDays(log: DailyLog, todayKey: string, count = 7): { key: s
   }
   return days;
 }
+
+/** Where the game lives, for the shared line. */
+const GAME_URL = 'https://undeadofnight.forthexp.com/';
+
+/**
+ * A few lines a player can paste anywhere: the day, how far they got, and their streak.
+ * Words only, no spoilers about the town beyond its level, so it reads the same to anyone who has not played yet.
+ */
+export function shareText(key: string, result: Pick<DailyResult, 'score' | 'kills' | 'level'>, streak: number, url: string = GAME_URL): string {
+  const nights = streak === 1 ? '1 night' : `${streak} nights`;
+  const streakLine = streak > 1 ? `\nStreak: ${nights} in a row` : '';
+  return `Undead of Night - Daily Night, ${dayLabel(key)}\nReached level ${result.level}: ${result.score} points, ${result.kills} kills${streakLine}\n${url}`;
+}
+
+/** The day's counted run, ready to share, or null before it is played. */
+export function dailyShare(key: string, store: Store | null = browserStore()): string | null {
+  const log = loadDailyLog(store);
+  const counted = log[key];
+  return counted ? shareText(key, counted, streakOf(log, key)) : null;
+}

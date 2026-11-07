@@ -6,6 +6,7 @@ import {
   PLAYER_RADIUS,
   TICK_DT,
 } from './constants.ts';
+import { chainKill, chainMultiplier } from './kill-chain.ts';
 import { headOnBulletPlane, headshotMultiplier } from './headshots.ts';
 import type { EntityId } from './protocol.ts';
 import { maybeDropOnKill } from './pickups.ts';
@@ -44,8 +45,11 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
   // A killer who has dropped out (a burn lands after they go) keeps the credit for when they return.
   const away = present ? undefined : [...sim.departed.values()].find((p) => p.id === killerId);
   const killer = present ?? away;
+  // A kill in a chain pays more, the bonus rounded down so a single kill pays exactly its worth.
+  const chain = killer ? chainKill(sim, killer.id) : 1;
+  const points = Math.floor(z.points * chainMultiplier(chain));
   if (killer) {
-    killer.score += z.points;
+    killer.score += points;
     killer.kills += 1;
   }
   emit(sim, {
@@ -56,7 +60,8 @@ function killZombie(sim: SimState, z: ZombieState, angle: number, killerId: Enti
     y: z.y,
     angle,
     killerId,
-    points: z.points,
+    points: killer ? points : z.points,
+    chain,
   });
   // The bunker's horde drops nothing: the chest is the reward. Off the overrun this rolls as it always has.
   const bunkerHorde = z.horde && sim.overrun !== null;

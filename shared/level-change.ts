@@ -37,6 +37,7 @@ function emptyWorld(sim: SimState, level: number): void {
   sim.noises = [];
   sim.tracks = [];
   sim.fires = [];
+  sim.killChains.clear();
   sim.flares = [];
   sim.drop = null;
   sim.dropDone = false;

@@ -34,6 +34,7 @@
       <PixelButton v-if="resumeAt !== null" :disabled="restarting" @press="game.continueAgain()">
         Continue from level {{ resumeAt }}
       </PixelButton>
+      <ShareButton v-if="result.daily" :text="result.daily.share" />
       <PixelButton @press="game.toMenu()">Main menu</PixelButton>
     </div>
   </section>
@@ -49,6 +50,7 @@ import { continueLevel, loadLevelProgress } from '../game/level-progress.ts';
 import type { RunResult } from '../game/hud-state.ts';
 import { continuesAfterDeath } from '../game/play-flow.ts';
 import PixelButton from './PixelButton.vue';
+import ShareButton from './ShareButton.vue';
 import SpriteImg from './SpriteImg.vue';
 import { useGame } from './use-game.ts';
 
