@@ -33,7 +33,8 @@ export class FrameBudget {
 
   /** Once a frame with the time since the last one. A held or frozen frame (dt 0) says nothing. */
   update(dt: number): void {
-    if (dt <= 0) return;
+    const passedNoTime = dt <= 0;
+    if (passedNoTime) return;
     this.average = this.average === 0 ? dt : this.average + (dt - this.average) * SMOOTHING;
     const slow = this.average > SLOW_FRAME_SEC;
     const easy = this.average < EASY_FRAME_SEC;

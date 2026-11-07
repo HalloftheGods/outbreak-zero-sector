@@ -29,7 +29,8 @@ function fill(): void {
     const r = 90 + sim.rng() * 260;
     const x = me.x + Math.cos(angle) * r;
     const y = me.y + Math.sin(angle) * r;
-    if (x < 20 || y < 20 || x > sim.map.width - 20 || y > sim.map.height - 20) continue;
+    const offMap = x < 20 || y < 20 || x > sim.map.width - 20 || y > sim.map.height - 20;
+    if (offMap) continue;
     spawnZombie(sim, types[tries % types.length], x, y);
     const z = sim.zombies[sim.zombies.length - 1];
     z.mode = 'hunt';
@@ -45,7 +46,8 @@ for (let tick = 0; tick < ticks; tick += 1) {
   me.health = 1e6;
   me.maxHealth = 1e6;
   for (const k of Object.keys(me.ammoBag)) me.ammoBag[k as keyof typeof me.ammoBag] = 999;
-  if (tick % 10 === 0) fill();
+  const topUp = tick % 10 === 0;
+  if (topUp) fill();
   game.setInput('p', {
     seq: tick, up: false, down: false, left: false, right: false, angle: tick * 0.05,
     shoot: true, reload: false, weapon: null, melee: false, heal: false, search: false,
@@ -58,7 +60,7 @@ for (let tick = 0; tick < ticks; tick += 1) {
 const total = performance.now() - t0;
 let hash = 0;
 for (const z of sim.zombies) hash = (Math.imul(hash, 31) + Math.round(z.x * 100) + Math.round(z.y * 7)) | 0;
-console.log(JSON.stringify({
+process.stdout.write(`${JSON.stringify({
   ticks, msPerTick: +(total / ticks).toFixed(3), snapshotMsPerTick: +(snapshotMs / ticks).toFixed(3),
   zombies: sim.zombies.length, kills: me.kills, events, hash,
-}));
+})}\n`);

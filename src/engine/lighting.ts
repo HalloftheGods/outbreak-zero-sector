@@ -184,9 +184,10 @@ export class Lighting {
     if (inPlace) return;
     const [r, g, b] = this.ambient;
     target.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    if (shiftX > 0) target.fillRect(0, 0, shiftX, height);
-    if (shiftX < 0) target.fillRect(width + shiftX, 0, -shiftX, height);
-    if (shiftY > 0) target.fillRect(0, 0, width, shiftY);
-    if (shiftY < 0) target.fillRect(0, height + shiftY, width, -shiftY);
+    // A strip as wide as the move, on the side the old light no longer covers; no move, no strip.
+    const stripX = shiftX > 0 ? 0 : width + shiftX;
+    const stripY = shiftY > 0 ? 0 : height + shiftY;
+    target.fillRect(stripX, 0, Math.abs(shiftX), height);
+    target.fillRect(0, stripY, width, Math.abs(shiftY));
   }
 }

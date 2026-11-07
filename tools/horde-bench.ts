@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- a dev bench that reaches into the running game's private state, and Playwright has no types in this project */
 // Horde stress bench: how many frames a big fight drops on a slow CPU.
 //
 //   pnpm dev                                    (in another shell; port 8096)
@@ -11,7 +12,6 @@ import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 // Playwright comes with the container (or a global install), not from this project's dependencies.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- no Playwright types in this project
 const { chromium } = createRequire(import.meta.url)('playwright') as { chromium: any };
 
 const args = new Map(process.argv.slice(2).map((a) => {
@@ -30,6 +30,17 @@ const height = Number(args.get('height') ?? 720);
 /** How many zombies to keep in the fight; by default the cap for the scene. */
 const zombies = Number(args.get('zombies') ?? -1);
 
+/** What one measured stretch of play reports back from the page. */
+interface BenchResult {
+  gaps: number[];
+  zombies: number;
+  dots: number;
+  bullets: number;
+  frameMs: number;
+  tickMs: number;
+  screen: string;
+}
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
 page.on('pageerror', (e: Error) => console.error('pageerror', e.message));
@@ -47,7 +58,8 @@ await page.evaluate(({ scene, level }: { scene: string; level: number }) => {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const game = window.__outbreak as unknown as { session: { startSolo(style: string, level?: number): void } };
-  if (scene === 'overrun') game.session.startSolo('campaign');
+  const breach = scene === 'overrun';
+  if (breach) game.session.startSolo('campaign');
   else game.session.startSolo('arcade', level);
 }, { scene, level });
 await page.waitForFunction(() => (window.__outbreak as unknown as { sim: unknown }).sim != null, null, { timeout: 30_000 });
@@ -75,14 +87,16 @@ await page.evaluate(async ({ scene, zombies }: { scene: string; zombies: number 
     const r = 90 + Math.random() * 260;
     const x = p.x + Math.cos(angle) * r;
     const y = p.y + Math.sin(angle) * r;
-    if (x < 20 || y < 20 || x > s.map.width - 20 || y > s.map.height - 20) continue;
+    const offMap = x < 20 || y < 20 || x > s.map.width - 20 || y > s.map.height - 20;
+    if (offMap) continue;
     waves.spawnZombie(s, types[i++ % types.length], x, y);
     const z = s.zombies[s.zombies.length - 1];
     z.mode = 'hunt';
     z.horde = true;
     z.interestLeft = 999;
   }
-  if (scene !== 'overrun' && cap > 0 && bosses.liveBoss(s) === null) {
+  const wantsBoss = scene !== 'overrun' && cap > 0 && bosses.liveBoss(s) === null;
+  if (wantsBoss) {
     s.wave = 999; // not the last horde: summon by hand
     const def = bosses.BOSSES.butcher;
     waves.spawnZombie(s, def.base, p.x + 200, p.y);
@@ -101,7 +115,6 @@ await page.evaluate(async ({ scene, zombies }: { scene: string; zombies: number 
     me.health = 1e6;
     me.maxHealth = 1e6;
     me.status = 'alive';
-    for (const gun of Object.values(me.guns ?? {})) if (gun && typeof gun === 'object' && 'ammo' in gun) (gun as { ammo: number }).ammo = 999;
     me.ammo = 999;
     for (const k of Object.keys(me.ammoBag ?? {})) me.ammoBag[k] = 999;
     let n = 0;
@@ -109,7 +122,8 @@ await page.evaluate(async ({ scene, zombies }: { scene: string; zombies: number 
       const angle = Math.random() * Math.PI * 2;
       const x = me.x + Math.cos(angle) * 300;
       const y = me.y + Math.sin(angle) * 300;
-      if (x < 20 || y < 20 || x > t.map.width - 20 || y > t.map.height - 20) continue;
+      const offMap = x < 20 || y < 20 || x > t.map.width - 20 || y > t.map.height - 20;
+      if (offMap) continue;
       waves.spawnZombie(t, types[n % types.length], x, y);
       const z = t.zombies[t.zombies.length - 1];
       z.mode = 'hunt';
@@ -122,7 +136,7 @@ await page.evaluate(async ({ scene, zombies }: { scene: string; zombies: number 
 // --disable=light,world,sim,hud switches a part off, to see what the frame costs without it.
 const disabled = (args.get('disable') ?? '').split(',').filter(Boolean);
 await page.evaluate((disabled: string[]) => {
-  const game = window.__outbreak as unknown as { renderer: any; session: any; runHud: any; run: any };
+  const game = window.__outbreak as unknown as Record<string, any>;
   const r = game.renderer;
   const off = (o: any, k: string) => { o[k] = () => {}; };
   if (disabled.includes('light')) { off(r, 'composeLight'); off(r.lighting, 'apply'); }
@@ -165,7 +179,8 @@ if (args.has('count-draws')) {
     let frames = 0;
     const tick = () => {
       frames += 1;
-      if (frames < 120) requestAnimationFrame(tick);
+      const sampling = frames < 120;
+      if (sampling) requestAnimationFrame(tick);
       else {
         proto.drawImage = original;
         const per: Record<string, number> = { total: Math.round(calls / frames) };
@@ -175,7 +190,7 @@ if (args.has('count-draws')) {
     };
     requestAnimationFrame(tick);
   }));
-  console.log('drawImage calls per frame', counts);
+  process.stdout.write(`drawImage calls per frame ${JSON.stringify(counts)}\n`);
 }
 if (args.has('count-sounds')) {
   const sounds = await page.evaluate(() => new Promise<unknown>((resolve) => {
@@ -186,11 +201,19 @@ if (args.has('count-sounds')) {
     mixer.play = (name: string, o: unknown) => {
       const before = mixer.total;
       play(name, o);
-      if (mixer.total > before) { started += 1; counts[name] = (counts[name] ?? 0) + 1; }
+      const voiceStarted = mixer.total > before;
+      if (voiceStarted) {
+        started += 1;
+        counts[name] = (counts[name] ?? 0) + 1;
+      }
     };
-    setTimeout(() => { mixer.play = play; resolve({ startedPerSec: started / 3, state: mixer.ctx.state, counts }); }, 3000);
+    const done = setTimeout(() => {
+      clearTimeout(done);
+      mixer.play = play;
+      resolve({ startedPerSec: started / 3, state: mixer.ctx.state, counts });
+    }, 3000);
   }));
-  console.log('sounds', JSON.stringify(sounds));
+  process.stdout.write(`sounds ${JSON.stringify(sounds)}\n`);
 }
 if (tracePath) await browser.startTracing(page, { path: tracePath, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
 if (profilePath) {
@@ -198,7 +221,7 @@ if (profilePath) {
   await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
   await cdp.send('Profiler.start');
 }
-const result = await page.evaluate((seconds: number) => new Promise<{ gaps: number[]; zombies: number; dots: number; bullets: number; frameMs: number; tickMs: number; screen: string }>((resolve) => {
+const result = await page.evaluate((seconds: number) => new Promise<BenchResult>((resolve) => {
   // Time spent in the game's own frame and tick, which unlike the frame gaps does not snap to vsync.
   const controller = window.__outbreak as unknown as { frame: (ms: number) => void; run: { transport: { tick: () => void } } };
   let frameMs = 0;
@@ -218,6 +241,10 @@ const result = await page.evaluate((seconds: number) => new Promise<{ gaps: numb
     tick();
     tickMs += performance.now() - t;
   };
+  const particleCount = (renderer: any): number => {
+    const dots = renderer ? renderer.fx.particles.dots : null;
+    return dots ? dots.length : -1;
+  };
   const gaps: number[] = [];
   let last = performance.now();
   const end = last + seconds * 1000;
@@ -225,12 +252,13 @@ const result = await page.evaluate((seconds: number) => new Promise<{ gaps: numb
   const step = (now: number) => {
     gaps.push(now - last);
     last = now;
-    if (now < end) requestAnimationFrame(step);
+    const running = now < end;
+    if (running) requestAnimationFrame(step);
     else {
       const s = game.sim.sim;
       controller.frame = frame;
       transport.tick = tick;
-      resolve({ frameMs: frameMs / frames, tickMs: (tickMs / seconds) / 30, gaps, zombies: s.zombies.length, bullets: s.bullets.length, dots: game.renderer?.fx?.particles?.dots?.length ?? -1, screen: (window.__outbreak as any).ui.value.screen });
+      resolve({ frameMs: frameMs / frames, tickMs: (tickMs / seconds) / 30, gaps, zombies: s.zombies.length, bullets: s.bullets.length, dots: particleCount(game.renderer), screen: (window.__outbreak as any).ui.value.screen });
     }
   };
   requestAnimationFrame(step);
@@ -248,7 +276,7 @@ const gaps = result.gaps.slice(1).sort((a: number, b: number) => a - b);
 const sum = gaps.reduce((a: number, b: number) => a + b, 0);
 const at = (q: number) => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * q))];
 const slow = gaps.filter((g: number) => g > 1000 / 55).length;
-console.log(JSON.stringify({
+process.stdout.write(`${JSON.stringify({
   scene, throttle, seconds, disabled: disabled.join(','), frames: gaps.length,
   fps: +(1000 * gaps.length / sum).toFixed(1),
   avgMs: +(sum / gaps.length).toFixed(2),
@@ -257,5 +285,5 @@ console.log(JSON.stringify({
   // Main-thread work per drawn frame and per sim tick (30 a second), in throttled milliseconds.
   renderMs: +result.frameMs.toFixed(2), tickMs: +result.tickMs.toFixed(2),
   zombies: result.zombies, screen: result.screen, bullets: result.bullets, dots: result.dots,
-}));
+})}\n`);
 await browser.close();

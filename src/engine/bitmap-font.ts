@@ -115,7 +115,8 @@ function outlinedCanvas(text: string, color: string, outline: string): HTMLCanva
   drawText(ctx, text, 1, 2, outline);
   drawText(ctx, text, 1, 1, color);
   outlinedCache.set(key, canvas);
-  if (outlinedCache.size > OUTLINED_CACHE_SIZE) outlinedCache.delete(outlinedCache.keys().next().value!);
+  const overFull = outlinedCache.size > OUTLINED_CACHE_SIZE;
+  if (overFull) outlinedCache.delete(outlinedCache.keys().next().value!);
   return canvas;
 }
 
