@@ -67,14 +67,14 @@ export class WorldRenderer {
   private ground: GroundLayer | null = null;
   private occlusion: OcclusionGrid | null = null;
   private time = 0;
-  private readonly reducedMotion: boolean;
+  private reducedMotion: boolean;
 
-  constructor(canvas: HTMLCanvasElement, art: ArtBook, reducedMotion: boolean) {
+  constructor(canvas: HTMLCanvasElement, art: ArtBook, reducedMotion: boolean, shakeLevel = 1) {
     this.canvas = canvas;
     this.art = art;
     this.reducedMotion = reducedMotion;
     this.ctx = canvas.getContext('2d', { alpha: false })!;
-    this.effects = new ScreenEffects(reducedMotion);
+    this.effects = new ScreenEffects(reducedMotion, shakeLevel);
     this.atmosphere = new Atmosphere(reducedMotion);
     this.groundMotion = new GroundMotion(reducedMotion);
     this.buildings = new BuildingLayer(art.environment);
@@ -86,6 +86,15 @@ export class WorldRenderer {
       addCorpse: (id, type, x, y) => this.addCorpse(id, type, x, y),
     });
     this.resize();
+  }
+
+  /** Applies the Motion setting to every layer that moves, without rebuilding anything. */
+  setMotion(reducedMotion: boolean, shakeLevel: number): void {
+    this.reducedMotion = reducedMotion;
+    this.effects.setMotion(reducedMotion, shakeLevel);
+    this.atmosphere.setReducedMotion(reducedMotion);
+    this.groundMotion.setReducedMotion(reducedMotion);
+    this.entities.setReducedMotion(reducedMotion);
   }
 
   private stamp(sprite: PixelSprite, x: number, y: number, alpha?: number): void {

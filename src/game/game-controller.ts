@@ -1,4 +1,4 @@
-import { shallowRef } from 'vue';
+import { shallowRef, watch } from 'vue';
 import type { ShallowRef } from 'vue';
 import { capCallsign } from '../../shared/callsign.ts';
 import type { EmoteId } from '../../shared/emotes.ts';
@@ -34,6 +34,7 @@ import type { RunHost, RunState } from './run-session.ts';
 import { RunStage } from './run-stage.ts';
 import { SnapshotHandler } from './snapshot-handler.ts';
 import { DEFAULT_PREFS, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
+import { motion } from './motion.ts';
 import { loadStyle, saveStyle } from './style-pref.ts';
 import { loadBests } from './trip-record.ts';
 import { isTouchDevice } from './touch-input.ts';
@@ -156,6 +157,7 @@ export class GameController {
     this.raf = requestAnimationFrame(this.frame);
     // Baking the art blocks for a moment: let the title paint first.
     this.artTimer = setTimeout(() => this.loadArt(), ART_DELAY_MS);
+    this.stopMotionWatch = watch([motion.reduced, motion.shake], ([reduced, shake]) => this.renderer?.setMotion(reduced, shake));
     this.audio.setScene('menu');
   }
 
@@ -164,6 +166,7 @@ export class GameController {
     if (this.artTimer) clearTimeout(this.artTimer);
     window.removeEventListener('resize', this.onResize);
     this.stopDprWatch();
+    this.stopMotionWatch();
     window.removeEventListener('blur', this.onAway);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.input.dispose();
@@ -180,9 +183,8 @@ export class GameController {
   private loadArt(): void {
     const canvas = this.canvas;
     if (!canvas) return;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const art = buildArtBook();
-    this.renderer = new WorldRenderer(canvas, art, reducedMotion);
+    this.renderer = new WorldRenderer(canvas, art, motion.reduced.value, motion.shake.value);
     this.titleMap = generateWorldMap(TITLE_MAP_SEED);
     this.renderer.setMap(this.titleMap);
     this.publish({ art });
@@ -193,6 +195,7 @@ export class GameController {
   }
 
   private stopDprWatch: () => void = () => {};
+  private stopMotionWatch: () => void = () => {};
 
   private readonly onResize = (): void => {
     fitWindow(this.renderer, this.run.transport?.kind === 'coop', this.ui.value.touch);

@@ -17,6 +17,8 @@
       <PixelButton class="options-mute" :aria-pressed="ui.muted" @press="game.toggleMute()">{{ muteLabel }}</PixelButton>
     </div>
 
+    <MotionOptions />
+
     <div class="options-analytics">
       <div class="options-analytics-head">
         <p class="px-label">Analytics</p>
@@ -46,6 +48,7 @@ import { consent, openPrivacy } from '../game/analytics/index.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { CONTROLS } from '../game/title-menu.ts';
 import MenuLink from './MenuLink.vue';
+import MotionOptions from './MotionOptions.vue';
 import PixelButton from './PixelButton.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
