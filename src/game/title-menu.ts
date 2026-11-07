@@ -5,7 +5,8 @@ import type { SoundUnlock } from './sound-unlock.ts';
 import type { BestRun, LeaderboardEntry } from './storage.ts';
 
 /** The title's menu, what each item opens, and the words its pages show. The components only lay these out. */
-export type TitlePage = 'play' | 'daily' | 'levels' | 'howto' | 'records' | 'sound' | 'options';
+/** Every title page. The changelog has no menu item: the version number in the corner opens it. */
+export type TitlePage = 'play' | 'daily' | 'levels' | 'howto' | 'records' | 'sound' | 'options' | 'changelog';
 
 export interface TitleMenuItem {
   readonly page: TitlePage;
