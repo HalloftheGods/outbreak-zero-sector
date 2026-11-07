@@ -20,6 +20,16 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'grounded-cacti',
+    date: '2026-11-07',
+    kind: 'fixed',
+    title: 'Cacti touch the ground',
+    deck: 'Desert saguaros no longer hover above their own shadows.',
+    points: [
+      'Each cactus now stands right on its shadow instead of a few pixels above it.',
+    ],
+  },
+  {
     id: 'floors',
     date: '2026-11-07',
     kind: 'new',
