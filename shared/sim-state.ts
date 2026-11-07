@@ -1,4 +1,5 @@
 import type { SupplyDrop } from './supply-drop.ts';
+import type { KillChain } from './kill-chain.ts';
 import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type {
@@ -270,6 +271,8 @@ export interface SimState {
   noises: Point[];
   /** Footprints in a snowy town, oldest first. */
   tracks: Footprint[];
+  /** Each survivor's kill chain, for the points it multiplies (`shared/kill-chain.ts`). */
+  killChains: Map<EntityId, KillChain>;
   /** Pools of molotov fire and lit flares, burning down. */
   fires: FireState[];
   flares: FlareState[];

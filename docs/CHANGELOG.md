@@ -2,6 +2,12 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Chains that pay, and a Daily result to share
+
+### Added
+- Kill chains pay: each kill by the same survivor within 1.4 seconds of the last is worth a quarter more, up to double from the fifth (`shared/kill-chain.ts`). The floating score says so ("+18 x1.5"), and `zombie_die` carries the kill's place in the chain.
+- A Copy result button on the Daily Night page (once played) and on the results screen after a Daily run. It copies the day, level, points, kills and streak with the game's link, ready to paste anywhere.
+
 ## [2026-11-07] - The record book
 
 ### Changed

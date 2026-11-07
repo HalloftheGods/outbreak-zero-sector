@@ -18,6 +18,7 @@
     <CharacterSelect ref="survivors" :art="ui.art" :bust-scale="2" />
 
     <template #actions>
+      <ShareButton v-if="share" :text="share" />
       <PixelButton primary silent :disabled="!ready" @press="game.startDaily()">{{ played ? 'Practice' : 'Start tonight' }}</PixelButton>
     </template>
   </TitlePage>
@@ -26,10 +27,11 @@
 <script setup lang="ts">
 /** Today's town, what it is, how you did, and the survivor to take in. Start skips the rest of the Play page: the day has already chosen. */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
-import { countdownText, dayLabel, loadDailyLog, msUntilTomorrow, nightFacts, streakOf, todaysNight } from '../game/daily-night.ts';
+import { countdownText, dailyShare, dayLabel, loadDailyLog, msUntilTomorrow, nightFacts, streakOf, todaysNight } from '../game/daily-night.ts';
 import type { UiState } from '../game/hud-state.ts';
 import CharacterSelect from './CharacterSelect.vue';
 import PixelButton from './PixelButton.vue';
+import ShareButton from './ShareButton.vue';
 import SpriteImg from './SpriteImg.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
@@ -44,6 +46,7 @@ const facts = nightFacts(night);
 const log = loadDailyLog();
 const today = log[night.key] ?? null;
 const played = today !== null;
+const share = dailyShare(night.key);
 const streak = streakOf(log, night.key);
 const todayLine = today ? `${today.score} points, level ${today.level}${today.attempts > 1 ? `, ${today.attempts - 1} practice` : ''}` : 'Not played yet';
 const scene = computed(() => ui.art?.ui.levelScenes[night.level - 1] ?? null);

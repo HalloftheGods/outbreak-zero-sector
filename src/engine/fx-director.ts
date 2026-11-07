@@ -1,4 +1,5 @@
 import { MUZZLE_OFFSET } from '../../shared/constants.ts';
+import { chainMultiplier } from '../../shared/kill-chain.ts';
 import { FLARE_SEC } from '../../shared/throwables.ts';
 import type { EntityId, GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
@@ -260,7 +261,10 @@ export class FxDirector {
     this.stampBlood(x, y);
     this.stampBlood(x + Math.cos(angle) * 9, y + Math.sin(angle) * 9);
     if (event.killerId === ctx.localId && event.points > 0) {
-      this.particles.addText(`+${event.points}`, x, y - 16, SCORE_COLOR);
+      // A chained kill shows what the chain paid it, so the callout's words come with a number.
+      const chained = (event.chain ?? 1) > 1;
+      const bonus = chained ? ` x${chainMultiplier(event.chain ?? 1)}` : '';
+      this.particles.addText(`+${event.points}${bonus}`, x, y - 16, SCORE_COLOR);
     }
   }
 

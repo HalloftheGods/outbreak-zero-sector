@@ -1,6 +1,6 @@
 import type { EntityId, GameEvent } from '../../shared/protocol.ts';
 
-/** Kills by the same player this close together make a chain. */
+/** Kills by the same player this close together make a chain; the sim pays chains on the same window (CHAIN_WINDOW_SEC in shared/kill-chain.ts). */
 export const CHAIN_WINDOW_MS = 1400;
 /** A kill at or under this share of health is a close call. */
 export const CLOSE_CALL_HEALTH = 0.2;

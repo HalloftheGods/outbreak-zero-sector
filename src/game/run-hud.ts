@@ -15,7 +15,7 @@ import { lockedTracksOf } from '../audio/playlists.ts';
 import { trackName } from './sound-test.ts';
 import { foundTracks, isRadioFound, recordRadioFound } from './sound-unlock.ts';
 import { recordRun } from './storage.ts';
-import { dayLabel, recordDaily } from './daily-night.ts';
+import { dailyShare, dayLabel, recordDaily } from './daily-night.ts';
 import { TownMapView } from './town-map.ts';
 
 const HUD_INTERVAL_MS = 100;
@@ -60,7 +60,7 @@ export function finishRun(stats: GameOverStats, localId: string, dailyKey: strin
   if (dailyKey !== null) {
     // A Daily Night keeps its own book, so the leaderboard stays a list of runs anyone could have had.
     const counted = local ? recordDaily(dailyKey, { score, kills, level: stats.level }) : false;
-    return { stats, localId, score, kills, isNewBest: false, daily: { label: `Daily Night, ${dayLabel(dailyKey)}`, counted } };
+    return { stats, localId, score, kills, isNewBest: false, daily: { label: `Daily Night, ${dayLabel(dailyKey)}`, counted, share: dailyShare(dailyKey) } };
   }
   const isNewBest = local ? recordRun({ score, kills, wave: stats.wave, durationSec: stats.durationSec }, undefined, local.name) : false;
   return { stats, localId, score, kills, isNewBest };
