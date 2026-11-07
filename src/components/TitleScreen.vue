@@ -59,10 +59,12 @@ const nav = ref(TITLE_HOME);
  */
 const invite = parseInvite(window.location.search);
 if (invite) {
-  if (invite.kind === 'room') {
+  const isRoomInvite = invite.kind === 'room';
+  if (isRoomInvite) {
     setPendingRoomCode(invite.code);
     // An online build joins a code from the same field a LAN address goes in.
-    if (onlineRoomsLive()) game.setServerAddress(invite.code);
+    const isOnlineBuild = onlineRoomsLive();
+    if (isOnlineBuild) game.setServerAddress(invite.code);
   } else game.setServerAddress(invite.address);
   nav.value = INVITE_LANDING;
   window.history.replaceState(null, '', withoutJoinParam(window.location.href));

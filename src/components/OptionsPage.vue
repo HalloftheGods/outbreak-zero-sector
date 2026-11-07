@@ -3,6 +3,8 @@
     <SoundOptions :ui />
     <DisplayOptions :ui />
 
+    <MotionOptions />
+
     <div class="options-analytics">
       <div class="options-analytics-head">
         <p class="px-label">Analytics</p>
@@ -33,6 +35,7 @@ import type { UiState } from '../game/hud-state.ts';
 import { CONTROLS } from '../game/title-menu.ts';
 import DisplayOptions from './DisplayOptions.vue';
 import MenuLink from './MenuLink.vue';
+import MotionOptions from './MotionOptions.vue';
 import PixelButton from './PixelButton.vue';
 import SoundOptions from './SoundOptions.vue';
 import TitlePage from './TitlePage.vue';

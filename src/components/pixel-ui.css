@@ -422,8 +422,7 @@ body {
   50% { opacity: 0.35; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .px-screen, .px-page, .px-blink {
-    animation: none !important;
-  }
+/* <html data-motion> follows the Motion option on the Options page, which can override the system either way. */
+:root[data-motion='reduced'] .px-screen, :root[data-motion='reduced'] .px-page, :root[data-motion='reduced'] .px-blink {
+  animation: none !important;
 }

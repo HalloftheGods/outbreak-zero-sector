@@ -1,7 +1,7 @@
 import type { GameStyle } from '../../shared/game-style.ts';
-import type { GameEvent, PickupType, PlayerEntity, WeaponId, WorldMap, ZombieType } from '../../shared/protocol.ts';
-import type { GunEffect } from '../../shared/round-effect-data.ts';
+import type { GameEvent, PlayerEntity, WeaponId, WorldMap, ZombieType } from '../../shared/protocol.ts';
 import { LOW_HEALTH } from '../game/heartbeat.ts';
+import { playEventSound } from './event-sounds.ts';
 import { FootstepTracker, StompTracker, type StepPlayer, type Stomper } from './footsteps.ts';
 import { HEARING_RANGE, Mixer, type BusLevels } from './mixer.ts';
 import { Music, type Scene } from './music.ts';
@@ -9,33 +9,16 @@ import { Soundtrack } from './soundtrack.ts';
 import { SFX } from './sfx-registry.ts';
 import type { SfxName } from './sfx-registry.ts';
 
+export { PICKUP_SFX } from './event-sounds.ts';
 export { renderSfx } from './render.ts';
 export { SFX_NAMES } from './sfx-registry.ts';
 export type { SfxName } from './sfx-registry.ts';
 export type { Scene } from './music.ts';
 
 const STORE_KEY = 'outbreak-zero.audio';
-const SHOT: Record<WeaponId, SfxName> = { pistol: 'pistol', carbine: 'carbine', shotgun: 'shotgun' };
-const DEATH: Record<ZombieType, SfxName> = {
-  walker: 'die_walker', runner: 'die_runner', bloater: 'die_bloater', brute: 'die_brute', screamer: 'die_walker',
-};
 const VOICE: Record<ZombieType, SfxName> = {
   walker: 'groan_walker', runner: 'shriek_runner', bloater: 'gurgle_bloater', brute: 'roar_brute', screamer: 'groan_walker',
 };
-const ALERT: Record<ZombieType, SfxName> = {
-  walker: 'alert_walker', runner: 'alert_runner', bloater: 'alert_bloater', brute: 'alert_brute', screamer: 'scream',
-};
-export const PICKUP_SFX: Record<PickupType, SfxName> = {
-  bandage: 'pickup_bandage', medkit: 'pickup_medkit', pistol_ammo: 'pickup_pistol_ammo',
-  carbine_ammo: 'pickup_carbine_ammo', shells: 'pickup_shells', carbine: 'pickup_weapon', shotgun: 'pickup_weapon',
-  knife: 'pickup_weapon', radio: 'pickup_radio',
-  barrel: 'pickup_weapon', grip: 'pickup_weapon', magazine: 'pickup_weapon', suppressor: 'pickup_weapon', toolkit: 'pickup_weapon',
-  incendiary_kit: 'pickup_weapon', acid_kit: 'pickup_weapon', piercing_kit: 'pickup_weapon', tranq_kit: 'pickup_weapon',
-  jewel_small: 'pickup_jewel', jewel_large: 'pickup_jewel_large',
-};
-const STATUS: Record<GunEffect, SfxName> = { incendiary: 'ignite', acid: 'corrode', piercing: 'pierce', tranq: 'tranq_dart' };
-/** A can on the end of a gun: still a shot, but a dull one. */
-const SUPPRESSED_GAIN = 0.35;
 /** A pack waking at once shares this: at most one alert snarl per window. */
 const ALERT_WINDOW = 0.15;
 /** A shotgun loads a shell this often until the reload ends, and never more than a full tube. */
@@ -125,7 +108,8 @@ export class AudioEngine {
       }
     }
     const ctx = this.mixer.ctx;
-    if (ctx.state === 'running') {
+    const isAudioRunning = ctx.state === 'running';
+    if (isAudioRunning) {
       this.soundtrack?.retry();
       return;
     }
@@ -269,66 +253,19 @@ export class AudioEngine {
     const mixer = this.mixer;
     if (!mixer) return;
     const at = (x: number, y: number, playerId?: string) => ({ x, y, local: playerId !== undefined && playerId === localPlayerId });
-    switch (e.type) {
-      case 'shot': {
-        const p = at(e.x, e.y, e.playerId);
-        mixer.play(SHOT[e.weapon], e.suppressed ? { ...p, gain: SUPPRESSED_GAIN } : p);
-        if (e.weapon === 'shotgun') mixer.play('pump', { ...p, delay: 0.45, gain: 0.8 });
-        break;
-      }
-      case 'dry_fire': mixer.play('dry_click', at(e.x, e.y, e.playerId)); break;
-      case 'reload_start': this.reloadStart(e.weapon, e.playerId, at(e.x, e.y, e.playerId)); break;
-      case 'reload_end': this.reloadEnd(e.weapon, e.playerId, at(e.x, e.y, e.playerId)); break;
-      case 'melee': mixer.play(e.hit ? 'melee_thud' : 'melee_swing', at(e.x, e.y, e.playerId)); break;
-      case 'heal': mixer.play('heal', at(e.x, e.y, e.playerId)); break;
-      case 'zombie_alert': {
-        if (this.alertIn > 0) break;
-        this.alertIn = ALERT_WINDOW;
-        mixer.play(ALERT[e.zombieType], { x: e.x, y: e.y });
-        break;
-      }
-      case 'zombie_track': mixer.play('sniff', { x: e.x, y: e.y }); break;
-      case 'weapon_switch':
-        this.shellLoads.delete(e.playerId);
-        mixer.play('weapon_switch', at(e.x, e.y, e.playerId));
-        break;
-      case 'bullet_impact': mixer.play('impact', { x: e.x, y: e.y }); break;
-      case 'zombie_hit': mixer.play('flesh_hit', { x: e.x, y: e.y }); break;
-      case 'headshot': mixer.play('headshot', at(e.x, e.y, e.playerId)); break;
-      case 'zombie_die': mixer.play(DEATH[e.zombieType], { x: e.x, y: e.y }); break;
-      // Everyone hears a boss go down, wherever they are in town.
-      case 'boss_down': mixer.play('boss_fall', { local: true }); break;
-      case 'zombie_status': mixer.play(STATUS[e.effect], { x: e.x, y: e.y }); break;
-      case 'zombie_attack': mixer.play('claw', { x: e.x, y: e.y }); break;
-      case 'bloater_burst': mixer.play('bloater_burst', { x: e.x, y: e.y }); break;
-      case 'player_hurt': mixer.play('player_hurt', at(e.x, e.y, e.playerId)); break;
-      case 'player_downed': mixer.play('player_downed', at(e.x, e.y, e.playerId)); break;
-      case 'player_dead': mixer.play('player_downed', { ...at(e.x, e.y, e.playerId), pitch: 0.75 }); break;
-      case 'player_revived': mixer.play('revive', at(e.x, e.y, e.playerId)); break;
-      case 'candy_eaten': mixer.play(e.saved ? 'revive' : 'heal', at(e.x, e.y, e.playerId)); break;
-      case 'pickup': mixer.play(PICKUP_SFX[e.pickup], at(e.x, e.y, e.playerId)); break;
-      case 'stairs_taken':
-        // Two treads, the second a little lower, where they come out.
-        mixer.play('step_hard', at(e.x, e.y, e.playerId));
-        mixer.play('step_hard', { ...at(e.x, e.y, e.playerId), pitch: 0.8 });
-        break;
-      case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
-      case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
-      case 'molotov_burst':
-        mixer.play('glass_smash', { x: e.x, y: e.y });
-        mixer.play('ignite', { x: e.x, y: e.y, pitch: 0.7 });
-        break;
-      case 'flare_lit': mixer.play('ignite', { x: e.x, y: e.y, pitch: 1.4 }); break;
-      case 'drop_called': mixer.play('ignite', { x: e.x, y: e.y, pitch: 1.4 }); break;
-      case 'drop_landed': mixer.play('distant_crash', { x: e.x, y: e.y }); break;
-      case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;
-      case 'wave_start': mixer.play('wave_start'); break;
-      case 'overrun_warning': this.ambient(e.step === 0 ? 'distant_groan' : 'distant_crash'); break;
-      case 'overrun_breach': mixer.play('wave_start'); break;
-      case 'wave_clear': mixer.play('wave_clear'); break;
-      case 'game_over': mixer.play('game_over', { local: true }); break;
-      case 'wave_intermission': break;
-    }
+    playEventSound(e, { mixer, at, playAmbient: (name) => this.ambient(name), claimAlert: () => this.claimAlert(),
+      reloadStart: (weapon, playerId, where) => this.reloadStart(weapon, playerId, where),
+      reloadEnd: (weapon, playerId, where) => this.reloadEnd(weapon, playerId, where),
+      dropShells: (playerId) => this.shellLoads.delete(playerId),
+    });
+  }
+
+  /** A pack waking at once snarls once: the first alert in a window claims it. */
+  private claimAlert(): boolean {
+    const isAlertCoolingDown = this.alertIn > 0;
+    if (isAlertCoolingDown) return false;
+    this.alertIn = ALERT_WINDOW;
+    return true;
   }
 
   tick(dt: number, zombies: readonly { x: number; y: number; type: ZombieType }[]): void {
@@ -337,11 +274,13 @@ export class AudioEngine {
     this.alertIn -= dt;
     this.loadShells(mixer, dt);
     this.groanIn -= dt;
-    if (this.groanIn > 0 || zombies.length === 0) return;
+    const isGroanQuiet = this.groanIn > 0 || zombies.length === 0;
+    if (isGroanQuiet) return;
     this.groanIn = (1 + Math.random() * 2.5) / (1 + Math.min(zombies.length, 12) * 0.12);
     const { x, y } = mixer.listener;
     const near = zombies.filter((z) => Math.hypot(z.x - x, z.y - y) < HEARING_RANGE);
-    if (near.length === 0) return;
+    const hasNoZombieInEarshot = near.length === 0;
+    if (hasNoZombieInEarshot) return;
     const z = near[Math.floor(Math.random() * near.length)];
     mixer.play(VOICE[z.type], { x: z.x, y: z.y, gain: 0.8 });
   }
@@ -351,7 +290,8 @@ export class AudioEngine {
    * or at zero volume, and until the audio has unlocked, like every other sound.
    */
   stepPlayers(players: readonly PlayerEntity[], localId: string | null, map: WorldMap, dt: number): void {
-    if (!this.mixer || this.level === 0) {
+    const isSilenced = !this.mixer || this.level === 0;
+    if (isSilenced) {
       this.footsteps.reset();
       return;
     }
@@ -443,7 +383,7 @@ export class AudioEngine {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(this.prefs));
     } catch {
-      // storage blocked: the setting still applies for this session
+      // chemx-allow: best-effort storage blocked: the setting still applies for this session
     }
   }
 }

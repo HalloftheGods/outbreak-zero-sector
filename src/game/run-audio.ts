@@ -17,7 +17,8 @@ export function tickRunAudio(audio: AudioEngine, world: ClientWorld, scene: Scen
   audio.setHealth(health);
   const threat = scene.phase === 'wave' ? Math.min(1, scene.hostiles / INTENSE_HOSTILES) : 0;
   audio.setIntensity(Math.min(1, threat * 0.75 + (1 - health) * 0.25));
-  if (heart.tick(dt, health)) audio.heartbeat(health);
+  const isHeartbeat = heart.tick(dt, health);
+  if (isHeartbeat) audio.heartbeat(health);
   audio.tick(dt, scene.zombies);
   audio.stepPlayers(scene.players, world.localId, world.worldMap, dt);
   audio.stompZombies(scene.zombies);

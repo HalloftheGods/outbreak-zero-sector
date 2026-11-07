@@ -30,6 +30,8 @@ export const JukeboxScreen = lazy(() => import('./JukeboxScreen.vue'));
 export const EndingFlow = lazy(() => import('./EndingFlow.vue'));
 
 const IDLE_FALLBACK_MS = 2_000;
+/** The fallback warm-up timer, so a second call replaces it instead of stacking another. */
+let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Warms every lazy screen once the browser is idle. A failed warm-up is left for the real open to retry. */
 export function prefetchLazyPages(): void {
@@ -38,5 +40,8 @@ export function prefetchLazyPages(): void {
   };
   const idle = typeof window.requestIdleCallback === 'function';
   if (idle) window.requestIdleCallback(warm, { timeout: IDLE_FALLBACK_MS * 2 });
-  else setTimeout(warm, IDLE_FALLBACK_MS);
+  else {
+    clearTimeout(fallbackTimer);
+    fallbackTimer = setTimeout(warm, IDLE_FALLBACK_MS);
+  }
 }

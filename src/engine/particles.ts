@@ -46,7 +46,8 @@ interface ClipEffect {
 function removeWhere<T>(items: T[], gone: (item: T) => boolean): void {
   let kept = 0;
   for (const item of items) {
-    if (!gone(item)) items[kept++] = item;
+    const isKept = !gone(item);
+    if (isKept) items[kept++] = item;
   }
   items.length = kept;
 }
@@ -57,7 +58,8 @@ export function stepCasing(casing: Casing, dt: number): boolean {
   casing.y += casing.vy * dt;
   casing.z += casing.vz * dt;
   casing.vz -= GRAVITY * dt;
-  if (casing.z > 0) return false;
+  const isAirborne = casing.z > 0;
+  if (isAirborne) return false;
   casing.z = 0;
   casing.bounces += 1;
   casing.vz = -casing.vz * CASING_RESTITUTION;
@@ -72,7 +74,8 @@ function stepDot(dot: Dot, dt: number): boolean {
   dot.y += dot.vy * dt;
   dot.z += dot.vz * dt;
   dot.vz -= GRAVITY * dt;
-  if (dot.z < 0) {
+  const isBelowGround = dot.z < 0;
+  if (isBelowGround) {
     dot.z = 0;
     dot.vx = 0;
     dot.vy = 0;
@@ -101,16 +104,19 @@ export class ParticleSystem {
   }
 
   addDot(dot: Dot): void {
-    if (this.dots.length < MAX_DOTS) this.dots.push(dot);
+    const hasRoomForDot = this.dots.length < MAX_DOTS;
+    if (hasRoomForDot) this.dots.push(dot);
   }
 
   addCasing(casing: Casing): void {
-    if (this.casings.length >= MAX_CASINGS) this.casings.shift();
+    const isCasingsFull = this.casings.length >= MAX_CASINGS;
+    if (isCasingsFull) this.casings.shift();
     this.casings.push(casing);
   }
 
   addClip(clip: Clip, x: number, y: number, emissive: boolean): void {
-    if (this.clips.length < MAX_CLIPS) this.clips.push({ clip, x, y, age: 0, emissive });
+    const hasRoomForClip = this.clips.length < MAX_CLIPS;
+    if (hasRoomForClip) this.clips.push({ clip, x, y, age: 0, emissive });
   }
 
   addText(text: string, x: number, y: number, color: string): void {
@@ -133,7 +139,8 @@ export class ParticleSystem {
 
   private drawDots(ctx: CanvasRenderingContext2D, left: number, top: number, emissive: boolean): void {
     for (const dot of this.dots) {
-      if (dot.emissive !== emissive) continue;
+      const isOtherLayer = dot.emissive !== emissive;
+      if (isOtherLayer) continue;
       ctx.fillStyle = dot.color;
       ctx.fillRect(Math.round(dot.x) - left, Math.round(dot.y - dot.z) - top, dot.size, dot.size);
     }
@@ -141,7 +148,8 @@ export class ParticleSystem {
 
   private drawClips(ctx: CanvasRenderingContext2D, left: number, top: number, emissive: boolean): void {
     for (const effect of this.clips) {
-      if (effect.emissive !== emissive) continue;
+      const isOtherLayer = effect.emissive !== emissive;
+      if (isOtherLayer) continue;
       drawSprite(ctx, clipFrame(effect.clip, effect.age), Math.round(effect.x) - left, Math.round(effect.y) - top);
     }
   }

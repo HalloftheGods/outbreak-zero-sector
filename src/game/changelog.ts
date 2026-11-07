@@ -20,6 +20,18 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'motion-setting',
+    date: '2026-11-07',
+    kind: 'new',
+    title: 'Choose your motion',
+    deck: 'Options has a Motion setting, and a slider for screen shake.',
+    points: [
+      'System follows your device, as before. Full plays every animation, the van ride too, whatever your device says.',
+      'Reduced calms things down: no big flashes, still transitions, and only a nudge of shake.',
+      'Screen shake goes from 0 to 100%, so you can keep the motion and lose the wobble.',
+    ],
+  },
+  {
     id: 'readable-pickup-text',
     date: '2026-11-07',
     kind: 'better',

@@ -40,7 +40,8 @@ export interface JuiceBeat {
 }
 
 export function chainWords(count: number): string | null {
-  if (count < 2) return null;
+  const isNoChain = count < 2;
+  if (isNoChain) return null;
   return CHAIN_WORDS[count] ?? `MASSACRE x${count}`;
 }
 
@@ -70,9 +71,11 @@ export class KillJuice {
     for (const event of events) {
       if (event.type === 'zombie_die') {
         anyKill = true;
-        if (event.killerId === null || event.killerId !== localId) continue;
+        const isNotMine = event.killerId === null || event.killerId !== localId;
+        if (isNotMine) continue;
         kills += 1;
-        if (event.zombieType === 'brute') freezeMs = Math.max(freezeMs, FREEZE_MS.brute);
+        const isBrute = event.zombieType === 'brute';
+        if (isBrute) freezeMs = Math.max(freezeMs, FREEZE_MS.brute);
       } else if (event.type === 'headshot' && event.playerId === localId) {
         freezeMs = Math.max(freezeMs, FREEZE_MS.headshot);
       } else if (event.type === 'wave_clear') {
@@ -88,7 +91,8 @@ export class KillJuice {
     if (hordeWiped) {
       return { freezeMs: Math.max(freezeMs, FREEZE_MS.hordeWiped), flash: Math.max(flash, 0.45), callout: null, hordeWiped };
     }
-    if (kills === 0) return freezeMs > 0 ? { freezeMs, flash, callout: null, hordeWiped } : null;
+    const hasNoKills = kills === 0;
+    if (hasNoKills) return freezeMs > 0 ? { freezeMs, flash, callout: null, hordeWiped } : null;
 
     const chained = now - this.lastKillMs <= CHAIN_WINDOW_MS;
     this.chain = (chained ? this.chain : 0) + kills;
@@ -97,7 +101,8 @@ export class KillJuice {
     if (chain) freezeMs = Math.max(freezeMs, FREEZE_MS.chain);
 
     const onTheEdge = health > 0 && health <= CLOSE_CALL_HEALTH && now - this.lastCloseCallMs > CLOSE_CALL_REPEAT_MS;
-    if (onTheEdge && !chain) {
+    const isCloseCall = onTheEdge && !chain;
+    if (isCloseCall) {
       this.lastCloseCallMs = now;
       return { freezeMs: Math.max(freezeMs, FREEZE_MS.chain), flash, callout: { text: 'CLOSE CALL', tone: 'close' }, hordeWiped };
     }
