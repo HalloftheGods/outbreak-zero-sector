@@ -1,4 +1,4 @@
-import { PROP_DEFS, TILE_SIZE } from './protocol.ts';
+import { BUILDING_DEFS, PROP_DEFS, TILE_SIZE, WALL_THICKNESS } from './protocol.ts';
 import type { BuildingInstance, BuildingKind, PropKind } from './protocol.ts';
 import type { MapBuilder } from './map-builder.ts';
 
@@ -62,7 +62,7 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
   garage: [
     ['shelf', 16, NORTH_WALL], ['workbench', 82, NORTH_DEEP], ['workbench', 130, NORTH_DEEP],
     ['locker', 144, 64],
-    ['car_sedan_h', 96, 80, 0.7],
+    ['car_sedan_h', 90, 80, 0.7],
     ['crate_stack', 16, 80],
   ],
   warehouse: [
@@ -88,10 +88,91 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
   ],
 };
 
+/** A gap narrower than this looks like a way round but is not one. */
+const WALL_SNAP = 24;
+
+interface Piece {
+  left: number;
+  readonly width: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Pieces that stand in one row with no real way between them, left to right. */
+function runsOf(pieces: readonly Piece[]): Piece[][] {
+  const runs: Piece[][] = [];
+  const sorted = [...pieces].sort((a, b) => a.left - b.left);
+  for (const piece of sorted) {
+    const joins = (run: Piece[]): boolean =>
+      run.some((other) => {
+        const sameRow = other.top < piece.bottom && piece.top < other.bottom;
+        return sameRow && piece.left - (other.left + other.width) < WALL_SNAP;
+      });
+    const run = runs.find(joins);
+    if (run) run.push(piece);
+    else runs.push([piece]);
+  }
+  return runs;
+}
+
+/**
+ * Lays a run wall to wall. When the run's free room adds up to a real aisle, the pieces close up and
+ * the aisle opens at the run's widest gap; otherwise the room is shared out evenly, so no gap opens
+ * up just short of passable.
+ */
+function spreadOut(run: Piece[], slack: number): void {
+  const gaps = run.slice(1).map((piece, index) => piece.left - (run[index].left + run[index].width));
+  const free = gaps.reduce((sum, gap) => sum + gap, slack);
+  const widest = gaps.indexOf(Math.max(...gaps));
+  const aisle = free >= WALL_SNAP;
+  let x = WALL_THICKNESS;
+  run.forEach((piece, index) => {
+    const opensAisle = aisle && index - 1 === widest;
+    const evenShare = aisle ? 0 : free / gaps.length;
+    if (index > 0) x += opensAisle ? free : evenShare;
+    piece.left = x;
+    x += piece.width;
+  });
+}
+
+/** Closes a run up to a side wall it nearly reaches, or spreads it wall to wall when it nearly reaches both. */
+function closeUp(run: Piece[], inside: number): void {
+  const left = Math.min(...run.map((piece) => piece.left));
+  const right = Math.max(...run.map((piece) => piece.left + piece.width));
+  const nearLeft = left - WALL_THICKNESS < WALL_SNAP;
+  const nearRight = inside - right < WALL_SNAP;
+  const spread = nearLeft && nearRight && run.length > 1;
+  if (spread) {
+    spreadOut(run, inside - WALL_THICKNESS - (right - left));
+    return;
+  }
+  const shift = nearLeft ? WALL_THICKNESS - left : nearRight ? inside - right : 0;
+  for (const piece of run) piece.left += shift;
+}
+
+const placed = new Map<BuildingKind, readonly number[]>();
+
+/**
+ * Each piece's left edge in a kind of building. The layouts were drawn for tile-thick walls and the
+ * walls are thinner, so a row that nearly meets a side wall is closed up against it instead of
+ * leaving a sliver that looks like a way round.
+ */
+export function placedLefts(kind: BuildingKind): readonly number[] {
+  const known = placed.get(kind);
+  if (known) return known;
+  const pieces: Piece[] = LAYOUTS[kind].map(([prop, left, bottom]) => ({ left, width: PROP_DEFS[prop].w, top: bottom - PROP_DEFS[prop].h, bottom }));
+  const inside = BUILDING_DEFS[kind].w - WALL_THICKNESS;
+  for (const run of runsOf(pieces)) closeUp(run, inside);
+  const lefts = pieces.map((piece) => Math.round(piece.left));
+  placed.set(kind, lefts);
+  return lefts;
+}
+
 /** Furnishes one building. Pieces go down as fixtures: the layouts already leave their own aisles. */
 export function furnish(b: MapBuilder, building: BuildingInstance): void {
-  for (const [kind, left, bottom, odds] of LAYOUTS[building.kind]) {
+  const lefts = placedLefts(building.kind);
+  LAYOUTS[building.kind].forEach(([kind, , bottom, odds], index) => {
     const skipped = odds !== undefined && b.rng() >= odds;
-    if (!skipped) b.fixture(kind, building.x + left + PROP_DEFS[kind].w / 2, building.y + bottom);
-  }
+    if (!skipped) b.fixture(kind, building.x + lefts[index] + PROP_DEFS[kind].w / 2, building.y + bottom);
+  });
 }

@@ -126,6 +126,11 @@ function filledIn(solids: readonly Box[], area: Box): boolean {
   return true;
 }
 
+/** True if a player can stand in the middle of the area: a gap with a piece across it is no way through. */
+function playerFitsIn({ map }: Room, area: Box): boolean {
+  return !circleHitsSolid(map, (area.x0 + area.x1) / 2, (area.y0 + area.y1) / 2, PLAYER_RADIUS);
+}
+
 /** Straight gaps between two solids that face each other with nothing else in between. */
 function facingGaps(room: Room): number[] {
   const solids = solidsOf(room);
@@ -140,7 +145,8 @@ function facingGaps(room: Room): number[] {
       const between: Box = overlapX
         ? { x0: Math.max(a.x0, b.x0), x1: Math.min(a.x1, b.x1), y0: Math.min(a.y1, b.y1), y1: Math.max(a.y0, b.y0) }
         : { y0: Math.max(a.y0, b.y0), y1: Math.min(a.y1, b.y1), x0: Math.min(a.x1, b.x1), x1: Math.max(a.x0, b.x0) };
-      if (!filledIn(solids, between)) gaps.push(gap);
+      const open = !filledIn(solids, between) && playerFitsIn(room, between);
+      if (open) gaps.push(gap);
     }
   });
   return gaps;

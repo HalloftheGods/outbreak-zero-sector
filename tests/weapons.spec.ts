@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MELEE_COOLDOWN_SEC, MELEE_DAMAGE, MELEE_RANGE, START_SPARE_ROUNDS, TICK_DT, TICK_RATE, WEAPONS } from '../shared/constants.ts';
 import { WEAPON_ORDER } from '../shared/protocol.ts';
 import { buildingBox, propBox } from '../shared/world-map.ts';
+import { circleHitsSolid } from '../shared/world-query.ts';
 import { addRoamer, addZombie, eventsOf, findBuilding, findProp, input, quietSim, stepUntil, steps } from './helpers/sim-harness.ts';
 import type { PlayerState } from '../shared/sim-state.ts';
 
@@ -60,7 +61,9 @@ describe('firing', () => {
 describe('bullets cannot tunnel', () => {
   it.each([500, 5000, 100000])('stops on a building at %i px/s', (speed) => {
     const { sim, state } = quietSim();
-    const box = propBox(findProp(sim, 'crate_stack'));
+    // A crate with open floor to its left: one stacked against a wall has nowhere to fire from.
+    const crates = sim.map.props.filter((p) => p.kind === 'crate_stack').map(propBox);
+    const box = crates.find((c) => !circleHitsSolid(sim.map, c.x0 - 4, (c.y0 + c.y1) / 2, 3.9)) ?? propBox(findProp(sim, 'crate_stack'));
     const y = (box.y0 + box.y1) / 2;
     state.bullets.push({ id: 'b', shooterId: 'a', x: box.x0 - 8, y, vx: speed, vy: 0, damage: 10, rangeLeft: 4000 });
     steps(sim, 3);

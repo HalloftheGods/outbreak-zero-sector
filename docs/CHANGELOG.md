@@ -2,6 +2,11 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Furniture against the side walls
+
+### Fixed
+- Furniture now stands flush against a building's side walls. The room layouts were drawn for walls a tile thick, but walls are 6px, so pieces near a side wall stood 10px off it. That left a gap that looked like a way round but was too tight for anyone, and it trapped players. A row that nearly meets one side wall now closes up against it. A row that nearly meets both is laid wall to wall, opening a real aisle at its widest gap when there is room for one (`placedLefts` in `shared/building-interiors.ts`).
+
 ## [2026-11-07] - Stamps
 
 ### Added
