@@ -95,6 +95,7 @@ export function buildEnvironment(): EnvironmentArt {
       // Floors above and below are only ever seen from inside, so they borrow a house's shell.
       upstairs: [buildGableHouse()],
       cellar: [buildGableHouse()],
+      apartment_upstairs: [buildBrickApartment()],
     },
     interior: buildInterior(),
     barrelFire: buildBarrelFire(),

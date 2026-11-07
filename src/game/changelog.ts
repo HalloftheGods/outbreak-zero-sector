@@ -20,6 +20,18 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'apartment-floors',
+    date: '2026-11-07',
+    kind: 'new',
+    title: 'Apartments go up a floor',
+    deck: 'Every apartment block has a second floor now.',
+    points: [
+      'The stairs are at the east end of the lobby, just inside the front.',
+      'Upstairs are two more flats off the same hall, with beds, fridges and lockers to search.',
+      'Zombies follow you up, the same as in a house.',
+    ],
+  },
+  {
     id: 'grounded-cacti',
     date: '2026-11-07',
     kind: 'fixed',

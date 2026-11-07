@@ -20,6 +20,12 @@ All notable changes to the Undead of Night: Last Round game are documented in th
 ### Changed
 - The gun bar moves to the bottom centre to make room for the log.
 
+## [2026-11-07] - Apartments go up a floor
+
+### Added
+- Every apartment block has a second floor (`apartment_upstairs`): two more flats off the same hall, with the same inside walls and furniture as below. The stairs are in the lobby's east end on both floors. It rolls nothing, so the houses' floors come out as before.
+- The strip under the town now lays floors out in 13 by 11 tile cells, to fit an apartment's.
+
 ## [2026-11-07] - Upstairs and cellars
 
 ### Added

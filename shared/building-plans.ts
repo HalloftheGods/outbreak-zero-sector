@@ -30,6 +30,14 @@ export const BACK_DOORS: Readonly<Partial<Record<BuildingKind, number>>> = {
 
 const T = WALL_THICKNESS;
 
+/** A hall from the front door to the back, with a flat on each side through a doorway. The floor above has the same. */
+const APARTMENT_HALL: readonly Rect[] = [
+  { x0: 58, y0: T, x1: 64, y1: 48 },
+  { x0: 58, y0: 80, x1: 64, y1: 90 },
+  { x0: 96, y0: T, x1: 102, y1: 48 },
+  { x0: 96, y0: 80, x1: 102, y1: 90 },
+];
+
 /**
  * Inside walls. Every doorway between them is a door wide, so a brute can follow anyone through,
  * and lines up with the tile grid for the same reason as the back doors.
@@ -39,12 +47,8 @@ export const PARTITIONS: Readonly<Partial<Record<BuildingKind, readonly Rect[]>>
   house: [{ x0: 54, y0: T, x1: 54 + T, y1: 56 }],
   upstairs: [{ x0: 54, y0: T, x1: 54 + T, y1: 56 }],
   // A hall from the front door to the back, with a room on each side through a doorway.
-  apartment: [
-    { x0: 58, y0: T, x1: 64, y1: 48 },
-    { x0: 58, y0: 80, x1: 64, y1: 90 },
-    { x0: 96, y0: T, x1: 102, y1: 48 },
-    { x0: 96, y0: 80, x1: 102, y1: 90 },
-  ],
+  apartment: APARTMENT_HALL,
+  apartment_upstairs: APARTMENT_HALL,
 };
 
 /** The opening in the north wall, in the world, or null for a building without one. */

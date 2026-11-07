@@ -66,6 +66,7 @@ const ROOM_CONTAINERS: Record<BuildingKind, Partial<Record<PropKind, ContainerKi
   house: { bed: 'drawer', fridge: 'fridge', locker: 'locker' },
   apartment: { bed: 'drawer', fridge: 'fridge', locker: 'locker', shelf: 'shelf' },
   upstairs: { bed: 'drawer', locker: 'locker', shelf: 'shelf' },
+  apartment_upstairs: { bed: 'drawer', fridge: 'fridge', locker: 'locker', shelf: 'shelf' },
   cellar: { shelf: 'shelf', crate_stack: 'box', workbench: 'cabinet' },
   diner: { fridge: 'fridge' },
   garage: { locker: 'locker', workbench: 'cabinet', shelf: 'shelf', car_sedan_h: 'car', crate_stack: 'box' },

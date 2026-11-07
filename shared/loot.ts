@@ -55,6 +55,7 @@ export const LOOT_RULES: Record<BuildingKind, LootRule> = {
   // No ammo up or down: the town's rounds are budgeted, so these floors are for first aid, and the candy hidden in them.
   upstairs: { items: [0, 1], table: { bandage: 3, knife: 0.3 } },
   cellar: { items: [0, 2], table: { bandage: 2, medkit: 1, knife: 0.5 } },
+  apartment_upstairs: { items: [0, 1], table: { bandage: 3, knife: 0.3 } },
 };
 
 const STOREY_LOOT_SALT = 0x55504457;

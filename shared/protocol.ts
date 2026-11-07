@@ -506,6 +506,8 @@ export const BUILDING_DEFS = {
   // A floor above or below a house, the same size as it. Its doorX only keeps loot off the strip a door would have.
   upstairs: { label: 'Upstairs', w: 112, h: 96, doorX: 48, floor: 'floor_carpet' },
   cellar: { label: 'Cellar', w: 112, h: 96, doorX: 48, floor: 'floor_concrete' },
+  // The second floor of an apartment block: two more flats off the same hall.
+  apartment_upstairs: { label: 'Upstairs', w: 160, h: 128, doorX: 80, floor: 'floor_carpet' },
 } as const;
 export type BuildingKind = keyof typeof BUILDING_DEFS;
 export const BUILDING_KINDS = Object.keys(BUILDING_DEFS) as BuildingKind[];
