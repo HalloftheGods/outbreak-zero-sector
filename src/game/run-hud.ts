@@ -66,7 +66,8 @@ export function finishRun(stats: GameOverStats, localId: string, dailyKey: strin
   const local = stats.players.find((player) => player.id === localId);
   const score = local?.score ?? 0;
   const kills = local?.kills ?? 0;
-  if (dailyKey !== null) {
+  const isDaily = dailyKey !== null;
+  if (isDaily) {
     // A Daily Night keeps its own book, so the leaderboard stays a list of runs anyone could have had.
     const counted = local ? recordDaily(dailyKey, { score, kills, level: stats.level }) : false;
     return { stats, localId, score, kills, isNewBest: false, daily: { label: `Daily Night, ${dayLabel(dailyKey)}`, counted, share: dailyShare(dailyKey) } };

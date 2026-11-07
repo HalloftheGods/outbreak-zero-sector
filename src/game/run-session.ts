@@ -108,7 +108,8 @@ export class RunSession {
   /** Arcade from `chosen` (guarded by what is unlocked) or, with none, the furthest level reached. Does nothing if there is no later level to start at. */
   continueSolo(chosen?: number): void {
     const level = soloStartLevel(chosen, loadLevelProgress());
-    if (level !== null) this.startSolo('arcade', level);
+    const hasLevel = level !== null;
+    if (hasLevel) this.startSolo('arcade', level);
   }
 
   /** `style` is offered to an empty room. A room already playing keeps its own, and this run follows it. */
@@ -133,7 +134,8 @@ export class RunSession {
    */
   private coopSession(address: string, style: GameStyle): RoomSession | null {
     const text = address.trim();
-    if (onlineRoomsLive()) {
+    const areRoomsLive = onlineRoomsLive();
+    if (areRoomsLive) {
       if (!text) {
         const hosting = new HostSession(style);
         hosting.onHosted = (code) => this.host.publish({ onlineRoom: code });
@@ -164,9 +166,11 @@ export class RunSession {
   /** After a solo death in Arcade: back in at the furthest level reached. Co-op restarts stay at level 1. */
   continueAgain(): void {
     const { mode, runStyle } = this.host.ui.value;
-    if (!continuesAfterDeath(mode, runStyle)) return;
+    const isRunOver = !continuesAfterDeath(mode, runStyle);
+    if (isRunOver) return;
     const level = continueLevel(loadLevelProgress());
-    if (level !== null) this.playAgain(level);
+    const hasLevel = level !== null;
+    if (hasLevel) this.playAgain(level);
   }
 
   toMenu(): void {
@@ -244,14 +248,16 @@ export class RunSession {
     // No callsign (blank or refused) goes out as '': every screen then labels the player by survivor name.
     const options = { name: cleanCallsign(ui.value.callsign), difficulty: fixed.difficulty ?? loadDifficulty(), character: loadCharacter(), style, ...(fixed.seed === undefined ? {} : { seed: fixed.seed }) };
     const roomDecides = transport.kind === 'coop';
-    if (roomDecides || !playsFromHome(style)) transport.connect({ ...options, startLevel });
+    const shouldConnect = roomDecides || !playsFromHome(style);
+    if (shouldConnect) transport.connect({ ...options, startLevel });
     else this.readHome(transport, (home) => transport.connect({ ...options, home }));
   }
 
   /** The room has said what it plays, and the screens, the music and the save follow it. */
   private answerRoom(session: RoomSession, style: GameStyle): void {
     this.followStyle(style);
-    if (playsFromHome(style)) {
+    const isHomeStyle = playsFromHome(style);
+    if (isHomeStyle) {
       this.readHome(session, (home) => session.join(style, home));
       return;
     }
