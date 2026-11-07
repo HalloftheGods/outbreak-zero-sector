@@ -20,6 +20,14 @@ export interface ChangeNote {
 
 export const CHANGE_NOTES: readonly ChangeNote[] = [
   {
+    id: 'setup-stepper-thumbs',
+    date: '2026-11-07',
+    kind: 'better',
+    title: 'Setup shows your picks',
+    deck: 'Each finished step in the setup stepper shows a little picture of what you chose.',
+    points: ['Your style, mode and difficulty sit in the stepper as thumbnails. Tap one to go back and change it.'],
+  },
+  {
     id: 'sound-color-size-options',
     date: '2026-11-07',
     kind: 'better',
