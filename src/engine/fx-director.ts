@@ -50,6 +50,8 @@ const STATUS_LIGHT_RADIUS = 46;
 const STATUS_LIGHT_LIFE = 0.25;
 /** The blast door bursting: the screen-effects scale takes it down for reduced motion. */
 const OVERRUN_BURST_SHAKE = 0.6;
+/** A boss hitting the ground shakes the screen hardest of anything (reduced motion scales it down). */
+const BOSS_DOWN_SHAKE = 0.95;
 const SHOT_KICK: Record<WeaponId, number> = { pistol: 0.16, carbine: 0.12, shotgun: 0.42 };
 
 const PICKUP_LABEL: Record<PickupType, string> = {
@@ -175,6 +177,7 @@ export class FxDirector {
       case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
       case 'zombie_status': this.onZombieStatus(event); break;
       case 'overrun_breach': this.effects.addShake(OVERRUN_BURST_SHAKE); break;
+      case 'boss_down': this.onBossDown(event.x, event.y); break;
       default: break;
     }
   }
@@ -330,6 +333,15 @@ export class FxDirector {
     this.pulses.push({ x, y, radius: radius * 4, color: '#ff8a1c', life: 0.3, maxLife: 0.3 });
     this.burning.push({ kind: 'fire', x, y, radius, left: sec, owed: 0 });
     this.effects.addShake(0.3);
+  }
+
+  /** The boss lands for good: a ring of dust, a flash of light where it fell and the hardest shake in the game. */
+  private onBossDown(x: number, y: number): void {
+    this.burstDots(x, y, -Math.PI / 2, DUST, 48, 160, false, Math.PI);
+    this.burstDots(x, y, 0, BLOOD, 24, 120, false, Math.PI);
+    for (let i = 0; i < 4; i += 1) this.particles.addClip(this.art.fx.smokePuff, x + spread(22), y - 4 + spread(10), false);
+    this.pulses.push({ x, y, radius: 140, color: '#ffd28a', life: 0.4, maxLife: 0.4 });
+    this.effects.addShake(BOSS_DOWN_SHAKE);
   }
 
   /** The crate hits the street: dust, splinters and a thump felt by anyone near. */

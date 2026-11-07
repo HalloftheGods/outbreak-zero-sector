@@ -13,6 +13,9 @@ const BED_LEVEL = 0.12;
 /** The player's two sub-levels, 0..1, under the master volume. */
 export interface BusLevels { readonly music: number; readonly sfx: number }
 export const FULL_BUSES: BusLevels = { music: 1, sfx: 1 };
+/** The effects' low-pass when hearing is clear, and at its most muffled near death. */
+const CLEAR_HZ = 20000;
+const MUFFLED_HZ = 1400;
 
 export interface Spatial { readonly gain: number; readonly pan: number }
 
@@ -45,6 +48,8 @@ export class Mixer {
   /** The recorded soundtrack, mixed well under the effects so shots and groans still read. */
   readonly tracks: GainNode;
   private readonly master: GainNode;
+  /** Low-pass on the effects only: the world dulls as the player bleeds out, the music does not. */
+  private readonly muffle: BiquadFilterNode;
   private readonly active = new Map<SfxName, number>();
   private readonly last = new Map<SfxName, number>();
   private total = 0;
@@ -77,7 +82,11 @@ export class Mixer {
     clip.curve = softClip();
     this.master = ctx.createGain();
     this.master.gain.value = level;
-    this.sfx.connect(bus);
+    this.muffle = ctx.createBiquadFilter();
+    this.muffle.type = 'lowpass';
+    this.muffle.frequency.value = CLEAR_HZ;
+    this.sfx.connect(this.muffle);
+    this.muffle.connect(bus);
     this.music.connect(bus);
     this.tracks.connect(bus);
     bus.connect(comp);
@@ -106,6 +115,13 @@ export class Mixer {
     this.sfx.gain.setTargetAtTime(buses.sfx, now, 0.02);
     this.music.gain.setTargetAtTime(BED_LEVEL * buses.music, now, 0.02);
     this.tracks.gain.setTargetAtTime(TRACK_LEVEL * buses.music, now, 0.02);
+  }
+
+  /** 0 is clear hearing, 1 the most muffled. Swept on a log scale so the middle still sounds like a change. */
+  setMuffle(amount: number): void {
+    const t = Math.max(0, Math.min(1, amount));
+    const hz = CLEAR_HZ * (MUFFLED_HZ / CLEAR_HZ) ** t;
+    this.muffle.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.15);
   }
 
   play(name: SfxName, o: PlayOpts = {}): void {

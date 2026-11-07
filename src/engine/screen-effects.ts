@@ -48,6 +48,8 @@ export class ScreenEffects {
   private hurt = 0;
   private flash = 0;
   private health = 1;
+  /** 0..1, the heartbeat's swell this frame (src/game/heartbeat.ts), so the red beats with the heart. */
+  private heartPulse = 0;
   private desaturation = 0;
   private desaturationTarget = 0;
   private time = 0;
@@ -67,6 +69,7 @@ export class ScreenEffects {
     this.hurt = 0;
     this.flash = 0;
     this.health = 1;
+    this.heartPulse = 0;
     this.desaturation = 0;
     this.desaturationTarget = 0;
   }
@@ -88,6 +91,10 @@ export class ScreenEffects {
 
   setHealth(fraction: number): void {
     this.health = fraction;
+  }
+
+  setHeartPulse(pulse: number): void {
+    this.heartPulse = pulse;
   }
 
   setDesaturation(target: number): void {
@@ -112,7 +119,8 @@ export class ScreenEffects {
     let lowHealth = 0;
     if (this.health > 0 && this.health < LOW_HEALTH) {
       const severity = 1 - this.health / LOW_HEALTH;
-      const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.45 * Math.sin(this.time * 6);
+      // Reduced motion holds the red steady instead of throbbing.
+      const pulse = this.reducedMotion ? 0.7 : 0.45 + 0.55 * this.heartPulse;
       lowHealth = (0.25 + 0.5 * severity) * pulse;
     }
     return Math.min(1, Math.max(this.hurt, lowHealth));

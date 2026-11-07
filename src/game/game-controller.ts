@@ -28,6 +28,7 @@ import type { UiState } from './hud-state.ts';
 import { InputManager } from './input-manager.ts';
 import { InputSender } from './input-sender.ts';
 import { tickRunAudio } from './run-audio.ts';
+import { Heartbeat } from './heartbeat.ts';
 import { deathFade, healthFraction, NO_RUN_UI, RunHud } from './run-hud.ts';
 import { newRunState, RunSession } from './run-session.ts';
 import type { RunHost, RunState } from './run-session.ts';
@@ -84,6 +85,8 @@ export class GameController {
   private titleTime = 0;
   /** A hit-stop holds the picture until this frame time. */
   private heldUntilMs = 0;
+  /** The low-health heart, one clock for its sound and the screen's red pulse. */
+  private readonly heart = new Heartbeat();
   /** Read once, as the solo session reads it: the blast door is drawn only with the overrun on. */
   private readonly overrunOn = overrunOn(globalThis.location?.search ?? '', import.meta.env.DEV);
 
@@ -530,7 +533,7 @@ export class GameController {
     this.lastScene = scene;
     const sending = transport !== null && !over;
     if (sending) this.inputs.send(transport, world, aim, dirX, dirY, dt);
-    tickRunAudio(this.audio, world, scene, dt);
+    renderer.effects.setHeartPulse(tickRunAudio(this.audio, world, scene, dt, this.heart));
     renderer.effects.setHealth(healthFraction(world.localPlayer));
     renderer.effects.setDesaturation(deathFade(world.localPlayer?.status, over));
     renderer.render(scene, dt);
