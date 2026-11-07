@@ -86,6 +86,7 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
       'Whatever is inside drops at your feet.',
       'Each piece can be searched once.',
       'Some searches are loud.',
+      'Downtown, a town may still have S.O.S. Discount, a cheap-goods store its survivors stripped for supplies. Check the back room.',
     ],
   },
   {

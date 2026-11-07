@@ -2,6 +2,11 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - S.O.S. Discount
+
+### Added
+- How to Play (Searching) and the README name S.O.S. Discount, the downtown store with a back room worth checking (#7319).
+
 ## [2026-11-07] - Biomes, terrain, ground effects and footsteps
 
 ### Added
