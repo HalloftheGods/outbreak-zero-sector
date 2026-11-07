@@ -1,3 +1,4 @@
+import { ammoCapOf } from '../../shared/keepsakes.ts';
 import { CANDIES } from '../../shared/candy.ts';
 import type { CandyId } from '../../shared/protocol.ts';
 import { BOSSES } from '../../shared/bosses.ts';
@@ -65,7 +66,7 @@ export function pickupNote(pickup: PickupType, before: PlayerEntity | null, afte
 /** Why an item the player is standing on is still on the floor, or null if there is no such reason. */
 export function refusalNote(player: PlayerEntity, type: PickupType): string | null {
   const gun = AMMO_GUN[type];
-  const noRoomForAmmo = gun !== undefined && player.ammoBag[gun] >= WEAPONS[gun].reserveCap;
+  const noRoomForAmmo = gun !== undefined && player.ammoBag[gun] >= ammoCapOf(player, gun);
   const wastedBandage = type === 'bandage' && player.health >= player.maxHealth;
   const noRoomForMedkit = type === 'medkit' && player.medkits >= MEDKIT_MAX;
   const secondKnife = type === 'knife' && player.knife;

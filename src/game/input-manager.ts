@@ -1,3 +1,4 @@
+import type { KeepsakeId } from '../../shared/protocol.ts';
 import { WEAPON_ORDER } from '../../shared/protocol.ts';
 import type { ClientInputPacket, Stance, WeaponId } from '../../shared/protocol.ts';
 import { TouchInput } from './touch-input.ts';
@@ -110,6 +111,7 @@ export class InputManager {
   private molotovLatch = false;
   private flareLatch = false;
   private eatLatch = false;
+  private keepsakeLatch: KeepsakeId | null = null;
   private reloadLatch = false;
   private weaponLatch: WeaponId | null = null;
   private cycleLatch = 0;
@@ -166,6 +168,11 @@ export class InputManager {
     this.clearLatches();
   };
 
+  /** The keepsake card the player chose, sent with the next input. */
+  pickKeepsake(id: KeepsakeId): void {
+    this.keepsakeLatch = id;
+  }
+
   private clearLatches(): void {
     this.fireLatch = false;
     this.shoveLatch = false;
@@ -174,6 +181,7 @@ export class InputManager {
     this.molotovLatch = false;
     this.flareLatch = false;
     this.eatLatch = false;
+    this.keepsakeLatch = null;
     this.reloadLatch = false;
     this.weaponLatch = null;
     this.cycleLatch = 0;
@@ -236,6 +244,7 @@ export class InputManager {
       ...(this.molotovLatch ? { molotov: true } : {}),
       ...(this.flareLatch ? { flare: true } : {}),
       ...(this.eatLatch ? { eat: true } : {}),
+      ...(this.keepsakeLatch ? { keepsake: this.keepsakeLatch } : {}),
       search: this.isHeld([SEARCH_CODE]),
       ...(this.stance === 'sneak' ? { sneak: true } : {}),
       ...(this.stance === 'sprint' ? { sprint: true } : {}),

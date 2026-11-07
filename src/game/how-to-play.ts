@@ -80,6 +80,7 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
       'Search buildings for ammo, medkits and bandages.',
       'It is Halloween: houses and apartments hide the most candy. Carry two, press X to eat one, and it works for about a horde. A candy already working cannot be eaten twice.',
       'Sour Skulls reload twice as fast. Fang Taffy doubles your shove and knife. Ghost Gum makes sprinting silent. Pumpkin Fizz runs a quarter faster. Witch\'s Brittle heals 2 a kill. Bat Bites pierce. Candy Corn Rush holds a chain longer. A Jawbreaker halves damage. Black Licorice Lash makes heads easier to hit. A Caramel Apple picks you back up once. Popping Eyeballs light molotovs with no fuel. A rare Full-Size Bar does a little of everything for twenty seconds.',
+      'Reaching towns 3, 5, 7 and 9, you choose one of three keepsakes (J, K, L or a tap), yours for the rest of the run: a Lucky Rabbit\'s Foot, Worn Sneakers, a Bandolier, a Rosary, a Pocket Lighter, an Old Watch, a Trick-or-Treat Bag or Dog Tags.',
       'Low and empty ammo warnings show on the HUD.',
     ],
   },

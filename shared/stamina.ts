@@ -1,3 +1,4 @@
+import { hasKeepsake, SNEAKER_STAMINA } from './keepsakes.ts';
 // Sprinting costs breath. The bar drains while a survivor sprints on the move and refills when
 // they do not; run it dry and they walk until it is back past the re-arm mark. A faster survivor
 // (characters.ts moveSpeed) lasts longer, so the Speed stat on the select screen is the stamina stat too.
@@ -31,7 +32,8 @@ export function updateStamina(p: PlayerState): void {
 }
 
 function spend(p: PlayerState): void {
-  p.stamina = Math.max(0, p.stamina - TICK_DT / (SPRINT_DRAIN_SEC * characterOf(p.skin).moveSpeed));
+  const sneakers = hasKeepsake(p, 'sneakers') ? SNEAKER_STAMINA : 1;
+  p.stamina = Math.max(0, p.stamina - TICK_DT / (SPRINT_DRAIN_SEC * characterOf(p.skin).moveSpeed * sneakers));
   p.staminaRest = STAMINA_REGEN_DELAY_SEC;
   p.winded ||= p.stamina === 0;
 }

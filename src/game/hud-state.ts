@@ -1,3 +1,5 @@
+import { KEEPSAKES } from '../../shared/keepsakes.ts';
+import type { KeepsakeId } from '../../shared/protocol.ts';
 import { CANDIES } from '../../shared/candy.ts';
 import { BOSSES } from '../../shared/bosses.ts';
 import type { CalloutTone } from './kill-juice.ts';
@@ -42,6 +44,12 @@ export interface TeammateHud {
   readonly status: PlayerStatus;
 }
 
+export interface KeepsakeCard {
+  readonly id: KeepsakeId;
+  readonly name: string;
+  readonly blurb: string;
+}
+
 export interface HudState {
   readonly health: number;
   readonly maxHealth: number;
@@ -63,6 +71,10 @@ export interface HudState {
   readonly candy: readonly string[];
   /** Candy working now, with whole seconds left. */
   readonly sugar: readonly { readonly name: string; readonly left: number }[];
+  /** Keepsakes kept this run, by name. */
+  readonly keepsakes: readonly string[];
+  /** The three to choose one from, while the choice is open. */
+  readonly keepsakeOffer: readonly KeepsakeCard[] | null;
   readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
@@ -191,6 +203,8 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     flares: local.flares ?? 0,
     candy: (local.candy ?? []).map((id) => CANDIES[id].name),
     sugar: (local.sugar ?? []).map((sugar) => ({ name: CANDIES[sugar.id].name, left: Math.ceil(sugar.left) })),
+    keepsakes: (local.keepsakes ?? []).map((id) => KEEPSAKES[id].name),
+    keepsakeOffer: local.keepsakeOffer ? local.keepsakeOffer.map((id) => ({ id, name: KEEPSAKES[id].name, blurb: KEEPSAKES[id].blurb })) : null,
     knife: local.knife,
     reload: local.reload,
     score: local.score,

@@ -7,6 +7,7 @@ import type { DifficultyId } from './difficulty.ts';
 import type {
   BulletEntity,
   CandyId,
+  KeepsakeId,
   EntityId,
   GameEvent,
   GameOverStats,
@@ -59,7 +60,7 @@ export interface PlayerHome extends Omit<HomeView, 'overrun' | 'chest'> {
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home' | 'candy' | 'sugar'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home' | 'candy' | 'sugar' | 'keepsakes' | 'keepsakeOffer'> {
   bottles: number;
   /** Fuel for molotovs and flares to throw, found in town and left there (`shared/throwables.ts`). */
   fuel: number;
@@ -75,6 +76,10 @@ export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottl
   candy: CandyId[];
   sugar: SugarState[];
   eatQueued: boolean;
+  /** Kept for the run, and the three on offer while the choice is open (`shared/keepsakes.ts`). */
+  keepsakes: KeepsakeId[];
+  keepsakeOffer: KeepsakeId[] | null;
+  keepsakeQueued: KeepsakeId | null;
   parts: PartCounts;
   kits: KitCounts;
   /** Said so at the current workbench. */

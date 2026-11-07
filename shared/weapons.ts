@@ -1,3 +1,4 @@
+import { hasKeepsake, WATCH_RELOAD } from './keepsakes.ts';
 import { sugarOf } from './candy.ts';
 import { characterOf } from './characters.ts';
 import { DRY_FIRE_INTERVAL_SEC, MUZZLE_OFFSET, TICK_DT, WEAPON_SWITCH_DELAY_SEC } from './constants.ts';
@@ -33,7 +34,7 @@ function switchWeapon(sim: SimState, p: PlayerState): void {
 }
 
 function reloadSeconds(p: PlayerState): number {
-  return ((heldStats(p).reloadMs / 1000) * characterOf(p.skin).reloadTime) / (1 + sugarOf(p, 'sour_skulls'));
+  return ((heldStats(p).reloadMs / 1000) * characterOf(p.skin).reloadTime) / (1 + sugarOf(p, 'sour_skulls')) / (hasKeepsake(p, 'old_watch') ? WATCH_RELOAD : 1);
 }
 
 function startReload(sim: SimState, p: PlayerState): void {

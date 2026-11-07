@@ -81,6 +81,8 @@ export function restartRun(sim: SimState, fromLevel?: number): void {
     p.health = p.maxHealth;
     p.score = 0;
     p.kills = 0;
+    p.keepsakes = [];
+    p.keepsakeOffer = null;
     p.dryFireCooldown = 0;
     if (level > FIRST_LEVEL) giveReturnKit(p);
     else giveStartingLoadout(p);

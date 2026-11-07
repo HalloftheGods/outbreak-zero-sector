@@ -1,3 +1,4 @@
+import { KEEPSAKES } from '../../shared/keepsakes.ts';
 import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { ClientWorld } from './client-world.ts';
@@ -139,6 +140,8 @@ export class SnapshotHandler {
     runHud.onEvent(event, now);
     const ateIt = event.type === 'candy_eaten' && event.playerId === world.localId;
     if (ateIt) runHud.say(candyBanner(event.candy, event.saved === true), now);
+    const keptIt = event.type === 'keepsake_taken' && event.playerId === world.localId;
+    if (keptIt) runHud.say({ title: KEEPSAKES[event.keepsake].name.toUpperCase(), subtitle: 'KEPT FOR THE RUN', tone: 'hope' }, now);
   }
 
   enterGameOver(stats: GameOverStats, localId: string, now: number): void {

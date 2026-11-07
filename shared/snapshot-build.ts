@@ -102,6 +102,8 @@ export function playerSnapshot(p: PlayerState): PlayerEntity {
     ...(p.fuel > 0 ? { fuel: p.fuel } : {}),
     ...(p.flares > 0 ? { flares: p.flares } : {}),
     ...(p.candy.length > 0 ? { candy: [...p.candy] } : {}),
+    ...(p.keepsakes.length > 0 ? { keepsakes: [...p.keepsakes] } : {}),
+    ...(p.keepsakeOffer ? { keepsakeOffer: [...p.keepsakeOffer] } : {}),
     ...(p.sugar.length > 0 ? { sugar: p.sugar.map((sugar) => ({ id: sugar.id, left: round2(sugar.left) })) } : {}),
     ...staminaField(p),
     search: round2(p.search),

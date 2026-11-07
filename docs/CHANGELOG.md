@@ -2,6 +2,17 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Keepsakes
+
+### Added
+- Keepsakes (`shared/keepsakes.ts`), the slow, permanent side of the perks. Reaching towns 3, 5, 7 and 9, each survivor is offered three they do not have (drawn from the town seed and their id on a generator of its own) and keeps one for the rest of the run. An offer not taken is replaced at the next one, and a restart clears them.
+  - Lucky Rabbit's Foot (+15% chance an empty search turns something up), Worn Sneakers (sprint 20% longer), Bandolier (25% more spare ammo), Rosary (bleedout 1.5× longer), Pocket Lighter (molotov fires 1.5× longer), Old Watch (reload 10% faster), Trick-or-Treat Bag (carry 3 candies), Dog Tags (revive teammates twice as fast).
+- A "Choose a keepsake" card over the HUD, picked with a click, a tap, or J, K, L. The click never reaches the gun. A banner names the keepsake kept.
+- `keepsake_taken` event, `PlayerEntity.keepsakes` and `.keepsakeOffer`, and the `keepsake` input field.
+
+### Fixed
+- A remote player's `eat` input was dropped by the room's packet parser, so candy could not be eaten in online co-op. The parser now reads `eat` and `keepsake`.
+
 ## [2026-11-07] - Halloween candy
 
 ### Added
