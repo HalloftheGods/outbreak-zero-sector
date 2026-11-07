@@ -2,9 +2,9 @@ import { townContainers } from '../../shared/containers.ts';
 import { isBunkerMap } from '../../shared/home-protocol.ts';
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
 import type { BuildingInstance, BuildingKind, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
-import { dirFromAngle } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT, textWidth } from '../engine/bitmap-font.ts';
-import { drawArrow } from '../engine/overlay-renderer.ts';
+import { drawCursor } from './map-cursor.ts';
+import type { CursorClock } from './map-cursor.ts';
 import { isLandmark } from './run-notices.ts';
 
 /** Map pixels per world tile. 200 tiles makes a 400px map, which scales up by whole numbers. */
@@ -60,6 +60,7 @@ const BUILDING_COLOR: Record<BuildingKind, string> = {
   police: LAW,
   gun_shop: ARMS,
   grocery: FOOD,
+  discount: FOOD,
   diner: FOOD,
   garage: WORK,
   warehouse: WORK,
@@ -83,7 +84,6 @@ const DISTRICT_COLOR = '#938d7a';
 const LABEL_COLOR = '#e4dcc3';
 export const TICK_COLOR = '#b6e04a';
 export const CROSS_COLOR = '#e0463a';
-const SELF_COLOR = '#ffffff';
 const TEAM_COLOR = '#e8a33d';
 const DOWNED_COLOR = '#e0463a';
 
@@ -192,6 +192,9 @@ function placeLabel(
   }
   return false;
 }
+
+/** A cursor that holds still, with its full label: what a paint with no clock gets. */
+const STEADY_CLOCK: CursorClock = { nowMs: 0, openedMs: 0, reducedMotion: true };
 
 /** The town as a player would sketch it: streets, buildings by use, names, and where they have been. */
 export class TownMapView {
@@ -327,13 +330,9 @@ export class TownMapView {
     ctx.fillRect(midX, midY, 2, 2);
   }
 
-  private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerEntity, isLocal: boolean): void {
+  private drawTeammate(ctx: CanvasRenderingContext2D, player: PlayerEntity): void {
     const x = Math.round(player.x / this.worldPerPx);
     const y = Math.round(player.y / this.worldPerPx);
-    if (isLocal) {
-      drawArrow(ctx, { x, y, dir: dirFromAngle(player.angle) }, SELF_COLOR);
-      return;
-    }
     ctx.fillStyle = EDGE_COLOR;
     ctx.fillRect(x - 2, y - 2, 5, 5);
     ctx.fillStyle = player.status === 'alive' ? TEAM_COLOR : DOWNED_COLOR;
@@ -356,6 +355,7 @@ export class TownMapView {
     localId: EntityId | null,
     exit: ExitEntity | null = null,
     openedContainers: readonly number[] = [],
+    clock: CursorClock = STEADY_CLOCK,
   ): void {
     if (openedContainers.length > 0) this.syncOpened(openedContainers);
     ctx.drawImage(this.base, 0, 0);
@@ -366,9 +366,13 @@ export class TownMapView {
       this.drawTick(ctx, building);
     }
     if (exit) this.drawExit(ctx, exit);
-    for (const player of players) {
-      const stillOnTheMap = player.status !== 'dead';
-      if (stillOnTheMap) this.drawPlayer(ctx, player, player.id === localId);
+    const onMap = players.filter((player) => player.status !== 'dead');
+    for (const player of onMap) {
+      if (player.id !== localId) this.drawTeammate(ctx, player);
     }
+    // The local player goes last, so nobody's mark covers the cursor.
+    const local = onMap.find((player) => player.id === localId);
+    const hasLocal = local !== undefined;
+    if (hasLocal) drawCursor(ctx, Math.round(local.x / this.worldPerPx), Math.round(local.y / this.worldPerPx), local.angle, clock, this);
   }
 }

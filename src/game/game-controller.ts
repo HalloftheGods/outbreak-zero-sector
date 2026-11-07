@@ -421,6 +421,7 @@ export class GameController {
     const frozen = menuUp && transport?.kind === 'solo';
     if (frozen) {
       renderer.render({ ...this.lastScene, showCrosshair: false }, 0);
+      this.runHud.repaintMap(ms);
       return;
     }
     const dirX = this.input.dirX;

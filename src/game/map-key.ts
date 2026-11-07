@@ -1,7 +1,11 @@
 // The words beside the map screen. A town has districts, buildings to tick off and a van; the bunker has rooms and stations, so it gets its own key.
 
 import type { TransportKind } from '../network/transport.ts';
+import { CURSOR_COLOR } from './map-cursor.ts';
 import { BUNKER_LEGEND, TOWN_LEGEND } from './town-map.ts';
+
+/** The first line of every key: the blinking cursor on the map. */
+export const YOU_ARE_HERE: readonly [string, string] = [CURSOR_COLOR, 'You are here'];
 
 export interface MapKey {
   /** The screen's name and heading. */
@@ -15,8 +19,8 @@ export interface MapKey {
 
 const waitNoteOf = (place: string) => (mode: TransportKind) => (mode === 'solo' ? 'Paused.' : `The ${place} does not wait.`);
 
-const TOWN_KEY: MapKey = { title: 'Town map', legend: TOWN_LEGEND, marks: true, waitNote: waitNoteOf('town') };
-const BUNKER_KEY: MapKey = { title: 'Bunker map', legend: BUNKER_LEGEND, marks: false, waitNote: waitNoteOf('bunker') };
+const TOWN_KEY: MapKey = { title: 'Town map', legend: [YOU_ARE_HERE, ...TOWN_LEGEND], marks: true, waitNote: waitNoteOf('town') };
+const BUNKER_KEY: MapKey = { title: 'Bunker map', legend: [YOU_ARE_HERE, ...BUNKER_LEGEND], marks: false, waitNote: waitNoteOf('bunker') };
 
 export function mapKey(inBunker: boolean): MapKey {
   return inBunker ? BUNKER_KEY : TOWN_KEY;

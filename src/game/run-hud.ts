@@ -17,6 +17,13 @@ import { recordRun } from './storage.ts';
 import { TownMapView } from './town-map.ts';
 
 const HUD_INTERVAL_MS = 100;
+/** How often a held map repaints: fast enough for a 1.5 Hz blink, and rarely when nothing blinks. */
+const MAP_BLINK_REPAINT_MS = 50;
+const MAP_STILL_REPAINT_MS = 500;
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+}
 const SIGNAL_WEAK_MS = 1500;
 
 /** Everything a run has on screen, cleared at either end of it. */
@@ -78,6 +85,9 @@ export class RunHud {
   private town: TownMapView | null = null;
   private townCanvas: HTMLCanvasElement | null = null;
   private lastHudMs = 0;
+  /** When the open map first painted, so its cursor's long label knows how old it is. */
+  private mapOpenedMs: number | null = null;
+  private lastMapPaintMs = 0;
   /** The town the run is in, which is where a Radio's track belongs. */
   private level = 1;
   private lastScene: SceneView | null = null;
@@ -102,6 +112,7 @@ export class RunHud {
   /** The map screen hands over its canvas when it opens, and null when it closes. */
   attachTownCanvas(canvas: HTMLCanvasElement | null): void {
     this.townCanvas = canvas;
+    this.mapOpenedMs = null;
     const town = this.town;
     const canSize = canvas !== null && town !== null;
     if (canSize) {
@@ -111,11 +122,25 @@ export class RunHud {
     this.paintTown();
   }
 
-  private paintTown(): void {
+  /**
+   * A solo run stands still behind the map, so no tick comes to repaint it.
+   * Asked every frame, this repaints only the open map canvas, at the blink's pace.
+   */
+  repaintMap(ms: number): void {
+    const interval = prefersReducedMotion() ? MAP_STILL_REPAINT_MS : MAP_BLINK_REPAINT_MS;
+    const due = this.townCanvas !== null && ms - this.lastMapPaintMs >= interval;
+    if (due) this.paintTown(ms);
+  }
+
+  private paintTown(ms: number = this.lastHudMs): void {
+    this.lastMapPaintMs = ms;
     const ctx = this.townCanvas?.getContext('2d') ?? null;
     const scene = this.lastScene;
     const canPaint = ctx !== null && scene !== null;
-    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers);
+    if (!canPaint) return;
+    this.mapOpenedMs ??= ms;
+    const clock = { nowMs: ms, openedMs: this.mapOpenedMs, reducedMotion: prefersReducedMotion() };
+    this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers, clock);
   }
 
   onEvent(event: GameEvent, now: number): void {
@@ -178,7 +203,7 @@ export class RunHud {
     if (notDue) return;
     this.lastHudMs = ms;
     this.noticeSurroundings(renderer, world, ms);
-    this.paintTown();
+    this.paintTown(ms);
     const snapshot = world.latest;
     const local = world.localPlayer;
     const hasRun = snapshot !== null && local !== null;
