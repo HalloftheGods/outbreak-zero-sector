@@ -1,4 +1,4 @@
-// Mags the Gunsmith's shop-screen bust, matching her stall figure (merchants.ts LOOKS): a
+// Mags the Gunsmith's shop-screen bust, matching her stall figure (merchant-people/gunsmith.ts): a
 // seamed leather work cap pulled low, welding goggles pushed up on it with amber lenses
 // catching the light; a black jaw-length bob, one lock falling under the peak; a square adult
 // jaw, one brow cocked and a lopsided smirk; a smear of gun oil across her cheek. A leather

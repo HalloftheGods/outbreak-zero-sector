@@ -1,7 +1,7 @@
 // Doc the Medic's shop-screen bust: an adult in a pale bone-white coat with blood-red piping on
 // the lapels and a red cross on the breast, teal scrubs underneath. Dark hair swept across from a
 // side part, tired kind eyes under raised brows, a small closed smile, a tiny bandage on the lit
-// cheek, and a stethoscope draped around the neck. Same colours as the stall figure (LOOKS.medic).
+// cheek, and a stethoscope draped around the neck. Same colours as the stall figure (merchant-people/medic.ts).
 // Lit from the upper left like the survivor busts.
 
 import { RAMPS } from '../../palette.ts';

@@ -1,4 +1,4 @@
-// Cinder the Powder maker's shop portrait, matching the stall figure (merchants.ts LOOKS.powder):
+// Cinder the Powder maker's shop portrait, matching the stall figure (merchant-people/powder.ts):
 // a rust-orange coat under an ink hood, the ink scarf pulled down off the face and bunched at the
 // throat. An adult face: long jaw, soot swiped across one cheek, a crooked smirk and one brow
 // cocked. The singed fringe that pokes out of the hood ends in ember tips, and the eyes glow
