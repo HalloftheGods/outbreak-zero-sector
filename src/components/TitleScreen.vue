@@ -13,7 +13,7 @@
       </p>
       <MenuLink v-if="!privacyOpen" class="title-privacy" @press="openPrivacy()">Privacy</MenuLink>
     </footer>
-    <p class="title-version">v{{ APP_VERSION }}</p>
+    <MenuLink class="title-version" aria-label="What's new in this version" @press="nav = openPage(nav, 'changelog')">v{{ APP_VERSION }}</MenuLink>
   </section>
 
   <PlaySetup v-else-if="nav.page === 'play'" :ui :join="nav.invited" :level="nav.startLevel" @close="nav = closePlay(nav)" />
@@ -21,6 +21,7 @@
   <LevelsPage v-else-if="nav.page === 'levels'" :art="ui.art" @start="nav = pickLevel(nav, $event)" @close="close" />
   <HowToPlay v-else-if="nav.page === 'howto'" @close="close" />
   <RecordsPage v-else-if="nav.page === 'records'" :ui @close="close" />
+  <ChangelogPage v-else-if="nav.page === 'changelog'" :version="APP_VERSION" @close="close" />
   <SoundTestPage v-else-if="nav.page === 'sound'" @close="close" />
   <OptionsPage v-else :ui @close="close" />
 </template>
@@ -35,6 +36,7 @@ import { onlineRoomsLive } from '../network/play-api.ts';
 import { BRAND_MARK, STUDIO_LINE } from '../game/studio-splash.ts';
 import { TITLE_MENU } from '../game/title-menu.ts';
 import { closePage, closePlay, INVITE_LANDING, openPage, pickLevel, TITLE_HOME } from '../game/title-nav.ts';
+import ChangelogPage from './ChangelogPage.vue';
 import DailyPage from './DailyPage.vue';
 import HowToPlay from './HowToPlay.vue';
 import InstallCartridge from './InstallCartridge.vue';
@@ -108,8 +110,13 @@ function close(): void {
   position: absolute;
   bottom: calc(var(--u) * 2);
   left: calc(var(--u) * 3);
+  min-height: 44px;
   margin: 0;
+  padding-inline: calc(var(--u) * 2);
   color: var(--bone-dim);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.25em;
+  text-transform: none;
 }
 
 .title-credit {

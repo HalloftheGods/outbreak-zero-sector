@@ -2,6 +2,24 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - What's New book
+
+### Added
+- Clicking the version number in the title screen's corner opens What's New, a changelog printed like How to Play and the Record Book: a front page with the version and a contents list (each line jumps to its page), then every update two to a page, newest first, stamped New, Better or Fixed. Turned with Prev and Next, the arrow keys or a swipe; Esc or Back closes it.
+- The notes are written for players in `src/game/changelog.ts`. To add one, put a new `ChangeNote` at the top of `CHANGE_NOTES`; the pages and contents follow.
+
+### Changed
+- The Record Book and the changelog share their page turning (`src/game/book-turn.ts`, `src/components/use-book-pages.ts`).
+
+## [2026-11-07] - Run log
+
+### Added
+- A run log (`src/game/event-log.ts`): every callout, banner, title card, landmark, pickup and teammate going down or getting back up is written down with the run's clock, so it can still be read after the toast is gone. The same words again within a few seconds count up on one line ("CLOSE CALL ×3").
+- The newest five lines sit in the bottom-right corner, older ones dimmer (two lines on touch). Press L, or tap or click the corner, to open the whole log over the run, with tabs for Fights, Loot, Night and Team. The run keeps going underneath.
+
+### Changed
+- The gun bar moves to the bottom centre to make room for the log.
+
 ## [2026-11-07] - Back doors and rooms
 
 ### Added

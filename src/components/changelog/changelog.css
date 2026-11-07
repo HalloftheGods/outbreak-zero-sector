@@ -1,0 +1,142 @@
+/* The changelog: the How to Play magazine's paper, each update stamped New, Better or Fixed like a Record Book day. */
+
+.cl-leaf p,
+.cl-leaf h3,
+.cl-leaf ol,
+.cl-leaf ul {
+  margin: 0;
+  padding: 0;
+}
+
+/* The version, written in by hand under the title. */
+.cl-version {
+  font-family: var(--hand);
+  font-size: calc(var(--k) * 30);
+  line-height: 1;
+  color: var(--hand-ink, #1f3b8a);
+  transform: rotate(-2deg);
+  transform-origin: left center;
+}
+
+.cl-contents {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+.cl-contents-line {
+  display: grid;
+  grid-template-columns: calc(var(--k) * 64) 1fr auto;
+  align-items: baseline;
+  gap: calc(var(--k) * 10);
+  width: 100%;
+  padding: calc(var(--k) * 3) 0;
+  border: 0;
+  border-bottom: calc(var(--k) * 1) dotted var(--print-soft);
+  background: none;
+  color: var(--print);
+  font: inherit;
+  font-size: calc(var(--k) * 15);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-contents-line:hover,
+.cl-contents-line:focus-visible {
+  background: color-mix(in srgb, var(--band) 18%, transparent);
+  outline: none;
+}
+
+.cl-contents-title {
+  font-family: var(--book);
+}
+
+.cl-contents-page {
+  font-family: var(--chunky);
+  color: var(--band-deep);
+}
+
+/* A small label in the contents, coloured by what kind of change it is. */
+.cl-kind {
+  justify-self: start;
+  padding: 0 calc(var(--k) * 5);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 10);
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--print);
+}
+
+.cl-kind.is-new {
+  background: #dc2237;
+}
+
+.cl-kind.is-better {
+  background: #0f9c92;
+}
+
+.cl-kind.is-fixed {
+  background: #6a46b8;
+}
+
+/* Two notes to a page, split by a band-coloured rule. */
+.cl-notes {
+  gap: calc(var(--k) * 18);
+}
+
+.cl-note {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 6);
+}
+
+.cl-note + .cl-note {
+  padding-top: calc(var(--k) * 16);
+  border-top: calc(var(--k) * 4) solid var(--band);
+}
+
+.cl-note .mag-head-kicker {
+  align-self: flex-start;
+}
+
+.cl-leaf .cl-title {
+  padding-right: calc(var(--k) * 150);
+  font-family: var(--chunky);
+  font-size: calc(var(--k) * 30);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--print);
+  text-shadow: calc(var(--k) * 2) calc(var(--k) * 2) 0 var(--band);
+}
+
+.cl-stamp {
+  top: calc(var(--k) * 4);
+}
+
+.cl-note + .cl-note .cl-stamp {
+  top: calc(var(--k) * 20);
+}
+
+.cl-stamp.is-better {
+  color: #0a6a64;
+}
+
+.cl-stamp.is-fixed {
+  color: #442a80;
+}
+
+.cl-points {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 5);
+  padding-left: calc(var(--k) * 20) !important;
+  font-family: var(--book);
+  font-size: calc(var(--k) * 16);
+  line-height: 1.3;
+  color: var(--print);
+}
+
+.cl-points li::marker {
+  color: var(--band-deep);
+}

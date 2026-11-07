@@ -1,4 +1,5 @@
 import { KEEPSAKES } from '../../shared/keepsakes.ts';
+import { displayName } from '../../shared/callsign.ts';
 import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { ClientWorld } from './client-world.ts';
@@ -129,15 +130,20 @@ export class SnapshotHandler {
   onGameEvent(event: GameEvent, world: ClientWorld, now: number, before: PlayerEntity | null, after: PlayerEntity | null): void {
     const { audio, renderer, runHud } = this.host;
     audio.handleEvent(event, world.localId);
+    const note = event.type === 'pickup' ? pickupNote(event.pickup, before, after) : undefined;
     renderer?.handleEvent(event, {
       localId: world.localId,
       localX: world.predictor.x,
       localY: world.predictor.y,
-      pickupNote: event.type === 'pickup' ? pickupNote(event.pickup, before, after) : undefined,
+      pickupNote: note,
     });
     const music = EVENT_MUSIC[event.type];
     if (music) audio.setScene(music);
-    runHud.onEvent(event, now);
+    const nameOf = (id: string): string | null => {
+      const player = after?.id === id ? after : world.latest?.players.find((each) => each.id === id);
+      return player ? displayName(player.name, player.skin) : null;
+    };
+    runHud.onEvent(event, now, { localId: world.localId, nameOf, ...(note ? { pickupNote: note } : {}) });
     const ateIt = event.type === 'candy_eaten' && event.playerId === world.localId;
     if (ateIt) runHud.say(candyBanner(event.candy, event.saved === true), now);
     const keptIt = event.type === 'keepsake_taken' && event.playerId === world.localId;
