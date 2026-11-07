@@ -54,7 +54,8 @@ const touchOnly = isTouchDevice();
 const stayStill = holdsStill(touchOnly, wantsCalm);
 
 function setTile(index: number, el: unknown): void {
-  if (el instanceof HTMLElement) tiles.set(index, el);
+  const isTile = el instanceof HTMLElement;
+  if (isTile) tiles.set(index, el);
 }
 
 function shownFor(survivor: SurvivorArt, index: number) {
@@ -88,7 +89,8 @@ function pick(index: number): void {
 
 function onKey(event: KeyboardEvent): void {
   const next = rosterStep(chosen, event.key);
-  if (next === null) return;
+  const isNotRosterKey = next === null;
+  if (isNotRosterKey) return;
   event.preventDefault();
   pick(next);
   tiles.get(next)?.focus();

@@ -30,7 +30,8 @@ const phase = ref<'in' | 'hold' | 'out'>('in');
 const timers = new Set<ReturnType<typeof setTimeout>>();
 
 function after(ms: number, then: () => void): void {
-  timers.add(setTimeout(then, ms));
+  const timer = setTimeout(then, ms);
+  timers.add(timer);
 }
 
 function clearTimers(): void {

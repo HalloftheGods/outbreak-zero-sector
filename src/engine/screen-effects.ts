@@ -26,7 +26,8 @@ function buildVignette(width: number, height: number): HTMLCanvasElement {
       const nx = (x / width) * 2 - 1;
       const ny = (y / height) * 2 - 1;
       const density = smoothstep(0.55, 1.15, Math.hypot(nx, ny));
-      if (density <= bayerThreshold(x, y)) continue;
+      const isClear = density <= bayerThreshold(x, y);
+      if (isClear) continue;
       const i = (y * width + x) * 4;
       image.data[i] = VIGNETTE_RGB[0];
       image.data[i + 1] = VIGNETTE_RGB[1];
@@ -110,7 +111,8 @@ export class ScreenEffects {
 
   private vignetteStrength(): number {
     let lowHealth = 0;
-    if (this.health > 0 && this.health < LOW_HEALTH) {
+    const isLowHealth = this.health > 0 && this.health < LOW_HEALTH;
+    if (isLowHealth) {
       const severity = 1 - this.health / LOW_HEALTH;
       const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.45 * Math.sin(this.time * 6);
       lowHealth = (0.25 + 0.5 * severity) * pulse;
@@ -119,7 +121,8 @@ export class ScreenEffects {
   }
 
   draw(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    if (this.desaturation > 0.01) {
+    const isDesaturated = this.desaturation > 0.01;
+    if (isDesaturated) {
       ctx.globalCompositeOperation = 'saturation';
       ctx.globalAlpha = this.desaturation;
       ctx.fillStyle = '#808080';
@@ -127,11 +130,14 @@ export class ScreenEffects {
       ctx.globalCompositeOperation = 'source-over';
     }
     const strength = this.vignetteStrength();
-    if (strength > 0.01 && this.vignette) {
+    const vignette = this.vignette;
+    const hasVignette = strength > 0.01 && vignette;
+    if (hasVignette) {
       ctx.globalAlpha = strength;
-      ctx.drawImage(this.vignette, 0, 0);
+      ctx.drawImage(vignette, 0, 0);
     }
-    if (this.flash > 0.01) {
+    const isFlashing = this.flash > 0.01;
+    if (isFlashing) {
       ctx.globalAlpha = this.flash * 0.6;
       ctx.fillStyle = '#fff4dc';
       ctx.fillRect(0, 0, width, height);
