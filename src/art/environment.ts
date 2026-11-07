@@ -8,6 +8,7 @@ import { buildFridge, buildLocker } from './containers/shelving.ts';
 import { buildForge, buildJukebox, buildLevelMap } from './environment/bunker-props.ts';
 import { buildClinic } from './environment/clinic.ts';
 import { buildDiner } from './environment/diner.ts';
+import { buildDiscount } from './environment/discount.ts';
 import { buildInterior } from './environment/floors.ts';
 import { buildBed, buildCounter, buildShelf, buildSofa, buildTable, buildWorkbench } from './environment/furniture.ts';
 import { buildGarage } from './environment/garage.ts';
@@ -85,6 +86,7 @@ export function buildEnvironment(): EnvironmentArt {
       police: [buildPolice()],
       gun_shop: [buildGunShop()],
       grocery: [buildGrocery()],
+      discount: [buildDiscount()],
       diner: [buildDiner()],
       garage: [buildGarage()],
       warehouse: [buildSteelWarehouse(), buildBrickWarehouse()],

@@ -45,6 +45,8 @@ export const LOOT_RULES: Record<BuildingKind, LootRule> = {
   garage: { items: [0, 2], table: { pistol_ammo: 3, shells: 1, bandage: 1, knife: 0.4 } },
   warehouse: { items: [0, 2], table: { pistol_ammo: 3, carbine_ammo: 1, shells: 1, bandage: 1 } },
   grocery: { items: [0, 2], table: { bandage: 3, pistol_ammo: 1 }, smallAmmo: true },
+  // Cheap goods off the shelves: mostly first aid, the odd knife, a half box of rounds.
+  discount: { items: [0, 2], table: { bandage: 3, pistol_ammo: 1, knife: 0.3 }, smallAmmo: true },
   diner: { items: [0, 1], table: { bandage: 2, pistol_ammo: 1, knife: 0.3 }, smallAmmo: true },
   house: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2, knife: 0.05 }, smallAmmo: true },
   apartment: { items: [-1, 1], table: { bandage: 3, pistol_ammo: 2 }, smallAmmo: true },

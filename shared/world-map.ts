@@ -6,7 +6,7 @@ import { biomeFor } from './biomes.ts';
 import { MapBuilder } from './map-builder.ts';
 import { createRng, randRange } from './rng.ts';
 import type { Rng } from './rng.ts';
-import { raiseBuildings } from './town-buildings.ts';
+import { hasDiscountStore, raiseBuildings } from './town-buildings.ts';
 import { raiseTownPieces } from './town-pieces.ts';
 import { EDGE_TILES, MAP_TILES, planTown, rectBox } from './town-plan.ts';
 import { dressStreets, paintStreets } from './town-streets.ts';
@@ -129,7 +129,7 @@ export function generateWorldMap(seed: number, level = 1): WorldMap {
   fillPark(builder, rectBox(plan.park));
   const roadMask = paintStreets(builder, plan.roads);
   raiseFence(builder);
-  raiseBuildings(builder, plan);
+  raiseBuildings(builder, plan, hasDiscountStore(seed));
   dressStreets(builder, plan.roads, roadMask);
   raiseTownPieces(builder, plan);
 

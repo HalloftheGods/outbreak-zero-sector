@@ -2,7 +2,7 @@ import { furnish } from './building-interiors.ts';
 import { BUILDING_DEFS, DOOR_WIDTH, TILE_SIZE } from './protocol.ts';
 import type { BuildingKind, TileKind } from './protocol.ts';
 import type { MapBuilder } from './map-builder.ts';
-import { pick, randInt } from './rng.ts';
+import { createRng, pick, randInt } from './rng.ts';
 import { EDGE_TILES, MAP_TILES, WALK_TILES, rectBox } from './town-plan.ts';
 import type { Block, TownPlan, TownStyle } from './town-plan.ts';
 import { fillCamp, fillParking } from './world-blocks.ts';
@@ -15,6 +15,15 @@ const LANE_PAVED_TILES = 2;
 const DOOR_APRON_TILES = 3;
 const FORECOURT_W_TILES = 7;
 const FORECOURT_H_TILES = 5;
+
+/** The town's one S.O.S. Discount, when it has one: downtown's first plot once every wish there stands. */
+const STORE: BuildingKind = 'discount';
+const STORE_DISTRICT: TownStyle = 'downtown';
+const STORE_ODDS = 2 / 3;
+/** Off the town's seed, so a town without the store is laid out exactly as it was before there was one. */
+const STORE_SALT = 0x5050;
+
+export const hasDiscountStore = (seed: number): boolean => createRng(seed ^ STORE_SALT)() < STORE_ODDS;
 
 interface DistrictStyle {
   readonly ground: TileKind;
@@ -78,11 +87,13 @@ const widthOf = (kind: BuildingKind): number => BUILDING_DEFS[kind].w / TILE_SIZ
 const heightOf = (kind: BuildingKind): number => BUILDING_DEFS[kind].h / TILE_SIZE;
 const plotWidth = (kind: BuildingKind): number => widthOf(kind) + (kind === 'garage' ? FORECOURT_W_TILES : 0);
 
-/** The next building that fits, wishes before fillers. */
-function nextKind(b: MapBuilder, style: DistrictStyle, wishes: BuildingKind[], room: number, height: number): BuildingKind | null {
+/** The next building that fits: wishes, then a late arrival once every wish stands, then fillers. */
+function nextKind(b: MapBuilder, style: DistrictStyle, wishes: BuildingKind[], late: BuildingKind[], room: number, height: number): BuildingKind | null {
   const fits = (kind: BuildingKind): boolean => plotWidth(kind) <= room && heightOf(kind) <= height;
   const wished = wishes.findIndex(fits);
   if (wished >= 0) return wishes.splice(wished, 1)[0];
+  const arrived = wishes.length === 0 ? late.findIndex(fits) : -1;
+  if (arrived >= 0) return late.splice(arrived, 1)[0];
   const fillers = style.fillers.filter(fits);
   return fillers.length > 0 ? pick(b.rng, fillers) : null;
 }
@@ -110,14 +121,14 @@ function raise(b: MapBuilder, kind: BuildingKind, col: number, bottom: number, w
 }
 
 /** Packs one row of buildings against `bottom`. Returns the row's top edge, or null if nothing fit. */
-function packRow(b: MapBuilder, block: Block, style: DistrictStyle, bottom: number, walkDown: number, wishes: BuildingKind[]): number | null {
+function packRow(b: MapBuilder, block: Block, style: DistrictStyle, bottom: number, walkDown: number, wishes: BuildingKind[], late: BuildingKind[]): number | null {
   const height = bottom - block.r0;
   let cursor = block.c0 + randInt(b.rng, 0, 2);
   let top: number | null = null;
   for (;;) {
     const leaveVacant = wishes.length === 0 && b.rng() < style.vacancy;
     if (leaveVacant) cursor += randInt(b.rng, 3, 6);
-    const kind = nextKind(b, style, wishes, block.c1 - cursor, height);
+    const kind = nextKind(b, style, wishes, late, block.c1 - cursor, height);
     if (!kind) return top;
     raise(b, kind, cursor, bottom, walkDown);
     top = Math.min(top ?? bottom, bottom - heightOf(kind));
@@ -126,7 +137,7 @@ function packRow(b: MapBuilder, block: Block, style: DistrictStyle, bottom: numb
 }
 
 /** Rows run from the south edge, each with its doors on a paved lane or the street. */
-function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: BuildingKind[]): void {
+function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: BuildingKind[], late: BuildingKind[]): void {
   const area = rectBox(block);
   b.fill(area, style.ground === 'grass' ? b.biome.ground : style.ground);
   // No street runs along the fence, so doors facing it get a path of their own.
@@ -135,7 +146,7 @@ function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: Bu
   let bottom = block.r1 - style.front;
   let walkDown = style.front;
   for (;;) {
-    const top = packRow(b, block, style, bottom, walkDown, wishes);
+    const top = packRow(b, block, style, bottom, walkDown, wishes, late);
     if (top === null) break;
     bottom = top - LANE_TILES;
     if (bottom <= block.r0) break;
@@ -146,8 +157,11 @@ function fillBlock(b: MapBuilder, block: Block, style: DistrictStyle, wishes: Bu
   for (const [kind, count, onlyOn] of [...style.clutter, ...b.biome.extra]) b.flora(kind, area, Math.ceil(count * scale), undefined, onlyOn);
 }
 
-/** Fills every block; the farthest in two districts stay open as a car park and a camp. */
-export function raiseBuildings(b: MapBuilder, plan: TownPlan): void {
+/**
+ * Fills every block; the farthest in two districts stay open as a car park and a camp. A store
+ * that finds no plot in its district is left out rather than carried on.
+ */
+export function raiseBuildings(b: MapBuilder, plan: TownPlan, store = false): void {
   const distance = (block: Block): number =>
     Math.hypot(((block.c0 + block.c1) / 2) * TILE_SIZE - plan.spawn.x, ((block.r0 + block.r1) / 2) * TILE_SIZE - plan.spawn.y);
   let carried: BuildingKind[] = [];
@@ -156,7 +170,8 @@ export function raiseBuildings(b: MapBuilder, plan: TownPlan): void {
     const blocks = plan.blocks.filter((block) => block.style === name).sort((a, c) => distance(a) - distance(c));
     const wishes = [...carried, ...style.wishes];
     const openLot = name === 'downtown' || name === 'riverside' ? blocks.pop() : undefined;
-    for (const block of blocks) fillBlock(b, block, style, wishes);
+    const late: BuildingKind[] = store && name === STORE_DISTRICT ? [STORE] : [];
+    for (const block of blocks) fillBlock(b, block, style, wishes, late);
     if (openLot) {
       if (name === 'downtown') fillParking(b, rectBox(openLot));
       else fillCamp(b, rectBox(openLot));

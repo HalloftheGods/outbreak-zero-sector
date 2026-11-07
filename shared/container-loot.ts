@@ -28,6 +28,7 @@ export const CONTAINER_LOOT: Record<BuildingKind | 'outdoors', ContainerLootRule
   garage: { odds: 0.25, table: { pistol_ammo: 1.2, shells: 0.6, bandage: 2, knife: 1.5 } },
   warehouse: { odds: 0.18, table: { bandage: 2, pistol_ammo: 1, shells: 0.5 } },
   grocery: { odds: 0.2, table: { bandage: 4, pistol_ammo: 0.5 } },
+  discount: { odds: 0.22, table: { bandage: 3, pistol_ammo: 0.8, knife: 1, shells: 0.2 } },
   pharmacy: { odds: 0.35, table: { bandage: 3, medkit: 2 } },
   clinic: { odds: 0.35, table: { bandage: 3, medkit: 2 } },
   police: { odds: 0.3, table: { pistol_ammo: 3, carbine_ammo: 3, shells: 1 } },

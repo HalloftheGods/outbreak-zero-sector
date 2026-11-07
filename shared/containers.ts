@@ -67,6 +67,7 @@ const ROOM_CONTAINERS: Record<BuildingKind, Partial<Record<PropKind, ContainerKi
   garage: { locker: 'locker', workbench: 'cabinet', shelf: 'shelf', car_sedan_h: 'car', crate_stack: 'box' },
   warehouse: { workbench: 'cabinet', shelf: 'shelf', crate_stack: 'box' },
   grocery: { counter: 'cabinet', shelf: 'shelf' },
+  discount: { counter: 'cabinet', shelf: 'shelf', crate_stack: 'box', locker: 'locker' },
   pharmacy: { counter: 'cabinet' },
   clinic: { locker: 'locker', counter: 'cabinet', shelf: 'shelf' },
   police: { locker: 'locker', counter: 'cabinet', shelf: 'shelf' },

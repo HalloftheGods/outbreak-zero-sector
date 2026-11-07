@@ -46,6 +46,14 @@ const LAYOUTS: Record<BuildingKind, readonly Slot[]> = {
     ['shelf', 96, 96], ['shelf', 128, 96], ['shelf', 160, 96],
     ['counter', 16, 60],
   ],
+  discount: [
+    // Stockroom in the back corner: cartons and the locked cabinet.
+    ['crate_stack', 10, 22], ['locker', 34, NORTH_WALL], ['crate_stack', 10, 62, 0.6],
+    ['shelf', 74, NORTH_WALL], ['shelf', 106, NORTH_WALL], ['shelf', 138, NORTH_WALL],
+    ['shelf', 74, 50], ['shelf', 106, 50],
+    // The checkout, just inside the door, against the front wall.
+    ['counter', 80, 95], ['shelf', 136, 95, 0.6],
+  ],
   diner: [
     ['fridge', 14, NORTH_WALL], ['counter', 32, NORTH_DEEP], ['fridge', 85, NORTH_WALL], ['counter', 106, NORTH_DEEP],
     ['table', 72, 64], ['table', 128, 64],
