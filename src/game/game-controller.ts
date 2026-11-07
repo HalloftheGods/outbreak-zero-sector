@@ -33,12 +33,13 @@ import { newRunState, RunSession } from './run-session.ts';
 import type { RunHost, RunState } from './run-session.ts';
 import { RunStage } from './run-stage.ts';
 import { SnapshotHandler } from './snapshot-handler.ts';
-import { DEFAULT_PREFS, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
+import { browserStore, DEFAULT_PREFS, loadLeaderboard, loadPrefs, savePrefs } from './storage.ts';
 import { loadStyle, saveStyle } from './style-pref.ts';
 import { loadBests } from './trip-record.ts';
 import { isTouchDevice } from './touch-input.ts';
 import { touchMarks } from './touch-marks.ts';
 import { fitWindow, watchDpr } from './view-fit.ts';
+import { applyPalette, loadDisplayPrefs, saveDisplayPrefs, UI_SCALES, type PaletteId, type UiScale } from './display-prefs.ts';
 
 
 const GAME_OVER_BEAT_MS = 1800;
@@ -88,6 +89,8 @@ export class GameController {
 
   constructor(options: GameControllerOptions = {}) {
     const prefs = loadPrefs();
+    const display = loadDisplayPrefs(browserStore());
+    applyPalette(display.palette);
     this.ui = shallowRef<UiState>({
       touch: isTouchDevice(),
       screen: 'title',
@@ -106,7 +109,10 @@ export class GameController {
       serverAddress: prefs.serverAddress,
       onlineRoom: null,
       volume: this.audio.volume,
+      musicVolume: this.audio.musicVolume,
+      sfxVolume: this.audio.sfxVolume,
       muted: this.audio.muted,
+      ...display,
     });
     this.homeLink = new HomeLink({ store: options.homeStore ?? createBrowserHomeStore, host: this.homeHost() });
     this.home = this.homeLink.actions;
@@ -195,7 +201,7 @@ export class GameController {
   private stopDprWatch: () => void = () => {};
 
   private readonly onResize = (): void => {
-    fitWindow(this.renderer, this.run.transport?.kind === 'coop', this.ui.value.touch);
+    fitWindow(this.renderer, this.run.transport?.kind === 'coop', this.ui.value.touch, UI_SCALES[this.ui.value.uiScale]);
   };
 
   /** A hidden tab gets no frames, so solo would otherwise be eaten alive unseen. */
@@ -239,6 +245,35 @@ export class GameController {
   setVolume(volume: number): void {
     this.audio.volume = volume;
     this.publish({ volume });
+  }
+
+  setMusicVolume(musicVolume: number): void {
+    this.audio.musicVolume = musicVolume;
+    this.publish({ musicVolume });
+  }
+
+  setSfxVolume(sfxVolume: number): void {
+    this.audio.sfxVolume = sfxVolume;
+    this.publish({ sfxVolume });
+  }
+
+  /** Hit and danger colors: the classic red and green, or a pair that reads for red-green colorblind players. */
+  setPalette(palette: PaletteId): void {
+    applyPalette(palette);
+    this.publish({ palette });
+    this.saveDisplay();
+  }
+
+  /** The HUD and menus, bigger for a small phone screen. */
+  setUiScale(uiScale: UiScale): void {
+    this.publish({ uiScale });
+    this.saveDisplay();
+    this.onResize();
+  }
+
+  private saveDisplay(): void {
+    const { palette, uiScale } = this.ui.value;
+    saveDisplayPrefs(browserStore(), { palette, uiScale });
   }
 
   toggleMute(): void {

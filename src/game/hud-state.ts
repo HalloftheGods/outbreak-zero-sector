@@ -1,3 +1,4 @@
+import type { PaletteId, UiScale } from './display-prefs.ts';
 import { KEEPSAKES } from '../../shared/keepsakes.ts';
 import type { KeepsakeId } from '../../shared/protocol.ts';
 import { CANDIES } from '../../shared/candy.ts';
@@ -187,7 +188,12 @@ export interface UiState {
   /** The code of the online room this tab is hosting, for the host to share; null otherwise. */
   readonly onlineRoom: string | null;
   readonly volume: number;
+  /** Music and sound effects, each a share of volume. */
+  readonly musicVolume: number;
+  readonly sfxVolume: number;
   readonly muted: boolean;
+  readonly palette: PaletteId;
+  readonly uiScale: UiScale;
 }
 
 export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectating: string | null): HudState {
