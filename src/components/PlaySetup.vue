@@ -1,5 +1,9 @@
 <template>
-  <TitlePage :heading size="extra-wide" @close="back">
+  <TitlePage :heading size="extra-wide" boxed steady @close="back">
+    <template #lead>
+      <SetupStepper :stops="stepper" @pick="jump" />
+    </template>
+
     <StyleSelect v-if="flow.step === 'style'" ref="styles" :art="ui.art" :game-style="ui.style" @choose="chooseStyle" />
 
     <template v-else-if="flow.step === 'mode'">
@@ -55,7 +59,7 @@
     </template>
 
     <template #actions>
-      <MenuLink v-if="!startsRun(flow)" @press="next">Next</MenuLink>
+      <PixelButton v-if="!startsRun(flow)" @press="next">Next</PixelButton>
       <template v-else>
         <PixelButton primary silent :disabled="!ready" @press="start">{{ actionLabel }}</PixelButton>
         <PixelButton v-if="resumeAt !== null && !multi && runStyle === 'arcade'" :disabled="!ready" @press="game.continueSolo()">
@@ -76,14 +80,14 @@ import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
 import { buildInviteLink } from '../game/invite-link.ts';
 import { chosenStartLevel, continueLevel, isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
-import { advance, chooseMode, claimedStyle, playHeading, retreat, setupFailure, setupStyle, showsServer, showsStyleLabel, startFlow, startsRun, STYLE_LABELS } from '../game/play-flow.ts';
-import type { PlayMode } from '../game/play-flow.ts';
+import { advance, chooseMode, claimedStyle, playHeading, playStepper, retreat, returnTo, setupFailure, setupStyle, showsServer, showsStyleLabel, startFlow, startsRun, STYLE_LABELS } from '../game/play-flow.ts';
+import type { PlayMode, PlayStep } from '../game/play-flow.ts';
 import { setupActionLabel } from '../game/title-menu.ts';
 import CharacterSelect from './CharacterSelect.vue';
 import DifficultySelect from './DifficultySelect.vue';
-import MenuLink from './MenuLink.vue';
 import ModeSelect from './ModeSelect.vue';
 import PixelButton from './PixelButton.vue';
+import SetupStepper from './SetupStepper.vue';
 import StyleSelect from './StyleSelect.vue';
 import TitlePage from './TitlePage.vue';
 import { useGame } from './use-game.ts';
@@ -111,6 +115,7 @@ const levelLines = computed(() => setupLevelLines({ style: shownStyle.value, mul
 const startLine = computed(() => levelLines.value.startLine);
 const coopNote = computed(() => levelLines.value.coopNote);
 const heading = computed(() => playHeading(flow.value));
+const stepper = computed(() => playStepper(flow.value));
 /** Co-op on either step: the mode decides how the run starts. The server field shows on the first step only. */
 const multi = computed(() => flow.value.mode === 'multi');
 const serverShown = computed(() => showsServer(flow.value));
@@ -166,6 +171,12 @@ function focusStep(): void {
 function next(event?: Event): void {
   if (event instanceof KeyboardEvent && event.repeat) return;
   flow.value = advance(flow.value);
+  focusStep();
+}
+
+/** A done step picked on the stepper: straight back to it, the keyboard landing on its choice. */
+function jump(step: PlayStep): void {
+  flow.value = returnTo(flow.value, step);
   focusStep();
 }
 

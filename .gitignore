@@ -4,3 +4,5 @@ dist
 !.vite/.gitkeep
 *.tsbuildinfo
 .vitest/
+# Chemical X local telemetry & audit history
+.chemx/

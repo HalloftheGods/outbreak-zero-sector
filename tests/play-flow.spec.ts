@@ -9,6 +9,8 @@ import {
   PLAY_LEVEL,
   PLAY_START,
   playHeading,
+  playStepper,
+  returnTo,
   playSteps,
   retreat,
   setupFailure,
@@ -82,8 +84,8 @@ describe('play flow', () => {
 
   it('titles each step', () => {
     expect(playHeading(PLAY_START)).toBe('Choose Style');
-    expect(playHeading(advance(PLAY_START))).toBe('Play');
-    expect(playHeading(advance(advance(PLAY_START)))).toBe('Difficulty');
+    expect(playHeading(advance(PLAY_START))).toBe('Choose Mode');
+    expect(playHeading(advance(advance(PLAY_START)))).toBe('Choose Difficulty');
     expect(playHeading(advance(advance(advance(PLAY_START))))).toBe('Choose Survivor');
   });
 
@@ -122,5 +124,33 @@ describe('play flow', () => {
     expect(continuesAfterDeath('solo', 'campaign')).toBe(false);
     expect(continuesAfterDeath('solo', null)).toBe(false);
     expect(continuesAfterDeath('coop', 'arcade')).toBe(false);
+  });
+
+  it('lays out the stepper: done steps behind, the current one lit, the rest ahead', () => {
+    const third = advance(advance(PLAY_START));
+    expect(playStepper(third)).toEqual([
+      { step: 'style', label: 'Style', number: 1, state: 'done' },
+      { step: 'mode', label: 'Mode', number: 2, state: 'done' },
+      { step: 'difficulty', label: 'Difficulty', number: 3, state: 'current' },
+      { step: 'who', label: 'Survivor', number: 4, state: 'next' },
+    ]);
+  });
+
+  it('numbers the stepper from the first step this walk has', () => {
+    expect(playStepper(PLAY_LEVEL).map((each) => [each.number, each.step, each.state])).toEqual([
+      [1, 'mode', 'current'],
+      [2, 'difficulty', 'next'],
+      [3, 'who', 'next'],
+    ]);
+  });
+
+  it('jumps back to a done step from the stepper, but never forward or off the walk', () => {
+    const fourth = chooseMode(advance(advance(advance(PLAY_START))), 'multi');
+    expect(returnTo(fourth, 'mode')).toEqual({ step: 'mode', mode: 'multi', styled: true });
+    expect(returnTo(fourth, 'style')).toEqual({ step: 'style', mode: 'multi', styled: true });
+    expect(returnTo(fourth, 'who')).toBe(fourth);
+    const second = advance(PLAY_START);
+    expect(returnTo(second, 'difficulty')).toBe(second);
+    expect(returnTo(advance(PLAY_LEVEL), 'style')).toEqual(advance(PLAY_LEVEL));
   });
 });
