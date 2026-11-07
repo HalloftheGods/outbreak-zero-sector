@@ -1,7 +1,7 @@
 import { townContainers } from '../../shared/containers.ts';
 import { isBunkerMap } from '../../shared/home-protocol.ts';
 import { BUILDING_DEFS, TILE_KINDS, TILE_SIZE } from '../../shared/protocol.ts';
-import type { BuildingInstance, BuildingKind, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
+import type { BuildingInstance, BuildingKind, DropView, EntityId, ExitEntity, PlayerEntity, TileKind, WorldMap } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import { drawOutlinedText, FONT_HEIGHT, textWidth } from '../engine/bitmap-font.ts';
 import { drawArrow } from '../engine/overlay-renderer.ts';
@@ -52,6 +52,7 @@ const LAW = '#4a78a8';
 const FOOD = '#5c9450';
 const WORK = '#86745a';
 const HOMES = '#4c4c56';
+const DROP_COLOR = '#e0463a';
 export const EXIT_COLOR = '#ffc03c';
 
 const BUILDING_COLOR: Record<BuildingKind, string> = {
@@ -76,6 +77,7 @@ export const TOWN_LEGEND: readonly (readonly [string, string])[] = [
   [FOOD, 'Food'],
   [HOMES, 'Homes'],
   [EXIT_COLOR, 'The van, once it comes'],
+  [DROP_COLOR, 'A supply drop'],
 ];
 
 const EDGE_COLOR = '#0b0c10';
@@ -340,6 +342,17 @@ export class TownMapView {
     ctx.fillRect(x - 1, y - 1, 3, 3);
   }
 
+  /** A red box where the supply drop is coming down, or came down. */
+  private drawDrop(ctx: CanvasRenderingContext2D, drop: DropView): void {
+    const x = Math.round(drop.x / this.worldPerPx);
+    const y = Math.round(drop.y / this.worldPerPx);
+    ctx.fillStyle = EDGE_COLOR;
+    ctx.fillRect(x - 4, y - 4, 9, 9);
+    ctx.fillStyle = DROP_COLOR;
+    ctx.fillRect(x - 3, y - 3, 7, 7);
+    drawOutlinedText(ctx, drop.landed ? 'SUPPLIES' : 'DROP', x, y - 5 - FONT_HEIGHT, DROP_COLOR);
+  }
+
   private drawExit(ctx: CanvasRenderingContext2D, exit: ExitEntity): void {
     const x = Math.round(exit.x / this.worldPerPx);
     const y = Math.round(exit.y / this.worldPerPx);
@@ -356,6 +369,7 @@ export class TownMapView {
     localId: EntityId | null,
     exit: ExitEntity | null = null,
     openedContainers: readonly number[] = [],
+    drop: DropView | null = null,
   ): void {
     if (openedContainers.length > 0) this.syncOpened(openedContainers);
     ctx.drawImage(this.base, 0, 0);
@@ -366,6 +380,7 @@ export class TownMapView {
       this.drawTick(ctx, building);
     }
     if (exit) this.drawExit(ctx, exit);
+    if (drop) this.drawDrop(ctx, drop);
     for (const player of players) {
       const stillOnTheMap = player.status !== 'dead';
       if (stillOnTheMap) this.drawPlayer(ctx, player, player.id === localId);

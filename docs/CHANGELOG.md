@@ -2,6 +2,13 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Supply drops
+
+### Added
+- Once a town, after the first horde, a red flare goes up on open ground a fair walk away and a supply crate lands on it ten seconds later: a round kit, two double boxes of ammo, a medkit, and a large jewel (Campaign) or a gun part (Arcade). The flare hisses the whole time and the crate lands loud, so the town comes too.
+- `drop_called` and `drop_landed` events, `SnapshotPacket.drop`, a SUPPLY DROP banner, a red arrow on screen, a red box on the town map (with a key entry) and dust when it lands.
+- Spot and contents are rolled from the town's seed on their own generator (`shared/supply-drop.ts`), so the simulation's rolls are unchanged. Tests in `tests/supply-drop.spec.ts`.
+
 ## [2026-11-07] - Molotovs and flares
 
 ### Added

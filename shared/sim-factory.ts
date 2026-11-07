@@ -72,6 +72,8 @@ export function createSimState(options: SimulationOptions): SimState {
     tracks: [],
     fires: [],
     flares: [],
+    drop: null,
+    dropDone: false,
     players: [],
     departed: new Map(),
     zombies: [],

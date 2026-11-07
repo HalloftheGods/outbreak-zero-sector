@@ -145,6 +145,7 @@ export function isSnapshotPacket(v: unknown): v is SnapshotPacket {
     && Array.isArray(v.bullets) && v.bullets.every(isBulletEntity)
     && Array.isArray(v.pickups) && v.pickups.every(isPickupEntity)
     && (v.exit === null || isExitEntity(v.exit))
+    && (v.drop === undefined || (isFields(v.drop) && hasNumbers(v.drop, ['x', 'y']) && typeof v.drop.landed === 'boolean'))
     && Array.isArray(v.openedContainers)
     && v.openedContainers.every(isNumber)
     && (v.tracks === undefined || (Array.isArray(v.tracks) && v.tracks.every(isTrackEntity)))

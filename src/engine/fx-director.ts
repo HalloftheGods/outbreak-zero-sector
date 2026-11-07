@@ -1,4 +1,5 @@
 import { MUZZLE_OFFSET } from '../../shared/constants.ts';
+import { FLARE_SEC } from '../../shared/throwables.ts';
 import type { EntityId, GameEvent, PickupType, WeaponId, ZombieType } from '../../shared/protocol.ts';
 import { dirFromAngle } from '../art/types.ts';
 import type { ArtBook, PixelSprite } from '../art/types.ts';
@@ -15,6 +16,7 @@ const ACID = ['#a9d94a', '#6d9c22', '#d4f07a'];
 const SPARK = ['#fff0b8', '#ffc04a', '#ff8e2e'];
 const BOTTLE_GLASS = ['#8c8c56', '#c4f048', '#e4f0c0'];
 const FLAMES = ['#ffd27a', '#ff9a2e', '#ff5a1c', '#c4300f'];
+const DUST = ['#8a7a5c', '#b3a27a', '#5e523e'];
 const FLARE_SPARKS = ['#ffd0d0', '#ff4a3c', '#ff7a5c'];
 /** Flames and sparks a second for a pool of fire and for a flare. */
 const FIRE_DOTS_PER_SEC = 70;
@@ -160,6 +162,8 @@ export class FxDirector {
       case 'bottle_smash': this.onBottleSmash(event.x, event.y); break;
       case 'molotov_burst': this.onMolotov(event.x, event.y, event.radius, event.sec); break;
       case 'flare_lit': this.onFlare(event.x, event.y, event.sec); break;
+      case 'drop_called': this.onFlare(event.x, event.y, FLARE_SEC); break;
+      case 'drop_landed': this.onDropLanded(event.x, event.y); break;
       case 'car_alarm': this.particles.addText('CAR ALARM', event.x, event.y - NOTE_HEIGHT, SCORE_COLOR); break;
       case 'zombie_status': this.onZombieStatus(event); break;
       case 'overrun_breach': this.effects.addShake(OVERRUN_BURST_SHAKE); break;
@@ -315,6 +319,15 @@ export class FxDirector {
     this.pulses.push({ x, y, radius: radius * 4, color: '#ff8a1c', life: 0.3, maxLife: 0.3 });
     this.burning.push({ kind: 'fire', x, y, radius, left: sec, owed: 0 });
     this.effects.addShake(0.3);
+  }
+
+  /** The crate hits the street: dust, splinters and a thump felt by anyone near. */
+  private onDropLanded(x: number, y: number): void {
+    this.burstDots(x, y, -Math.PI / 2, DUST, 26, 110, false, Math.PI);
+    this.particles.addClip(this.art.fx.smokePuff, x + spread(8), y - 4, false);
+    this.particles.addClip(this.art.fx.smokePuff, x + spread(12), y - 2, false);
+    this.particles.addText('SUPPLIES', x, y - NOTE_HEIGHT, PICKUP_COLOR);
+    this.effects.addShake(0.35);
   }
 
   private onFlare(x: number, y: number, sec: number): void {

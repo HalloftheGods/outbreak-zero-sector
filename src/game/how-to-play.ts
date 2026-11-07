@@ -64,6 +64,7 @@ export const HOW_TO_SECTIONS: readonly HowToSection[] = [
       'Fuel from garages, warehouses and diners turns a bottle into a molotov: a pool of fire for five seconds that sets alight whatever walks through. Including you.',
       'Fuel and flares stay in the town they were found in. Use them before the van.',
       'Stay quiet and let them wander past.',
+      'After the first horde, a red flare goes up and a supply crate comes down on it: ammo, a medkit, a round kit and something better. The flare hisses until it lands, so you will not be the only one heading there.',
       'From level 3, grey screamers roam. One that spots you calls everything nearby. Shoot it first, or stay out of its sight.',
       'Some towns bend the rules: floodwater slows you, a blackout hides you but carries sound, fresh snow keeps your footprints.',
     ],

@@ -254,6 +254,8 @@ export class AudioEngine {
         mixer.play('ignite', { x: e.x, y: e.y, pitch: 0.7 });
         break;
       case 'flare_lit': mixer.play('ignite', { x: e.x, y: e.y, pitch: 1.4 }); break;
+      case 'drop_called': mixer.play('ignite', { x: e.x, y: e.y, pitch: 1.4 }); break;
+      case 'drop_landed': mixer.play('distant_crash', { x: e.x, y: e.y }); break;
       case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;
       case 'wave_start': mixer.play('wave_start'); break;
       case 'overrun_warning': this.ambient(e.step === 0 ? 'distant_groan' : 'distant_crash'); break;
