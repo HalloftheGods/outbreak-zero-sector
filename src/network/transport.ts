@@ -14,7 +14,7 @@ export interface ConnectOptions {
   readonly startLevel?: number;
   /** The gear and highest level this player brings to a Campaign run. */
   readonly home?: JoinHome;
-  /** Solo plays in this style, and left off that is Arcade. In co-op the room decides, so `SocketSession.join` is told instead. */
+  /** Solo plays in this style, and left off that is Arcade. In co-op the room decides, so `RemoteSession.join` is told instead. */
   readonly style?: GameStyle;
 }
 

@@ -4,7 +4,9 @@ import { closeText, FRIEND_NEEDS_UPDATE_TEXT, NEEDS_UPDATE_TEXT, UPDATE_REASON }
 import type { GameStyle } from '../shared/game-style.ts';
 import { PROTOCOL_VERSION, type SnapshotPacket, type WelcomePacket } from '../shared/protocol.ts';
 import { LocalSession } from '../src/network/local-session.ts';
-import { SocketSession } from '../src/network/socket-session.ts';
+import { createSocketSession } from '../src/network/socket-session.ts';
+import { RemoteSession } from '../src/network/remote-session.ts';
+import type { PacketPipe } from '../src/network/packet-pipe.ts';
 import { TickClock } from '../src/network/tick-clock.ts';
 
 const TICK_MS = TICK_DT * 1000;
@@ -155,12 +157,12 @@ class FakeSocket {
   }
 }
 
-describe('SocketSession', () => {
+describe('SocketSession (ws link)', () => {
   const welcome = JSON.stringify({ type: 'welcome', yourId: 'a', tickRate: 30, mapSeed: 7 });
 
   function connect() {
     vi.stubGlobal('WebSocket', FakeSocket);
-    const session = new SocketSession('ws://host:8097');
+    const session = createSocketSession('ws://host:8097');
     const closed: string[] = [];
     const welcomes: WelcomePacket[] = [];
     session.onClosed = (reason) => closed.push(reason);

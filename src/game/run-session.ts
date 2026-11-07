@@ -7,7 +7,8 @@ import type { SnapshotPacket, WelcomePacket, WorldMap } from '../../shared/proto
 import type { AudioEngine } from '../audio/audio-engine.ts';
 import type { WorldRenderer } from '../engine/world-renderer.ts';
 import { LocalSession } from '../network/local-session.ts';
-import { resolveServerUrl, SocketSession } from '../network/socket-session.ts';
+import type { RemoteSession } from '../network/remote-session.ts';
+import { createSocketSession, resolveServerUrl } from '../network/socket-session.ts';
 import type { GameTransport } from '../network/transport.ts';
 import type { BenchLink } from './bench-link.ts';
 import { ClientWorld } from './client-world.ts';
@@ -98,7 +99,7 @@ export class RunSession {
     }
     this.host.audio.playUi('start');
     this.host.publish({ mode: 'coop', error: null, connecting: true });
-    const session = new SocketSession(url);
+    const session = createSocketSession(url);
     session.onRoom = (room) => this.answerRoom(session, room ?? style);
     this.beginSession(session, style);
   }
@@ -201,7 +202,7 @@ export class RunSession {
   }
 
   /** The room has said what it plays, and the screens, the music and the save follow it. */
-  private answerRoom(session: SocketSession, style: GameStyle): void {
+  private answerRoom(session: RemoteSession, style: GameStyle): void {
     this.followStyle(style);
     if (playsFromHome(style)) {
       this.readHome(session, (home) => session.join(style, home));
