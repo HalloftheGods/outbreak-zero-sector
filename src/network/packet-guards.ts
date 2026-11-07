@@ -58,6 +58,8 @@ export function isPlayerEntity(v: unknown): v is PlayerEntity {
     && (v.indoors === null || isString(v.indoors))
     && (v.gear === undefined || isPlayerGear(v.gear))
     && (v.bottles === undefined || isNumber(v.bottles))
+    && (v.fuel === undefined || isNumber(v.fuel))
+    && (v.flares === undefined || isNumber(v.flares))
     && (v.stamina === undefined || isNumber(v.stamina))
     && isFlag(v.winded)
     && (v.home === undefined || isHomeView(v.home))

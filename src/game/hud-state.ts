@@ -54,6 +54,9 @@ export interface HudState {
   readonly medkits: number;
   /** Empty bottles to throw. */
   readonly bottles: number;
+  /** Fuel for molotovs (each also takes a bottle), and flares. */
+  readonly fuel: number;
+  readonly flares: number;
   readonly knife: boolean;
   readonly reload: number;
   readonly score: number;
@@ -169,6 +172,8 @@ export function buildHud(snapshot: SnapshotPacket, local: PlayerEntity, spectati
     mags: local.mags,
     medkits: local.medkits,
     bottles: local.bottles ?? 0,
+    fuel: local.fuel ?? 0,
+    flares: local.flares ?? 0,
     knife: local.knife,
     reload: local.reload,
     score: local.score,

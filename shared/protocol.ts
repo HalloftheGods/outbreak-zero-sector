@@ -58,6 +58,9 @@ export interface PlayerEntity {
   knife: boolean;
   /** Empty bottles to throw. Left off at none. */
   bottles?: number;
+  /** Fuel for molotovs, and flares, found in this town. Left off at none. */
+  fuel?: number;
+  flares?: number;
   /** Sprint stamina, 1 full to 0 empty. Left off while full. */
   stamina?: number;
   /** Ran dry: sprint is off until the bar refills past the re-arm mark. Left off when not. */
@@ -185,9 +188,13 @@ export type GameEvent =
   | { readonly type: 'player_revived'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'player_dead'; readonly playerId: EntityId; readonly x: number; readonly y: number }
   | { readonly type: 'pickup'; readonly playerId: EntityId; readonly pickup: PickupType; readonly x: number; readonly y: number }
-  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean }
+  | { readonly type: 'container_opened'; readonly playerId: EntityId; readonly container: number; readonly x: number; readonly y: number; readonly found: boolean; readonly noisy: boolean; readonly bottle?: boolean; readonly stash?: 'fuel' | 'flare' }
   /** A thrown bottle broke at x,y, thrown from fromX,fromY. */
   | { readonly type: 'bottle_smash'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number }
+  /** A molotov broke at x,y and left a pool of fire `radius` wide for `sec`. */
+  | { readonly type: 'molotov_burst'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number; readonly radius: number; readonly sec: number }
+  /** A flare landed at x,y and burns for `sec`. */
+  | { readonly type: 'flare_lit'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number; readonly sec: number }
   | { readonly type: 'car_alarm'; readonly x: number; readonly y: number }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
@@ -233,6 +240,10 @@ export interface ClientInputPacket {
   readonly search: boolean;
   /** Throw a bottle at the crosshair. Left off when not. */
   readonly throw?: boolean;
+  /** Light a bottle with fuel and throw it. Left off when not. */
+  readonly molotov?: boolean;
+  /** Throw a lit flare. Left off when not. */
+  readonly flare?: boolean;
   /** The sneak key is held. Left off when not. Wins over sprint when both are held. */
   readonly sneak?: boolean;
   /** The sprint key is held. Left off when not. */

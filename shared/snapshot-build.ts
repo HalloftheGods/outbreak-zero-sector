@@ -89,6 +89,8 @@ export function playerSnapshot(p: PlayerState): PlayerEntity {
     medkits: p.medkits,
     knife: p.knife,
     ...(p.bottles > 0 ? { bottles: p.bottles } : {}),
+    ...(p.fuel > 0 ? { fuel: p.fuel } : {}),
+    ...(p.flares > 0 ? { flares: p.flares } : {}),
     ...staminaField(p),
     search: round2(p.search),
     indoors: p.indoors,

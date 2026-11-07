@@ -1,3 +1,4 @@
+import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type {
   BulletEntity,
@@ -53,12 +54,17 @@ export interface PlayerHome extends Omit<HomeView, 'overrun' | 'chest'> {
 }
 
 /** Magazines live in `guns` and are read out for snapshots, so there is one copy of the count. */
-export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'home'> {
+export interface PlayerState extends Omit<PlayerEntity, 'mags' | 'gear' | 'bottles' | 'fuel' | 'flares' | 'home'> {
   bottles: number;
+  /** Fuel for molotovs and flares to throw, found in town and left there (`shared/throwables.ts`). */
+  fuel: number;
+  flares: number;
   /** Null outside home mode. */
   home: PlayerHome | null;
   /** A throw asked for and not yet made. */
   throwQueued: boolean;
+  molotovQueued: boolean;
+  flareQueued: boolean;
   throwCooldown: number;
   parts: PartCounts;
   kits: KitCounts;
@@ -263,6 +269,9 @@ export interface SimState {
   noises: Point[];
   /** Footprints in a snowy town, oldest first. */
   tracks: Footprint[];
+  /** Pools of molotov fire and lit flares, burning down. */
+  fires: FireState[];
+  flares: FlareState[];
   players: PlayerState[];
   /** Who left this run, by reconnect token, as they stood when they went. */
   departed: Map<string, PlayerState>;

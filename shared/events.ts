@@ -18,7 +18,7 @@ export const PICKUP_TYPES = [
 export const GAME_EVENT_TYPES = [
   'shot', 'dry_fire', 'melee', 'heal', 'zombie_alert', 'zombie_track', 'reload_start', 'reload_end', 'weapon_switch', 'bullet_impact',
   'zombie_hit', 'zombie_status', 'headshot', 'zombie_die', 'zombie_attack', 'bloater_burst', 'player_hurt',
-  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'car_alarm', 'wave_intermission',
+  'player_downed', 'player_revived', 'player_dead', 'pickup', 'container_opened', 'bottle_smash', 'molotov_burst', 'flare_lit', 'car_alarm', 'wave_intermission',
   'wave_start', 'wave_clear', 'exit_open', 'level_complete', 'level_start', 'game_over', 'trip_start',
   'overrun_warning', 'overrun_breach', 'overrun_end',
 ] as const;

@@ -70,6 +70,8 @@ export function createSimState(options: SimulationOptions): SimState {
     topUpTimer: 0,
     noises: [],
     tracks: [],
+    fires: [],
+    flares: [],
     players: [],
     departed: new Map(),
     zombies: [],

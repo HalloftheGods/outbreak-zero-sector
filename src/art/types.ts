@@ -147,6 +147,9 @@ export interface UiArt {
   readonly heart: PixelSprite;
   /** The HUD's count of bottles to throw. */
   readonly bottle: PixelSprite;
+  /** The HUD's count of fuel for molotovs, and of flares. */
+  readonly fuelCan: PixelSprite;
+  readonly flare: PixelSprite;
   readonly skull: PixelSprite;
   /** Title lockup for the menu and game over screens. */
   readonly logo: PixelSprite;

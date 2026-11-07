@@ -24,6 +24,8 @@ function resetKit(p: PlayerState, spareRounds: number): void {
   p.medkits = 0;
   p.knife = false;
   p.bottles = START_BOTTLES;
+  p.fuel = 0;
+  p.flares = 0;
   p.parts = noParts();
   p.kits = noKits();
   p.owned = ['pistol'];
