@@ -3,6 +3,7 @@ import { CHARACTERS } from '../shared/characters.ts';
 import {
   parseGuestSignal,
   parseHostSignal,
+  parseIceServers,
   parseToGuestSignal,
   parseToHostSignal,
   SIGNAL_MAX_BYTES,
@@ -72,5 +73,32 @@ describe('relayed signals', () => {
     expect(parseToGuestSignal(json({ type: 'peer-left' }))).toEqual({ type: 'peer-left' });
     expect(parseToGuestSignal(json({ type: 'ice', ice }))).toMatchObject({ type: 'ice' });
     expect(parseToGuestSignal(json({ type: 'offer', sdp: 'v=0' }))).toBeNull();
+  });
+});
+
+describe('ICE servers on ready and admitted', () => {
+  const stun = { urls: 'stun:stun.cloudflare.com:3478' };
+  const turn = { urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'u', credential: 'c' };
+
+  it('reads ready on the host side and admitted on the guest side', () => {
+    expect(parseToHostSignal(json({ type: 'ready', iceServers: [stun, turn], relayOnly: true }))).toEqual({
+      type: 'ready',
+      iceServers: [stun, turn],
+      relayOnly: true,
+    });
+    expect(parseToGuestSignal(json({ type: 'admitted', peerId: 'p1', iceServers: [stun], relayOnly: false }))).toEqual({
+      type: 'admitted',
+      peerId: 'p1',
+      iceServers: [stun],
+      relayOnly: false,
+    });
+  });
+
+  it('refuses an empty or malformed server list', () => {
+    expect(parseToHostSignal(json({ type: 'ready', iceServers: [], relayOnly: true }))).toBeNull();
+    expect(parseToHostSignal(json({ type: 'ready', iceServers: [{ urls: [] }], relayOnly: true }))).toBeNull();
+    expect(parseToHostSignal(json({ type: 'ready', iceServers: [stun] }))).toBeNull();
+    expect(parseToGuestSignal(json({ type: 'admitted', iceServers: [stun], relayOnly: false }))).toBeNull();
+    expect(parseIceServers([{ urls: 'stun:x', username: 5 }])).toBeNull();
   });
 });

@@ -73,6 +73,8 @@ export interface MatchRequest {
   readonly highest?: number;
   /** Rooms to skip, newest first. At most MAX_AVOID. */
   readonly avoid?: readonly string[];
+  /** Used only if no room fits and this player becomes the host. Left off it is 'desktop'. */
+  readonly device?: HostDevice;
 }
 
 export const MAX_AVOID = 5;
