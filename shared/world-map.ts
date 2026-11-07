@@ -111,7 +111,7 @@ function lightsFor(props: readonly PropInstance[], rng: Rng): MapLight[] {
       const roll = rng();
       if (roll < 0.25) continue; // Dead lamp: dark gaps keep the flashlight useful.
       const color = roll < 0.55 ? COOL : SODIUM;
-      lights.push({ x: prop.x, y: prop.y + 2, radius: 104, color, flicker: roll > 0.92 });
+      lights.push({ x: prop.x, y: prop.y + 2, radius: 104, color, flicker: roll > 0.85 });
     }
   }
   return lights;

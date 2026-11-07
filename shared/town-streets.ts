@@ -10,7 +10,7 @@ const ACROSS = 1;
 const DOWN = 2;
 const JUNCTION = ACROSS | DOWN;
 /** Longest stretch of kerb between two lamps on the same side. */
-const LAMP_SPACING_TILES = 12;
+const LAMP_SPACING_TILES = 18;
 const WRECK_SPACING_TILES = 22;
 const END_MARGIN_TILES = 6;
 

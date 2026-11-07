@@ -49,7 +49,7 @@ export function fillParking(b: MapBuilder, lot: Box): void {
 /** Lamps on the lot's corners and, on a long side, at an even pitch between them. */
 function lightLot(b: MapBuilder, lot: Box): void {
   const edge = 14;
-  const pitch = 12 * TILE_SIZE;
+  const pitch = 18 * TILE_SIZE;
   for (const y of [lot.y0 + edge + 4, lot.y1 - edge]) {
     const span = lot.x1 - lot.x0 - 2 * edge;
     const gaps = Math.max(1, Math.round(span / pitch));
@@ -59,7 +59,7 @@ function lightLot(b: MapBuilder, lot: Box): void {
 
 /** Lamps beside a straight path, alternating sides, clear of the middle where the safe square is. */
 function lightPath(b: MapBuilder, from: number, to: number, centre: number, horizontal: boolean, clear: number, pathAt: number): void {
-  const pitch = 10 * TILE_SIZE;
+  const pitch = 15 * TILE_SIZE;
   let north = true;
   for (const sign of [-1, 1]) {
     for (let at = centre + sign * clear; at > from && at < to; at += sign * pitch) {
