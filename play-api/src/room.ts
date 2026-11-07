@@ -199,7 +199,9 @@ export class Room extends DurableObject<Env> {
     const signal = parseHostSignal(text);
     const now = Date.now();
     if (now - at.openedAt > HOST_AUTH_MS) return shut(ws, POLICY, 'auth too late');
-    if (signal?.type !== 'auth' || !sameText(await sha256Hex(signal.hostKey), meta.hostKeyHash)) {
+    // Anything else that races ahead of the auth answer (a report, say) is dropped; the deadline still holds.
+    if (signal?.type !== 'auth') return;
+    if (!sameText(await sha256Hex(signal.hostKey), meta.hostKeyHash)) {
       logEvent('host_refused', 'bad_key');
       return shut(ws, POLICY, 'bad host key');
     }

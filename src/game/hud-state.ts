@@ -149,6 +149,8 @@ export interface UiState {
   readonly leaderboard: readonly LeaderboardEntry[];
   readonly callsign: string;
   readonly serverAddress: string;
+  /** The code of the online room this tab is hosting, for the host to share; null otherwise. */
+  readonly onlineRoom: string | null;
   readonly volume: number;
   readonly muted: boolean;
 }

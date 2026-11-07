@@ -28,13 +28,13 @@
         </div>
 
         <div class="setup-field" :class="{ 'is-hidden': !serverShown }" :aria-hidden="!serverShown || undefined">
-          <label class="px-label" :for="SERVER_FIELD_ID">Server address</label>
+          <label class="px-label" :for="SERVER_FIELD_ID">{{ online ? 'Room code or server' : 'Server address' }}</label>
           <div class="setup-server">
             <input
               :id="SERVER_FIELD_ID"
               class="px-input px-frame"
               :value="ui.serverAddress"
-              :placeholder="defaultServer"
+              :placeholder="online ? 'BLANK HOSTS ONLINE' : defaultServer"
               autocomplete="off"
               spellcheck="false"
               @input="game.setServerAddress(textOf($event))"
@@ -78,7 +78,8 @@ import { trackTitlePage } from '../game/analytics/index.ts';
 import { setupLevelLines } from '../game/home-screens.ts';
 import { SERVER_FIELD_ID } from '../game/hud-state.ts';
 import type { UiState } from '../game/hud-state.ts';
-import { buildInviteLink } from '../game/invite-link.ts';
+import { buildInviteLink, buildRoomLink } from '../game/invite-link.ts';
+import { onlineRoomsLive } from '../network/play-api.ts';
 import { chosenStartLevel, continueLevel, isLevelUnlocked, loadLevelProgress } from '../game/level-progress.ts';
 import { advance, chooseMode, claimedStyle, playHeading, playStepper, retreat, returnTo, setupFailure, setupStyle, showsServer, showsStyleLabel, startFlow, startsRun, STYLE_LABELS } from '../game/play-flow.ts';
 import type { PlayMode, PlayStep } from '../game/play-flow.ts';
@@ -124,7 +125,13 @@ const actionLabel = computed(() => setupActionLabel(multi.value, ui.art !== null
 const failure = computed(() => setupFailure(flow.value.mode, runStyle.value, ui.error));
 const defaultServer = `${window.location.hostname}:${DEFAULT_SERVER_PORT}`;
 /** The address friends need: what is typed, or this host's default when the field is blank. */
-const inviteLink = computed(() => buildInviteLink(window.location.href, ui.serverAddress.trim() || defaultServer));
+/** A build with online rooms takes a room code in the same field, and a blank one hosts a new room. */
+const online = onlineRoomsLive();
+const inviteLink = computed(() => {
+  const typed = ui.serverAddress.trim();
+  if (online) return typed ? (buildRoomLink(window.location.href, typed) ?? buildInviteLink(window.location.href, typed)) : null;
+  return buildInviteLink(window.location.href, typed || defaultServer);
+});
 
 function textOf(event: Event): string {
   return (event.target as HTMLInputElement).value;

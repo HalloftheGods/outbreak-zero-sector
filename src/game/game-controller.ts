@@ -102,6 +102,7 @@ export class GameController {
       leaderboard: loadLeaderboard(),
       callsign: prefs.callsign || DEFAULT_PREFS.callsign,
       serverAddress: prefs.serverAddress,
+      onlineRoom: null,
       volume: this.audio.volume,
       muted: this.audio.muted,
     });
