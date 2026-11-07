@@ -72,7 +72,8 @@ export function headUnderAim(sim: SimState, p: PlayerState, range: number): Zomb
   sim.grid.query(aim.x, aim.y, HEAD_SEARCH, nearby);
   let front: ZombieState | null = null;
   for (const z of nearby) {
-    const aimedAt = z.health > 0 && isOnHead(z, aim.x, aim.y, marginFor(sim, p));
+    // A boss is drawn far bigger than its kind's head map, so it takes no headshots.
+    const aimedAt = z.health > 0 && z.boss === undefined && isOnHead(z, aim.x, aim.y, marginFor(sim, p));
     const nearerTheCamera = front === null || z.y > front.y;
     if (aimedAt && nearerTheCamera) front = z;
   }

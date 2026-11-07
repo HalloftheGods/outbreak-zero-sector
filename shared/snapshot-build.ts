@@ -4,7 +4,8 @@ import { exitEntity } from './level-exit.ts';
 import { gearField } from './gun-upgrades.ts';
 import { overrunView } from './overrun.ts';
 import { WEAPON_ORDER } from './protocol.ts';
-import type { DropView, ExitEntity, GameEvent, PlayerEntity, SnapshotPacket, WeaponId } from './protocol.ts';
+import { liveBoss } from './bosses.ts';
+import type { BossView, DropView, ExitEntity, GameEvent, PlayerEntity, SnapshotPacket, WeaponId } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { hordeHostiles } from './waves.ts';
 import { statusView } from './zombie-status.ts';
@@ -26,6 +27,11 @@ function roundEvent(event: GameEvent): GameEvent {
 }
 
 /** The drop once its flare is up: before that nobody knows where it will come down. */
+const bossField = (sim: SimState): { boss?: BossView } => {
+  const z = liveBoss(sim);
+  return z?.boss ? { boss: { id: z.boss, health: round2(z.health), maxHealth: z.maxHealth } } : {};
+};
+
 const dropField = (sim: SimState): { drop?: DropView } =>
   sim.drop && sim.drop.phase !== 'waiting' ? { drop: { x: round2(sim.drop.x), y: round2(sim.drop.y), landed: sim.drop.phase === 'landed' } } : {};
 
@@ -136,6 +142,7 @@ export function buildSnapshot(sim: SimState): SnapshotPacket {
       attacking: z.attacking,
       ...statusView(z),
       ...(z.trail && !z.trail.searching ? { tracking: true } : {}),
+      ...(z.boss ? { boss: z.boss } : {}),
     })),
     bullets: sim.bullets.map((b) => ({
       id: b.id,
@@ -150,6 +157,7 @@ export function buildSnapshot(sim: SimState): SnapshotPacket {
     exit: exitView(exitEntity(sim)),
     openedContainers: openedContainers(sim),
     ...dropField(sim),
+    ...bossField(sim),
     ...tracksField(sim, inRange),
     events,
     gameOver: sim.gameOver ? { ...sim.gameOver, players: sim.gameOver.players.map((p) => ({ ...p })) } : null,

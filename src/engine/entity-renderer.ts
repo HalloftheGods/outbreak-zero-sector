@@ -1,3 +1,4 @@
+import { BOSSES } from '../../shared/bosses.ts';
 import { PLAYER_RADIUS, ZOMBIES } from '../../shared/constants.ts';
 import { townContainers } from '../../shared/containers.ts';
 import { CHEST_SPOT } from '../../shared/bunker-map.ts';
@@ -20,7 +21,7 @@ import type { BuildingLayer, PlacedBuilding } from './building-layer.ts';
 import { chestPending, doorState, hiddenProp } from './overrun-look.ts';
 import { CHEST_HEIGHT } from './scene.ts';
 import type { SceneView } from './scene.ts';
-import { bodyHeight, clipFrame, drawSilhouette, drawSprite, spriteCanvas, strideFrame } from './sprite-cache.ts';
+import { bodyHeight, clipFrame, drawSilhouette, drawSprite, drawSpriteScaled, spriteCanvas, strideFrame } from './sprite-cache.ts';
 import { beginStatusFrame, paintBurn, paintEffectTrail, paintTint } from './status-fx.ts';
 import { SurvivorFrames } from './survivor-frames.ts';
 import { trackWalking } from './visuals.ts';
@@ -350,7 +351,8 @@ export class EntityRenderer {
   /** Centred on the planted soles, which hang a few rows below a zombie's anchor. */
   private drawZombieShadow(ctx: CanvasRenderingContext2D, zombie: ZombieEntity, left: number, top: number): void {
     const footDrop = this.art.zombies[zombie.type].footDrop ?? 0;
-    drawShadow(ctx, Math.round(zombie.x) - left, Math.round(zombie.y) - top + footDrop, ZOMBIES[zombie.type].radius * 2 + 2);
+    const scale = zombie.boss ? BOSSES[zombie.boss].scale : 1;
+    drawShadow(ctx, Math.round(zombie.x) - left, Math.round(zombie.y) - top + footDrop * scale, ZOMBIES[zombie.type].radius * 2 * scale + 2);
   }
 
   private lunge(sinceShove: number): number {
@@ -374,7 +376,9 @@ export class EntityRenderer {
     const x = Math.round(zombie.x) - left;
     const y = Math.round(zombie.y) - top;
     const flashing = time < visual.flashUntil;
-    if (flashing) drawSilhouette(ctx, sprite, x, y);
+    const boss = zombie.boss ? BOSSES[zombie.boss] : null;
+    if (boss) drawSpriteScaled(ctx, sprite, x, y, boss.scale, flashing);
+    else if (flashing) drawSilhouette(ctx, sprite, x, y);
     else {
       drawSprite(ctx, sprite, x, y);
       paintTint(ctx, zombie, sprite, x, y, time, this.reducedMotion);

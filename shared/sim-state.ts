@@ -1,4 +1,5 @@
 import type { SupplyDrop } from './supply-drop.ts';
+import type { BossState } from './bosses.ts';
 import type { KillChain } from './kill-chain.ts';
 import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
@@ -162,6 +163,8 @@ export interface ZombieState extends ZombieEntity {
   status?: ZombieStatus;
   /** A screamer's seconds until it can call again. Absent until it first has. */
   screamLeft?: number;
+  /** A boss's own clock and charge (`shared/bosses.ts`). Absent on everything else. */
+  bossState?: BossState;
   /** The snow trail it is following. Absent unless it is tracking someone. */
   trail?: ZombieTrail;
   /** Seconds until it will take up a trail again after losing one. Absent until it has. */

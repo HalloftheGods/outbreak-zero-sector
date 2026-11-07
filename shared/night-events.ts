@@ -25,7 +25,7 @@ export interface NightEvent {
 
 export const NIGHT_EVENTS: Readonly<Record<NightEventId, NightEvent>> = {
   fog: { id: 'fog', name: 'Fog', blurb: 'Nobody sees far tonight. Zombies walk right up before they spot you.', sight: 0.55, hearing: 1, horde: 1, points: 1 },
-  blood_moon: { id: 'blood_moon', name: 'Blood moon', blurb: 'Bigger hordes, and every kill is worth double.', sight: 1, hearing: 1, horde: 1.5, points: 2 },
+  blood_moon: { id: 'blood_moon', name: 'Blood moon', blurb: 'Hordes twice the size, and every kill is worth double.', sight: 1, hearing: 1, horde: 2, points: 2 },
   power_cut: { id: 'power_cut', name: 'Power cut', blurb: 'The lights are out. Zombies see less, but they hear further.', sight: 0.7, hearing: 1.3, horde: 1, points: 1 },
 };
 

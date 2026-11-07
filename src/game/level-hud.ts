@@ -1,5 +1,6 @@
 import { BUNKER_LEVEL } from '../../shared/home-protocol.ts';
 import { FINAL_LEVEL, levelDef } from '../../shared/levels.ts';
+import { BOSS_LEVELS, BOSSES } from '../../shared/bosses.ts';
 import { nightEventFor } from '../../shared/night-events.ts';
 import { townRule } from '../../shared/town-rules.ts';
 import type { HudState, LevelCard } from './hud-state.ts';
@@ -31,11 +32,14 @@ export function levelTitle(level: number, mapSeed: number | null = null): Omit<L
   const isLast = number === FINAL_LEVEL;
   const rule = townRule(level);
   const event = mapSeed === null ? null : nightEventFor(mapSeed, level);
+  const bossId = BOSS_LEVELS[level];
+  const boss = bossId ? BOSSES[bossId] : null;
   return {
     heading: isLast ? 'Final level' : `Level ${number} of ${FINAL_LEVEL}`,
     title,
     goal: `Survive ${hordes} hordes, then reach the van`,
     ...(rule ? { rule: `${rule.name}: ${rule.blurb}` } : {}),
     ...(event ? { event: `${event.name}. ${event.blurb}` } : {}),
+    ...(boss ? { boss: `${boss.name} comes with the last horde. ${boss.blurb}` } : {}),
   };
 }
