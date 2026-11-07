@@ -196,6 +196,9 @@ export type GameEvent =
   /** A flare landed at x,y and burns for `sec`. */
   | { readonly type: 'flare_lit'; readonly playerId: EntityId; readonly x: number; readonly y: number; readonly fromX: number; readonly fromY: number; readonly sec: number }
   | { readonly type: 'car_alarm'; readonly x: number; readonly y: number }
+  /** A flare went up at x,y: a supply crate comes down on it in `sec`. */
+  | { readonly type: 'drop_called'; readonly x: number; readonly y: number; readonly sec: number }
+  | { readonly type: 'drop_landed'; readonly x: number; readonly y: number }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
   | { readonly type: 'wave_clear'; readonly wave: number }
@@ -272,6 +275,8 @@ export interface SnapshotPacket {
   readonly exit: ExitEntity | null;
   /** Ids of the town's containers that have been opened, so everyone sees them open. */
   readonly openedContainers: readonly number[];
+  /** The town's supply drop, from its flare to the end of its marked time, sent to everyone. Left off otherwise. */
+  readonly drop?: DropView;
   /** Footprints in a snowy town near this viewer. Left off when there are none. */
   readonly tracks?: readonly TrackEntity[];
   /** Events since the previous snapshot, in order. */
@@ -281,6 +286,12 @@ export interface SnapshotPacket {
   readonly bench?: BenchView;
   /** The room's level pick and reach. Left off outside home mode. */
   readonly home?: RoomHomeView;
+}
+
+export interface DropView {
+  readonly x: number;
+  readonly y: number;
+  readonly landed: boolean;
 }
 
 export interface WelcomePacket {

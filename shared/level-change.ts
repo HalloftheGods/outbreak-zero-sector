@@ -38,6 +38,8 @@ function emptyWorld(sim: SimState, level: number): void {
   sim.tracks = [];
   sim.fires = [];
   sim.flares = [];
+  sim.drop = null;
+  sim.dropDone = false;
   sim.zombies = [];
   sim.bullets = [];
   sim.pickups = [];

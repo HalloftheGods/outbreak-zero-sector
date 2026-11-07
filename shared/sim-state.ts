@@ -1,3 +1,4 @@
+import type { SupplyDrop } from './supply-drop.ts';
 import type { FireState, FlareState } from './throwables.ts';
 import type { DifficultyId } from './difficulty.ts';
 import type {
@@ -272,6 +273,10 @@ export interface SimState {
   /** Pools of molotov fire and lit flares, burning down. */
   fires: FireState[];
   flares: FlareState[];
+  /** This town's supply drop, from arming to the end of its marked time. */
+  drop: SupplyDrop | null;
+  /** The town has had its drop, or tried to and found no ground for it. */
+  dropDone: boolean;
   players: PlayerState[];
   /** Who left this run, by reconnect token, as they stood when they went. */
   departed: Map<string, PlayerState>;

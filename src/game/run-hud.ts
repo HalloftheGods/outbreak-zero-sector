@@ -117,7 +117,7 @@ export class RunHud {
     const ctx = this.townCanvas?.getContext('2d') ?? null;
     const scene = this.lastScene;
     const canPaint = ctx !== null && scene !== null;
-    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers);
+    if (canPaint) this.town?.paint(ctx, scene.players, scene.localId, scene.exit, scene.openedContainers, scene.drop);
   }
 
   onEvent(event: GameEvent, now: number): void {

@@ -1,14 +1,5 @@
 import type { Container } from '../../shared/containers.ts';
-import type {
-  BulletEntity,
-  EntityId,
-  ExitEntity,
-  GamePhase,
-  PickupEntity,
-  PlayerEntity,
-  TrackEntity,
-  ZombieEntity,
-} from '../../shared/protocol.ts';
+import type { BulletEntity, DropView, EntityId, ExitEntity, GamePhase, PickupEntity, PlayerEntity, TrackEntity, ZombieEntity } from '../../shared/protocol.ts';
 import type { MerchantId, OverrunView, StationId } from '../../shared/home-protocol.ts';
 
 export { CHEST_HEIGHT } from '../../shared/constants.ts';
@@ -48,6 +39,8 @@ export interface SceneView {
   readonly pickups: readonly PickupEntity[];
   /** The van out of town, once it has come. */
   readonly exit: ExitEntity | null;
+  /** The town's supply drop, from its flare until it stops being marked. */
+  readonly drop: DropView | null;
   /** Ids of the town's containers that have been opened. */
   readonly openedContainers: readonly number[];
   /** Footprints in the snow, drawn on the ground. Absent outside a snowy town. */
@@ -86,6 +79,7 @@ export const EMPTY_SCENE: SceneView = {
   bullets: [],
   pickups: [],
   exit: null,
+  drop: null,
   openedContainers: [],
   searchable: null,
   localId: null,

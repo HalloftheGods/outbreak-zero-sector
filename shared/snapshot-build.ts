@@ -4,7 +4,7 @@ import { exitEntity } from './level-exit.ts';
 import { gearField } from './gun-upgrades.ts';
 import { overrunView } from './overrun.ts';
 import { WEAPON_ORDER } from './protocol.ts';
-import type { ExitEntity, GameEvent, PlayerEntity, SnapshotPacket, WeaponId } from './protocol.ts';
+import type { DropView, ExitEntity, GameEvent, PlayerEntity, SnapshotPacket, WeaponId } from './protocol.ts';
 import type { PlayerState, SimState } from './sim-state.ts';
 import { hordeHostiles } from './waves.ts';
 import { statusView } from './zombie-status.ts';
@@ -24,6 +24,10 @@ function roundEvent(event: GameEvent): GameEvent {
   }
   return copy as unknown as GameEvent;
 }
+
+/** The drop once its flare is up: before that nobody knows where it will come down. */
+const dropField = (sim: SimState): { drop?: DropView } =>
+  sim.drop && sim.drop.phase !== 'waiting' ? { drop: { x: round2(sim.drop.x), y: round2(sim.drop.y), landed: sim.drop.phase === 'landed' } } : {};
 
 const exitView = (exit: ExitEntity | null): ExitEntity | null => exit && { ...exit, progress: round2(exit.progress) };
 
@@ -145,6 +149,7 @@ export function buildSnapshot(sim: SimState): SnapshotPacket {
     pickups: sim.pickups.filter(inRange).map((item) => ({ id: item.id, type: item.type, x: round2(item.x), y: round2(item.y) })),
     exit: exitView(exitEntity(sim)),
     openedContainers: openedContainers(sim),
+    ...dropField(sim),
     ...tracksField(sim, inRange),
     events,
     gameOver: sim.gameOver ? { ...sim.gameOver, players: sim.gameOver.players.map((p) => ({ ...p })) } : null,

@@ -77,6 +77,7 @@ export function refusalNote(player: PlayerEntity, type: PickupType): string | nu
 const SET_BANNERS: Partial<Record<GameEvent['type'], Omit<Banner, 'key'>>> = {
   wave_clear: { title: 'THE HORDE MOVES ON', subtitle: 'FOR NOW', tone: 'quiet' },
   exit_open: { title: 'THE VAN IS HERE', subtitle: 'GET EVERYONE ON BOARD', tone: 'hope' },
+  drop_called: { title: 'SUPPLY DROP', subtitle: 'FOLLOW THE RED FLARE', tone: 'hope' },
 };
 
 /** The loud banner for a horde or the van, or null for anything else. */
