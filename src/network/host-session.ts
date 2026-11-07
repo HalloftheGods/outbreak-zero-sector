@@ -24,6 +24,8 @@ export const KEEPALIVE_MS = 20_000;
 /** A dropped signal socket tries again this often, inside the Room's 2 minute grace. */
 export const SIGNAL_RETRY_MS = 5_000;
 export const SIGNAL_GRACE_MS = 2 * 60_000;
+/** How long a guest whose signaling ended may still take to open this end of its channel. */
+export const GUEST_SETUP_MS = 15_000;
 /** Where the host keeps its key, so a dropped signal socket can come back. Per tab, never in a URL. */
 const HOST_KEY_STORE = 'outbreak.hostKey';
 
@@ -46,12 +48,15 @@ interface Guest {
   hosted: HostedPeer | null;
   remoteSet: boolean;
   early: IceCandidate[];
+  /** Set once the Room says the guest left signaling while this end is still connecting. */
+  setupDeadline: ReturnType<typeof setTimeout> | null;
 }
 
 /** What the room tells the Lobby, read from the host's own snapshots. */
 export function reportOf(snapshot: SnapshotPacket): RoomReport {
   const taken = snapshot.players.reduce((bits, player) => bits | (1 << player.skin), 0);
-  return { seats: snapshot.players.length, taken, level: snapshot.level, highest: snapshot.level, phase: 'playing', locked: false };
+  const phase = snapshot.phase === 'gameover' ? 'over' : 'playing';
+  return { seats: snapshot.players.length, taken, level: snapshot.level, highest: snapshot.level, phase, locked: false };
 }
 
 const sameReport = (a: RoomReport | null, b: RoomReport): boolean =>
@@ -67,6 +72,8 @@ export class HostSession implements RoomSession {
   onRoom: (style: GameStyle | null) => void = () => {};
   /** The room's code, once play-api has given it one: the host shares it with friends. */
   onHosted: (code: string) => void = () => {};
+  /** The signal socket did not come back in time: play goes on, but no new guest can join. */
+  onUnlisted: () => void = () => {};
 
   private options: ConnectOptions = { name: '' };
   private inner: RemoteSession | null = null;
@@ -186,6 +193,7 @@ export class HostSession implements RoomSession {
     const hosted = room.admit(peer, 'host');
     peer.onFrame = (text) => hosted?.receive(text, byteLength(text));
     peer.onClosed = () => hosted?.closed();
+    peer.onProbe = () => hosted?.heard();
   }
 
   // ---- Signaling ----
@@ -213,7 +221,7 @@ export class HostSession implements RoomSession {
     if (refused) return this.finish('The online room closed. Your game can no longer take new survivors.');
     const now = Date.now();
     this.signalLostAt ??= now;
-    if (now - this.signalLostAt >= SIGNAL_GRACE_MS) return;
+    if (now - this.signalLostAt >= SIGNAL_GRACE_MS) return this.onUnlisted();
     this.retry = setTimeout(() => {
       this.retry = null;
       if (!this.finished) this.openSignal();
@@ -237,9 +245,14 @@ export class HostSession implements RoomSession {
     } else if (signal.type === 'ice') {
       await this.addIce(signal.peerId, signal.ice);
     } else {
+      // A guest closes its signal socket as soon as its own end of the channel opens, which can be a moment
+      // before this end does. So a half-open guest gets a little longer before it is given up on.
       const guest = this.guests.get(signal.peerId);
-      // A guest closes its signal socket once its channel is up, so only a half-open one is dropped.
-      if (guest && guest.channel.readyState !== 'open') this.dropGuest(signal.peerId);
+      if (guest && guest.channel.readyState !== 'open' && guest.setupDeadline === null) {
+        guest.setupDeadline = setTimeout(() => {
+          if (this.guests.get(signal.peerId) === guest && guest.channel.readyState !== 'open') this.dropGuest(signal.peerId);
+        }, GUEST_SETUP_MS);
+      }
     }
   }
 
@@ -263,7 +276,7 @@ export class HostSession implements RoomSession {
     if (this.guests.has(peerId) || !this.room) return;
     const pc = this.rtc.peer(rtcConfig(this.iceServers, this.relayOnly));
     const channel = pc.createDataChannel('game', GAME_CHANNEL);
-    const guest: Guest = { pc, channel, hosted: null, remoteSet: false, early: [] };
+    const guest: Guest = { pc, channel, hosted: null, remoteSet: false, early: [], setupDeadline: null };
     this.guests.set(peerId, guest);
     pc.onicecandidate = (event) => {
       const ice = candidateOf(event);
@@ -273,6 +286,8 @@ export class HostSession implements RoomSession {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.dropGuest(peerId);
     };
     channel.onopen = () => {
+      if (guest.setupDeadline !== null) clearTimeout(guest.setupDeadline);
+      guest.setupDeadline = null;
       guest.hosted = this.room?.admit(this.peerOf(guest), peerId) ?? null;
     };
     channel.onmessage = (event) => {
@@ -334,6 +349,7 @@ export class HostSession implements RoomSession {
     const guest = this.guests.get(peerId);
     if (!guest) return;
     this.guests.delete(peerId);
+    if (guest.setupDeadline !== null) clearTimeout(guest.setupDeadline);
     guest.channel.onclose = null;
     guest.pc.onconnectionstatechange = null;
     guest.hosted?.closed();

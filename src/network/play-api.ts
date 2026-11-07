@@ -27,9 +27,12 @@ const LOOKUP_TEXT: Readonly<Record<number, string>> = {
 };
 const OFFLINE = 'Could not reach the online rooms. Check your connection.';
 
+/** A call that takes longer than this counts as unreachable, so a stuck network never leaves the player waiting. */
+export const API_TIMEOUT_MS = 10_000;
+
 async function call(fetcher: typeof fetch, url: string, init?: RequestInit): Promise<Response | null> {
   try {
-    return await fetcher(url, init);
+    return await fetcher(url, { ...init, signal: AbortSignal.timeout(API_TIMEOUT_MS) });
   } catch {
     return null;
   }
@@ -54,6 +57,11 @@ export async function createRoom(request: CreateRoomRequest, api: string = PLAY_
   });
   if (!response) return { ok: false, reason: OFFLINE };
   if (response.status === 429) return { ok: false, reason: 'You have opened too many games. Wait a while and try again.' };
-  if (!response.ok) return { ok: false, reason: 'The online rooms are busy. Try again in a moment.' };
-  return { ok: true, room: (await response.json()) as CreateRoomResult };
+  const busy = { ok: false, reason: 'The online rooms are busy. Try again in a moment.' } as const;
+  if (!response.ok) return busy;
+  try {
+    return { ok: true, room: (await response.json()) as CreateRoomResult };
+  } catch {
+    return busy;
+  }
 }

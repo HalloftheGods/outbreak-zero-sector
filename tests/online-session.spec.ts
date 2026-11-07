@@ -28,6 +28,16 @@ describe('loopback pipe', () => {
     expect(peer.open).toBe(false);
   });
 
+  it('answers a probe while open, so the host never drops its own player', () => {
+    const { peer } = loopbackPair();
+    let heard = 0;
+    peer.onProbe = () => (heard += 1);
+    peer.probe();
+    peer.close(1000, '');
+    peer.probe();
+    expect(heard).toBe(1);
+  });
+
   it('runs a RemoteSession: room, then a bye from the host ends it with the close text', async () => {
     const { pipe, peer } = loopbackPair();
     const session = new RemoteSession(pipe, words);
@@ -58,5 +68,6 @@ describe('room report', () => {
   it('counts seats and marks each taken survivor', () => {
     const snapshot = { level: 3, players: [{ skin: 0 }, { skin: 2 }] } as unknown as SnapshotPacket;
     expect(reportOf(snapshot)).toEqual({ seats: 2, taken: 0b101, level: 3, highest: 3, phase: 'playing', locked: false });
+    expect(reportOf({ ...snapshot, phase: 'gameover' } as SnapshotPacket).phase).toBe('over');
   });
 });

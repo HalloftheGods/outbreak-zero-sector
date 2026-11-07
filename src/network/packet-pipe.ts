@@ -31,7 +31,10 @@ export const DROPPED = 1006;
  * Two ends in one tab: the host's own player talks to its room with no network between. Delivery waits
  * a microtask, as a socket would, so neither side ever runs inside the other's send.
  */
-export function loopbackPair(): { pipe: PacketPipe; peer: PeerSocket & { onFrame: (text: string) => void; onClosed: () => void } } {
+export function loopbackPair(): {
+  pipe: PacketPipe;
+  peer: PeerSocket & { onFrame: (text: string) => void; onClosed: () => void; onProbe: () => void };
+} {
   let handlers: PipeHandlers | null = null;
   let open = true;
   const later = (fn: () => void): void => queueMicrotask(fn);
@@ -48,6 +51,8 @@ export function loopbackPair(): { pipe: PacketPipe; peer: PeerSocket & { onFrame
   const peer = {
     onFrame: (_text: string): void => {},
     onClosed: (): void => {},
+    /** Nothing can drop between two ends in one tab, so a probe is answered at once. */
+    onProbe: (): void => {},
     get open() {
       return open;
     },
@@ -57,7 +62,9 @@ export function loopbackPair(): { pipe: PacketPipe; peer: PeerSocket & { onFrame
     close: (code: number, reason: string) => shut(code, reason, true),
     drop: () => shut(DROPPED, '', true),
     canTakeFrame: () => true,
-    probe: () => {},
+    probe: () => {
+      if (open) peer.onProbe();
+    },
   };
   const pipe: PacketPipe = {
     open: (next) => {

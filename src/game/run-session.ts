@@ -119,6 +119,8 @@ export class RunSession {
       if (!text) {
         const hosting = new HostSession(style);
         hosting.onHosted = (code) => this.host.publish({ onlineRoom: code });
+        // The game goes on, but nobody new can join, so the invite stops being offered.
+        hosting.onUnlisted = () => this.host.publish({ onlineRoom: null });
         return hosting;
       }
       const code = normalizeRoomCode(text);
@@ -258,7 +260,7 @@ export class RunSession {
       transport.disconnect();
       // Left open, the next run would write through a save that never finished opening.
       home.close();
-      this.host.publish({ connecting: false, runStyle: null, error: HOME_UNREADABLE });
+      this.host.publish({ connecting: false, runStyle: null, onlineRoom: null, error: HOME_UNREADABLE });
     };
     void home.open(transport.kind).then(answer, giveUp);
   }
