@@ -1,3 +1,5 @@
+import { liveBoss } from '../shared/bosses.ts';
+import { damageZombie } from '../shared/combat.ts';
 import { describe, expect, it } from 'vitest';
 import { SPAWN_SCATTER, STANDING_POPULATION } from '../shared/constants.ts';
 import { FINAL_LEVEL, LEVELS, levelDef } from '../shared/levels.ts';
@@ -121,7 +123,7 @@ describe('the end of a run', () => {
 });
 
 describe('the whole run', () => {
-  /** Plays the run by the rules, with no bot in the way: every horde outlasted, every van boarded on foot. */
+  /** Plays the run by the rules, with no bot in the way: every horde outlasted (and every boss killed), every van boarded on foot. */
   function driveToVictory(seed: number): { readonly frames: readonly SnapshotPacket[]; readonly sim: GameSimulation } {
     const sim = new GameSimulation({ seed });
     sim.addPlayer('a', 'Ann');
@@ -131,6 +133,9 @@ describe('the whole run', () => {
       const [p] = state.players;
       p.health = p.maxHealth;
       state.zombies = state.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) > 200);
+      // A boss night's horde cannot be outlasted, only won: the boss has to fall.
+      const boss = liveBoss(state);
+      if (boss) damageZombie(state, boss, 1e6, 0, 'a');
       if (state.exit) {
         boardVan(sim, state);
         p.health = p.maxHealth;

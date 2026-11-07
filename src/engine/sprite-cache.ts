@@ -81,6 +81,15 @@ export function drawSprite(ctx: CanvasRenderingContext2D, sprite: PixelSprite, x
   ctx.drawImage(spriteCanvas(sprite), x - sprite.ax, y - sprite.ay);
 }
 
+/** A sprite drawn bigger, pixels kept square, still standing on its anchor. */
+export function drawSpriteScaled(ctx: CanvasRenderingContext2D, sprite: PixelSprite, x: number, y: number, scale: number, silhouette = false): void {
+  const smoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  const canvas = silhouette ? silhouetteCanvas(sprite) : spriteCanvas(sprite);
+  ctx.drawImage(canvas, Math.round(x - sprite.ax * scale), Math.round(y - sprite.ay * scale), Math.round(sprite.w * scale), Math.round(sprite.h * scale));
+  ctx.imageSmoothingEnabled = smoothing;
+}
+
 export function drawSilhouette(ctx: CanvasRenderingContext2D, sprite: PixelSprite, x: number, y: number): void {
   ctx.drawImage(silhouetteCanvas(sprite), x - sprite.ax, y - sprite.ay);
 }

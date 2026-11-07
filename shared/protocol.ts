@@ -19,6 +19,8 @@ export type EntityId = string;
 
 export type WeaponId = 'pistol' | 'carbine' | 'shotgun';
 export type ZombieType = 'walker' | 'runner' | 'bloater' | 'brute' | 'screamer';
+/** A boss is a zombie of an existing type grown huge (`shared/bosses.ts`). */
+export type BossId = 'howler' | 'mother' | 'butcher';
 export type PickupType = (typeof PICKUP_TYPES)[number];
 export type PlayerStatus = 'alive' | 'downed' | 'dead';
 export type GamePhase = (typeof GAME_PHASES)[number];
@@ -103,6 +105,8 @@ export interface ZombieEntity {
   slowed?: boolean;
   /** Following someone's prints in the snow. Left off unless true. */
   tracking?: boolean;
+  /** Which boss this is, drawn big. Left off for everything else. */
+  boss?: BossId;
 }
 
 /** A footprint in the snow, for drawing: where, which way it points, and seconds before it fills in. */
@@ -199,6 +203,7 @@ export type GameEvent =
   /** A flare went up at x,y: a supply crate comes down on it in `sec`. */
   | { readonly type: 'drop_called'; readonly x: number; readonly y: number; readonly sec: number }
   | { readonly type: 'drop_landed'; readonly x: number; readonly y: number }
+  | { readonly type: 'boss_arrive' | 'boss_trick' | 'boss_down'; readonly boss: BossId; readonly x: number; readonly y: number }
   | { readonly type: 'wave_intermission'; readonly wave: number; readonly seconds: number }
   | { readonly type: 'wave_start'; readonly wave: number; readonly hostiles: number }
   | { readonly type: 'wave_clear'; readonly wave: number }
@@ -277,6 +282,8 @@ export interface SnapshotPacket {
   readonly openedContainers: readonly number[];
   /** The town's supply drop, from its flare to the end of its marked time, sent to everyone. Left off otherwise. */
   readonly drop?: DropView;
+  /** The town's boss while it stands, sent to everyone wherever they are. Left off otherwise. */
+  readonly boss?: BossView;
   /** Footprints in a snowy town near this viewer. Left off when there are none. */
   readonly tracks?: readonly TrackEntity[];
   /** Events since the previous snapshot, in order. */
@@ -286,6 +293,12 @@ export interface SnapshotPacket {
   readonly bench?: BenchView;
   /** The room's level pick and reach. Left off outside home mode. */
   readonly home?: RoomHomeView;
+}
+
+export interface BossView {
+  readonly id: BossId;
+  readonly health: number;
+  readonly maxHealth: number;
 }
 
 export interface DropView {

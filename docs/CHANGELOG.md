@@ -2,12 +2,25 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Boss nights
+
+### Added
+- Levels 3, 6 and 9 are boss nights (`shared/bosses.ts`). The town's last horde brings a boss: a zombie of an existing kind grown huge, with far more health and a trick of its own. The horde does not end while it stands, and it leaves a medkit and a prize (a large jewel on a Campaign trip, a gun part otherwise) when it falls.
+  - **The Howler** (level 3, a giant screamer): every 7 seconds it screams across 700 pixels, and two runners come.
+  - **Mother** (level 6, a giant bloater): every 9 seconds she gives birth to three walkers.
+  - **The Butcher** (level 9, a giant brute): every 6 seconds, if anyone is within 260 pixels, it charges at 2.6 times its speed for 1.2 seconds.
+- A boss health bar across the top of the screen, a banner when it comes and when it falls, and a warning on the level card. Bosses are drawn at their size, and take no headshots, since their heads are far above their kind's.
+- `boss_arrive`, `boss_trick` and `boss_down` events, `SnapshotPacket.boss` and `ZombieEntity.boss`.
+
+### Changed
+- A blood moon now brings hordes twice the size (was 1.5 times).
+
 ## [2026-11-07] - Night events
 
 ### Added
 - About three towns in ten, from level 2, get a night event, drawn from the town's seed on a generator of its own (`shared/night-events.ts`):
   - **Fog**: zombies spot you from 55% of the usual range, and the town is washed grey.
-  - **Blood moon**: hordes half as big again, every kill worth double, and a red sky that pulses.
+  - **Blood moon**: hordes twice the size, every kill worth double, and a red sky that pulses.
   - **Power cut**: zombies see 70% as far and hear 30% further, and most lamps are dead. A blackout town gets fog instead.
 - The level card names the event ("Tonight: Fog. ..."), and the Daily Night page shows it next to the difficulty. The client works it out from the snapshot's map seed, so nothing new goes over the wire.
 
