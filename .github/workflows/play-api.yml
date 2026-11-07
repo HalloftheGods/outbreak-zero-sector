@@ -1,0 +1,87 @@
+name: Deploy play API
+
+# Deploys the play-api Worker (Lobby and Room Durable Objects) to Cloudflare, then rebuilds the Pages site
+# so a first deploy, or a new ZOMBIE_PLAY_API value, reaches players.
+#
+# Needs these repository secrets:
+#   CLOUDFLARE_API_TOKEN   a token with Workers Scripts: Edit, plus Workers Routes: Edit on the forthexp.com zone
+#   CLOUDFLARE_ACCOUNT_ID  the account the Worker lives in
+# and, for TURN (public rooms are relay only, so they need it; without it rooms get STUN only):
+#   TURN_KEY_ID, TURN_KEY_API_TOKEN   from a Cloudflare Realtime TURN key
+on:
+  push:
+    branches: [main]
+    paths:
+      - play-api/**
+      - shared/**
+      - .github/workflows/play-api.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: play-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: play-api
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TURN_KEY_ID: ${{ secrets.TURN_KEY_ID }}
+      TURN_KEY_API_TOKEN: ${{ secrets.TURN_KEY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: play-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - name: Deploy
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set, so this run only checks the build."
+            pnpm exec cf deploy --dry-run
+            exit 0
+          fi
+          args=(--message "${GITHUB_SHA::7}")
+          # Secrets are sent only when both are set, so an empty one never overwrites a secret set by hand.
+          if [ -n "$TURN_KEY_ID" ] && [ -n "$TURN_KEY_API_TOKEN" ]; then
+            printf '{"TURN_KEY_ID":"%s","TURN_KEY_API_TOKEN":"%s"}' "$TURN_KEY_ID" "$TURN_KEY_API_TOKEN" > "$RUNNER_TEMP/secrets.json"
+            args+=(--secrets-file "$RUNNER_TEMP/secrets.json")
+          else
+            echo "::warning::TURN_KEY_ID or TURN_KEY_API_TOKEN is not set, so rooms keep whatever TURN secrets the Worker already has."
+          fi
+          pnpm exec cf deploy "${args[@]}"
+          rm -f "$RUNNER_TEMP/secrets.json"
+      - name: Check the API answers
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -sf https://play-api.forthexp.com/health | grep -q undead-play-api; then echo "attempt $i: up"; exit 0; fi
+            echo "attempt $i: not answering yet"
+            sleep 10
+          done
+          echo "::error::play-api.forthexp.com did not answer after the deploy."
+          exit 1
+      - name: Rebuild the site
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${{ vars.ZOMBIE_PLAY_API }}" ]; then
+            echo "::warning::Set the repository variable ZOMBIE_PLAY_API to https://play-api.forthexp.com to show online rooms, then run Deploy to GitHub Pages."
+          else
+            gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+          fi
