@@ -91,6 +91,19 @@
         </dl>
       </div>
 
+      <div v-else-if="isStampLeaf" class="rb-stamps">
+        <p class="rb-tab">{{ book.tally }}</p>
+        <ul class="rb-stamp-grid">
+          <li v-for="card in stampsHere" :key="card.id" class="rb-stamp-card" :class="{ 'is-earned': card.earned !== null }">
+            <span class="rb-ring" :style="{ '--tilt': `${card.tilt}deg` }">
+              <span class="rb-ring-name">{{ card.name }}</span>
+              <span v-if="card.earned" class="rb-ring-date">{{ card.earned }}</span>
+            </span>
+            <span class="rb-ring-how">{{ card.how }}</span>
+          </li>
+        </ul>
+      </div>
+
       <ol v-else class="rb-week">
         <li v-for="line in book.week" :key="line.key" class="rb-week-line">
           <span class="rb-week-day">
@@ -113,7 +126,7 @@
 import { computed, useTemplateRef } from 'vue';
 import { usePageFit } from '../../game/magazine-fit.ts';
 import { RECORD_BOOK_TITLE } from '../../game/record-book.ts';
-import type { DailySummary, Leaf, LeafId, WeekLine } from '../../game/record-book.ts';
+import type { DailySummary, Leaf, LeafId, StampCard, WeekLine } from '../../game/record-book.ts';
 import type { RecordRow, RecordSection } from '../../game/title-menu.ts';
 
 export interface RecordBookData {
@@ -121,6 +134,8 @@ export interface RecordBookData {
   readonly rows: readonly RecordRow[];
   readonly daily: DailySummary;
   readonly week: readonly WeekLine[];
+  readonly stamps: Readonly<Record<'stamps' | 'more_stamps', readonly StampCard[]>>;
+  readonly tally: string;
 }
 
 interface LeafProps {
@@ -137,6 +152,8 @@ const KICKERS: Readonly<Record<LeafId, string>> = {
   ledger: 'Top five',
   daily: 'One town a day',
   week: 'This week',
+  stamps: 'Earned in play',
+  more_stamps: 'The long haul',
 };
 
 const DECKS: Readonly<Record<LeafId, string>> = {
@@ -144,6 +161,8 @@ const DECKS: Readonly<Record<LeafId, string>> = {
   ledger: 'Every run worth writing down, best first.',
   daily: 'The same town for everyone, drawn fresh at midnight.',
   week: 'Only the first run of a day counts. The rest are practice.',
+  stamps: 'Each one inked the day you earned it. An empty ring says how.',
+  more_stamps: 'Bosses, bad nights and the road home.',
 };
 
 const STAMPS: Readonly<Record<WeekLine['stamp'], string>> = { counted: 'Counted', missed: 'Missed', open: 'Tonight' };
@@ -151,6 +170,9 @@ const STAMPS: Readonly<Record<WeekLine['stamp'], string>> = { counted: 'Counted'
 /** The ledger always shows five lines, ruled and waiting. */
 const LEDGER_LINES = 5;
 const blanks = computed(() => Array.from({ length: Math.max(0, LEDGER_LINES - book.rows.length) }, (_, index) => index + 1));
+
+const isStampLeaf = computed(() => leaf.id === 'stamps' || leaf.id === 'more_stamps');
+const stampsHere = computed(() => (leaf.id === 'more_stamps' ? book.stamps.more_stamps : book.stamps.stamps));
 
 const pageRef = useTemplateRef<HTMLElement>('pageRef');
 usePageFit(pageRef);

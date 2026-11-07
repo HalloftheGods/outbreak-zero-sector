@@ -2,10 +2,14 @@ import { isBunkerSeed } from '../../shared/home-protocol.ts';
 import type { GameEvent, GameOverStats, PlayerEntity, SnapshotPacket } from '../../shared/protocol.ts';
 import type { ClientWorld } from './client-world.ts';
 import { recordGameFinished, recordLevelReached } from './level-progress.ts';
+import type { CalloutWords } from './kill-juice.ts';
 import { KillJuice } from './kill-juice.ts';
 import { HORDE_WIPED_BANNER, pickupNote } from './run-notices.ts';
 import { finishRun, healthFraction } from './run-hud.ts';
 import type { RunHost } from './run-session.ts';
+import { dateKeyOf, loadDailyLog, streakOf } from './daily-night.ts';
+import { StampKeeper, stampName } from './stamps.ts';
+import type { StampContext, StampId } from './stamps.ts';
 import { loadLeaderboard } from './storage.ts';
 import { loadBests } from './trip-record.ts';
 
@@ -19,6 +23,9 @@ export class SnapshotHandler {
   /** The bunker's music is the horde's while the blast door is breached. */
   private breached = false;
   private readonly juice = new KillJuice();
+  private readonly stamps = new StampKeeper();
+  /** Stamps earned while a kill callout had the screen, shown once it is free. */
+  private stampsToShow: StampId[] = [];
 
   constructor(
     private readonly host: RunHost,
@@ -37,6 +44,8 @@ export class SnapshotHandler {
       renderer?.reset();
       stage.rewind();
       this.juice.reset();
+      this.stamps.reload();
+      this.stampsToShow = [];
       this.beginRun();
     }
     stage.follow(world, snapshot, now);
@@ -56,7 +65,8 @@ export class SnapshotHandler {
     this.setMood(snapshot, world.latest === null);
     state.lastSnapshotMs = now;
     for (const event of snapshot.events) this.onGameEvent(event, world, now, before, after);
-    this.punctuate(snapshot, world.localId, after, now);
+    const callout = this.punctuate(snapshot, world.localId, after, now);
+    this.stamp(snapshot, world.localId, after, callout, now);
     world.push(snapshot, now);
     if (onATrip) home.observe(snapshot, world.localId, now);
     const justEnded = snapshot.gameOver !== null && state.runResult === null;
@@ -64,14 +74,37 @@ export class SnapshotHandler {
   }
 
   /** The kills in this snapshot that deserve a beat: a held frame, a flash, a word over the action. */
-  private punctuate(snapshot: SnapshotPacket, localId: string | null, after: PlayerEntity | null, now: number): void {
+  private punctuate(snapshot: SnapshotPacket, localId: string | null, after: PlayerEntity | null, now: number): CalloutWords | null {
     const beat = this.juice.read(snapshot.events, localId, healthFraction(after), now);
-    if (!beat) return;
+    if (!beat) return null;
     const { renderer, runHud } = this.host;
     if (beat.freezeMs > 0) this.host.hitStop(beat.freezeMs);
     if (beat.flash > 0) renderer?.effects.addFlash(beat.flash);
     if (beat.callout) runHud.callout(beat.callout, now);
     if (beat.hordeWiped) runHud.say(HORDE_WIPED_BANNER, now);
+    return beat.callout;
+  }
+
+  /** Reads the snapshot for stamps, and stamps one on screen when no kill callout has it. */
+  private stamp(snapshot: SnapshotPacket, localId: string | null, after: PlayerEntity | null, callout: CalloutWords | null, now: number): void {
+    const today = dateKeyOf(new Date());
+    const landed = snapshot.drop?.landed === true;
+    const ctx: StampContext = {
+      localId,
+      level: snapshot.level,
+      mapSeed: snapshot.mapSeed,
+      kills: after?.kills ?? 0,
+      drop: landed ? snapshot.drop! : null,
+    };
+    const earned = this.stamps.read(snapshot.events, ctx, today);
+    const closeShave = callout?.tone === 'close' ? this.stamps.give(['close_shave'], today) : [];
+    this.stampsToShow.push(...earned, ...closeShave);
+    const next = this.stampsToShow[0];
+    const free = callout === null && !this.host.runHud.calloutShowing(now);
+    const show = next !== undefined && free;
+    if (!show) return;
+    this.stampsToShow.shift();
+    this.host.runHud.callout({ text: `STAMP: ${stampName(next).toUpperCase()}`, tone: 'stamp' }, now);
   }
 
   /** Someone joining mid-horde gets no wave_start, so the first frame sets the mood. The bunker has its own. */
@@ -109,6 +142,12 @@ export class SnapshotHandler {
   enterGameOver(stats: GameOverStats, localId: string, now: number): void {
     const { state, input, audio } = this.host;
     state.runResult = finishRun(stats, localId, state.daily);
+    const today = dateKeyOf(new Date());
+    const daily = state.runResult.daily;
+    if (daily?.counted) {
+      const inARow = state.daily !== null && streakOf(loadDailyLog(), state.daily) >= 3;
+      this.stamps.give(inARow ? ['daily_bread', 'three_nights'] : ['daily_bread'], today);
+    }
     const won = stats.outcome === 'victory';
     if (won && state.daily === null) recordGameFinished();
     state.gameOverAtMs = now;

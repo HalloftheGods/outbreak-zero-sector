@@ -9,13 +9,15 @@ describe('the record book', () => {
     expect(openLeaves(0, 'spread').map((leaf) => leaf.id)).toEqual(['bests', 'ledger']);
     expect(openLeaves(3, 'spread').map((leaf) => leaf.id)).toEqual(['daily', 'week']);
     expect(openLeaves(2, 'single').map((leaf) => leaf.id)).toEqual(['daily']);
-    expect(leafLabel(0, 'spread')).toBe('Pages 1-2 of 4');
-    expect(leafLabel(3, 'single')).toBe('Page 4 of 4');
+    expect(openLeaves(5, 'spread').map((leaf) => leaf.id)).toEqual(['stamps', 'more_stamps']);
+    expect(leafLabel(0, 'spread')).toBe('Pages 1-2 of 6');
+    expect(leafLabel(3, 'single')).toBe('Page 4 of 6');
   });
 
   it('turns within the book and stops at its covers', () => {
     expect(turnLeaves(0, 1, 'spread')).toBe(2);
-    expect(turnLeaves(2, 1, 'spread')).toBe(2);
+    expect(turnLeaves(2, 1, 'spread')).toBe(4);
+    expect(turnLeaves(4, 1, 'spread')).toBe(4);
     expect(turnLeaves(0, -1, 'single')).toBe(0);
     expect(turnLeaves(1, 1, 'single')).toBe(2);
   });

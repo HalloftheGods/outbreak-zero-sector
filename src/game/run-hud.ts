@@ -175,6 +175,10 @@ export class RunHud {
     this.publish({ callout: this.notices.callout(words, now) });
   }
 
+  calloutShowing(now: number): boolean {
+    return this.notices.calloutShowing(now);
+  }
+
   /** A banner of the game's own, outside any event: a hint, or a question put to the player. */
   say(banner: Omit<Banner, 'key'>, now: number): void {
     this.publish({ banner: this.notices.banner(banner, now) });
