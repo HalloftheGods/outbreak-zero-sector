@@ -3,7 +3,7 @@
 // temples, heavy brows pressed down into a stern squint, a big nose, a bushy brown chevron
 // moustache over a thin set mouth, a stub of cigar in the corner and an old scar on the right
 // cheek. Rank chevrons on his sleeve, a khaki shirt and dark tie in the collar, a pocket flap,
-// and a clipboard gripped in his fist. Colours follow his stall figure (LOOKS in merchants.ts):
+// and a clipboard gripped in his fist. Colours follow his stall figure (merchant-people/quartermaster.ts):
 // olive coat o/p/q, cap olive, brown moustache. Lit from the upper left.
 //
 // k/K are ink, skin a-d, wood w/x/y/l for the moustache, brows, cigar and board, ash g/G for the
