@@ -249,6 +249,11 @@ export class AudioEngine {
       case 'pickup': mixer.play(PICKUP_SFX[e.pickup], at(e.x, e.y, e.playerId)); break;
       case 'container_opened': mixer.play(e.noisy ? 'clatter' : 'container_open', at(e.x, e.y, e.playerId)); break;
       case 'bottle_smash': mixer.play('glass_smash', { x: e.x, y: e.y }); break;
+      case 'molotov_burst':
+        mixer.play('glass_smash', { x: e.x, y: e.y });
+        mixer.play('ignite', { x: e.x, y: e.y, pitch: 0.7 });
+        break;
+      case 'flare_lit': mixer.play('ignite', { x: e.x, y: e.y, pitch: 1.4 }); break;
       case 'car_alarm': mixer.play('car_alarm', { x: e.x, y: e.y }); break;
       case 'wave_start': mixer.play('wave_start'); break;
       case 'overrun_warning': this.ambient(e.step === 0 ? 'distant_groan' : 'distant_crash'); break;

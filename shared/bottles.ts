@@ -22,11 +22,11 @@ export const CAR_ALARM_RADIUS = 420;
 /** Pulls back along the throw in this many pixels at a time until the line is clear of walls. */
 const BACKOFF_STEP = 6;
 
-/** Where a bottle thrown at the crosshair lands: no further than its range, and short of the first wall. */
-export function landingSpot(sim: SimState, p: PlayerState): Point {
-  const aimed = p.aim ?? { x: p.x + Math.cos(p.angle) * BOTTLE_RANGE, y: p.y + Math.sin(p.angle) * BOTTLE_RANGE };
+/** Where a bottle (or anything else thrown at the crosshair) lands: no further than its range, and short of the first wall. */
+export function landingSpot(sim: SimState, p: PlayerState, range = BOTTLE_RANGE): Point {
+  const aimed = p.aim ?? { x: p.x + Math.cos(p.angle) * range, y: p.y + Math.sin(p.angle) * range };
   const angle = Math.atan2(aimed.y - p.y, aimed.x - p.x);
-  let distance = Math.min(BOTTLE_RANGE, Math.hypot(aimed.x - p.x, aimed.y - p.y));
+  let distance = Math.min(range, Math.hypot(aimed.x - p.x, aimed.y - p.y));
   const spotAt = (reach: number): Point => ({ x: p.x + Math.cos(angle) * reach, y: p.y + Math.sin(angle) * reach });
   let spot = spotAt(distance);
   while (distance > 0 && segmentHitsSolid(sim.map, p.x, p.y, spot.x, spot.y)) {

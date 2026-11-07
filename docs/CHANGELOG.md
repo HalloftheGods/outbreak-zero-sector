@@ -2,6 +2,15 @@
 
 All notable changes to the Undead of Night: Last Round game are documented in this file.
 
+## [2026-11-07] - Molotovs and flares
+
+### Added
+- Fuel and flares, found by searching (fuel in garages, warehouses and diners; flares at the police station, in garages and in cars) and carried two of each. Which containers hold them is rolled from the town's seed on a generator of its own (`stashIn` in `shared/throwables.ts`), so the simulation's rolls are unchanged.
+- T throws a molotov (a bottle plus a fuel): a smash heard 240 pixels off, then a 30-pixel pool of fire for 5 seconds that lights every zombie that walks in and burns any survivor standing in it.
+- V throws a flare: a red light that hisses for 20 seconds, a noise every 1.5 seconds that keeps pulling zombies in.
+- HUD chips for fuel (greyed with no bottle to fill) and flares, new icons, flames and glow drawn from the `molotov_burst` and `flare_lit` events, and a How to Play note.
+- Fuel and flares stay in the town: the van leaves them behind. A molotov counts toward bottle quests.
+
 ## [2026-11-07] - Kills that land
 
 ### Added

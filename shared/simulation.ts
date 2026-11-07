@@ -26,6 +26,7 @@ import { diedOnLeaving } from './overrun-fight.ts';
 import { arriveInRoom, keepsBodyOnLeaving, leaveRoom, updateLeftBodies } from './trip-roster.ts';
 import { updateWaves } from './waves.ts';
 import { updateZombieStatuses } from './zombie-burn.ts';
+import { updateFires } from './throwables.ts';
 import { benchCommand, updateBench } from './workbench.ts';
 import type { BenchAction } from './workbench.ts';
 import { ageFootprints } from './snow-tracks.ts';
@@ -189,6 +190,7 @@ export class GameSimulation {
     rebuildZombieGrid(sim);
     for (const p of sim.players) updatePlayer(sim, p);
     ageFootprints(sim);
+    updateFires(sim);
     updateBullets(sim);
     updateZombieStatuses(sim);
     updateZombies(sim);
